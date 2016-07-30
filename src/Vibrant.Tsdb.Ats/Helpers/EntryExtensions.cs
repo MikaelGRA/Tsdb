@@ -5,9 +5,9 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats.Helpers
 {
-   public static class EntryExtensions
+   internal static class EntryExtensions
    {
-      public static IEnumerable<EntrySplitResult<TEntry>> SplitEntriesByPartitionAndTable<TEntry>( this IEnumerable<TEntry> entries )
+      public static IEnumerable<EntrySplitResult<TEntry>> SplitEntriesById<TEntry>( this IEnumerable<TEntry> entries )
          where TEntry : IEntry
       {
          var splitEntries = new Dictionary<string, EntrySplitResult<TEntry>>();

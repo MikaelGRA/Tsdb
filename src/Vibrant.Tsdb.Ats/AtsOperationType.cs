@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public enum AtsOperationType
+   internal enum AtsOperationType
    {
       Insert = 1,
       Replace = 2,

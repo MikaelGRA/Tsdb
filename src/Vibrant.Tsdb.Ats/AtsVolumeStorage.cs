@@ -14,6 +14,10 @@ using Vibrant.Tsdb.Serialization;
 
 namespace Vibrant.Tsdb.Ats
 {
+   /// <summary>
+   /// Implementation of IVolumeStorage that uses Azure Table Storage
+   /// as its backend. 
+   /// </summary>
    public class AtsVolumeStorage : IVolumeStorage
    {
       private object _sync = new object();
@@ -24,6 +28,13 @@ namespace Vibrant.Tsdb.Ats
       private CloudTableClient _client;
       private Task<CloudTable> _table;
 
+      #region Public
+
+      /// <summary>
+      /// Constructs an instance of IVolumeStorage.
+      /// </summary>
+      /// <param name="tableName">The name of the table to use in Azure Table Storage.</param>
+      /// <param name="connectionString">The connection string used to connect to a storage account.</param>
       public AtsVolumeStorage( string tableName, string connectionString )
       {
          _getSemaphore = new SemaphoreSlim( 25 );
@@ -33,11 +44,17 @@ namespace Vibrant.Tsdb.Ats
          _client = _account.CreateCloudTableClient();
       }
 
+      /// <summary>
+      /// Writes the specified entries.
+      /// </summary>
+      /// <param name="items">The entries to be written.</param>
+      /// <returns></returns>
       public async Task Write( IEnumerable<IEntry> items )
       {
          List<Task> tasks = new List<Task>();
 
-         foreach( var entry in items.SplitEntriesByPartitionAndTable() )
+         // split all entries by their id
+         foreach( var entry in items.SplitEntriesById() )
          {
             var id = entry.Id;
             var from = entry.From;
@@ -50,6 +67,13 @@ namespace Vibrant.Tsdb.Ats
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
+      /// <summary>
+      /// Deletes the entries with the specified id in the given range.
+      /// </summary>
+      /// <param name="id">The id of the entries to delete.</param>
+      /// <param name="from">The start of the range.</param>
+      /// <param name="to">The end of the range.</param>
+      /// <returns>The number of entries that were deleted.</returns>
       public async Task<int> Delete( string id, DateTime from, DateTime to )
       {
          int count = await DeleteForId( id, from, to ).ConfigureAwait( false );
@@ -57,6 +81,11 @@ namespace Vibrant.Tsdb.Ats
          return count;
       }
 
+      /// <summary>
+      /// Deletes all the entries with the specified id.
+      /// </summary>
+      /// <param name="id">The id of the entries to delete.</param>
+      /// <returns>The number of entries that were deleted.</returns>
       public async Task<int> Delete( string id )
       {
          int count = await DeleteAllForId( id ).ConfigureAwait( false );
@@ -64,6 +93,11 @@ namespace Vibrant.Tsdb.Ats
          return count;
       }
 
+      /// <summary>
+      /// Read the latest entry with the specified id.
+      /// </summary>
+      /// <param name="id">The id of the entry to read.</param>
+      /// <returns>The result of the read operation.</returns>
       public async Task<ReadResult<IEntry>> ReadLatest( string id )
       {
          var results = await RetrieveAllForId( id ).ConfigureAwait( false );
@@ -74,6 +108,11 @@ namespace Vibrant.Tsdb.Ats
                .ToList() );
       }
 
+      /// <summary>
+      /// Read the latest entry with the specified id.
+      /// </summary>
+      /// <param name="id">The id of the entry to read.</param>
+      /// <returns>The result of the read operation.</returns>
       public async Task<ReadResult<TEntry>> ReadLatestAs<TEntry>( string id )
          where TEntry : IEntry
       {
@@ -82,6 +121,11 @@ namespace Vibrant.Tsdb.Ats
          return entries.Cast<TEntry>();
       }
 
+      /// <summary>
+      /// Reads all the entries with the specified id.
+      /// </summary>
+      /// <param name="id">The id of the entries to read.</param>
+      /// <returns>The result of the read operation.</returns>
       public async Task<ReadResult<IEntry>> Read( string id )
       {
          var results = await RetrieveAllForId( id ).ConfigureAwait( false );
@@ -92,6 +136,11 @@ namespace Vibrant.Tsdb.Ats
                .ToList() );
       }
 
+      /// <summary>
+      /// Reads all the entries with the specified id.
+      /// </summary>
+      /// <param name="id">The id of the entries to read.</param>
+      /// <returns>The result of the read operation.</returns>
       public async Task<ReadResult<TEntry>> ReadAs<TEntry>( string id )
          where TEntry : IEntry
       {
@@ -100,6 +149,13 @@ namespace Vibrant.Tsdb.Ats
          return entries.Cast<TEntry>();
       }
 
+      /// <summary>
+      /// Reads the entries with specified id in the given range.
+      /// </summary>
+      /// <param name="id">The id of the entries to read.</param>
+      /// <param name="from">The start of the range.</param>
+      /// <param name="to">The end of the range.</param>
+      /// <returns>The result of the read operation.</returns>
       public async Task<ReadResult<IEntry>> Read( string id, DateTime from, DateTime to )
       {
          var results = await RetrieveRangeForId( id, from, to ).ConfigureAwait( false );
@@ -111,6 +167,13 @@ namespace Vibrant.Tsdb.Ats
                .ToList() );
       }
 
+      /// <summary>
+      /// Reads the entries with specified id in the given range.
+      /// </summary>
+      /// <param name="id">The id of the entries to read.</param>
+      /// <param name="from">The start of the range.</param>
+      /// <param name="to">The end of the range.</param>
+      /// <returns>The result of the read operation.</returns>
       public async Task<ReadResult<TEntry>> ReadAs<TEntry>( string id, DateTime from, DateTime to )
          where TEntry : IEntry
       {
@@ -118,6 +181,8 @@ namespace Vibrant.Tsdb.Ats
 
          return entries.Cast<TEntry>();
       }
+
+      #endregion
 
       private async Task<int> DeleteForId( string id, DateTime from, DateTime to )
       {

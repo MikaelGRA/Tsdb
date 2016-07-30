@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public class AtsOperation
+   internal class AtsOperation
    {
       public AtsOperation( TsdbTableEntity row, AtsOperationType operationType )
       {

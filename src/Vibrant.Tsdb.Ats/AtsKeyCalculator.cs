@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public static class AtsKeyCalculator
+   internal static class AtsKeyCalculator
    {
       private static readonly string MinPartitionKeyRange = "9999";
       private static readonly string MaxPartitionKeyRange = "0000";

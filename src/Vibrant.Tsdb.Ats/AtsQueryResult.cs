@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public class AtsQueryResult
+   internal class AtsQueryResult
    {
       private List<IEntry> _entries;
 

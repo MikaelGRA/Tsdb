@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats.Helpers
 {
-   public class EntrySplitResult<TEntry>
+   internal class EntrySplitResult<TEntry>
       where TEntry : IEntry
    {
       private IComparer<TEntry> _comparer;

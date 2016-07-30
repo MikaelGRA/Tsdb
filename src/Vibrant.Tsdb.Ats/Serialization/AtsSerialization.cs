@@ -8,7 +8,7 @@ using Vibrant.Tsdb.Serialization;
 
 namespace Vibrant.Tsdb.Ats.Serialization
 {
-   public static class AtsSerializer
+   internal static class AtsSerializer
    {
       public static List<AtsSerializationResult> Serialize( List<IEntry> entries, int maxByteArraySize )
       {

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public class AtsSerializationResult
+   internal class AtsSerializationResult
    {
       public AtsSerializationResult( DateTime from, byte[] data )
       {
