@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-    public interface IPerformanceStorage
-    {
-    }
+   public interface IPerformanceStorage : IStorage
+   {
+   }
 }

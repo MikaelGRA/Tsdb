@@ -20,6 +20,8 @@ Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Vibrant.Tsdb.Ats.Tests", "t
 EndProject
 Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Vibrant.Tsdb.ConsoleApp", "test\Vibrant.Tsdb.ConsoleApp\Vibrant.Tsdb.ConsoleApp.xproj", "{BEC2BEDD-1794-4620-93F6-35809FC6294C}"
 EndProject
+Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Vibrant.Tsdb.Sql", "src\Vibrant.Tsdb.Sql\Vibrant.Tsdb.Sql.xproj", "{6D79C9E5-9AB8-4D97-9621-D27E3A54B068}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,6 +44,10 @@ Global
 		{BEC2BEDD-1794-4620-93F6-35809FC6294C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BEC2BEDD-1794-4620-93F6-35809FC6294C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BEC2BEDD-1794-4620-93F6-35809FC6294C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6D79C9E5-9AB8-4D97-9621-D27E3A54B068}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6D79C9E5-9AB8-4D97-9621-D27E3A54B068}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6D79C9E5-9AB8-4D97-9621-D27E3A54B068}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6D79C9E5-9AB8-4D97-9621-D27E3A54B068}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -51,5 +57,6 @@ Global
 		{5F07D524-8CFA-404C-9B35-663E64A93E84} = {4AC69C99-B5CF-499D-93E8-2093E22AAA9C}
 		{95CCF888-2A5F-4D34-A0A5-2290A28376C3} = {C2FF3C50-F3CE-4D4F-ADCC-97FACF8C17E3}
 		{BEC2BEDD-1794-4620-93F6-35809FC6294C} = {C2FF3C50-F3CE-4D4F-ADCC-97FACF8C17E3}
+		{6D79C9E5-9AB8-4D97-9621-D27E3A54B068} = {4AC69C99-B5CF-499D-93E8-2093E22AAA9C}
 	EndGlobalSection
 EndGlobal
