@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Data.SqlTypes;
 using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
+using Microsoft.SqlServer.Server;
 using Vibrant.Tsdb.Serialization;
 using Vibrant.Tsdb.Sql.Serialization;
 
@@ -149,18 +151,26 @@ namespace Vibrant.Tsdb.Sql
          {
             await connection.OpenAsync().ConfigureAwait( false );
 
-            List<object> args = new List<object>();
+            List<SqlDataRecord> records = new List<SqlDataRecord>();
             SqlSerializer.Serialize( entries, ( entry, data ) =>
             {
-               args.Add( new
-               {
-                  Id = entry.GetId(),
-                  Timestamp = entry.GetTimestamp(),
-                  Data = data,
-               } );
+               SqlDataRecord record = new SqlDataRecord( Sql.InsertParameterMetadata );
+               record.SetString( 0, entry.GetId() );
+               record.SetDateTime( 1, entry.GetTimestamp() ); 
+               record.SetSqlBinary( 2, new SqlBinary( data ) );
+               records.Add( record );
             } );
 
-            await connection.ExecuteAsync( Sql.GetInsertCommand( _tableName ), args ).ConfigureAwait( false );
+            using( var command = connection.CreateCommand() )
+            {
+               command.CommandText = Sql.GetInsertProcedureName( _tableName );
+               command.CommandType = CommandType.StoredProcedure;
+               var parameter = command.Parameters.AddWithValue( "@Inserts", records );
+               parameter.SqlDbType = SqlDbType.Structured;
+               parameter.TypeName = Sql.GetInsertParameterType( _tableName );
+
+               await command.ExecuteNonQueryAsync().ConfigureAwait( false );
+            }
          }
       }
 
@@ -209,7 +219,7 @@ namespace Vibrant.Tsdb.Sql
             foreach( var id in ids )
             {
                tasks.Add( connection.QueryAsync<SqlEntry>(
-                  sql: Sql.GetQuery( _tableName ),
+                  sql: Sql.GetLatestQuery( _tableName ),
                   param: new { Id = id } ) );
             }
 

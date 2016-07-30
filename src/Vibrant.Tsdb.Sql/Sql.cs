@@ -1,23 +1,32 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.SqlServer.Server;
 
 namespace Vibrant.Tsdb.Sql
 {
-    internal static class Sql
-    {
+   internal static class Sql
+   {
+      public static readonly SqlMetaData[] InsertParameterMetadata;
+
+      static Sql()
+      {
+         InsertParameterMetadata = new SqlMetaData[ 3 ];
+         InsertParameterMetadata[ 0 ] = new SqlMetaData( "Id", SqlDbType.NVarChar, 256 );
+         InsertParameterMetadata[ 1 ] = new SqlMetaData( "Timestamp", SqlDbType.DateTime2 );
+         InsertParameterMetadata[ 2 ] = new SqlMetaData( "Data", SqlDbType.VarBinary, SqlMetaData.Max );
+      }
+
       private const string Ddl = @"
 SET ANSI_NULLS ON
-GO
 
 SET QUOTED_IDENTIFIER ON
-GO
 
 IF NOT EXISTS (SELECT * FROM [sys].[tables] WHERE [name] = '{0}')
 BEGIN
    SET ANSI_PADDING ON
-   GO
 
    CREATE TABLE [dbo].[{0}](
 	   [Id] [varchar](256) NOT NULL,
@@ -30,11 +39,9 @@ BEGIN
    )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
    ) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
 
-   GO
-
    SET ANSI_PADDING OFF
-   GO
 
+EXEC('
    CREATE TRIGGER [dbo].[{0}_InsteadOfInsert]
       ON  [dbo].[{0}] 
       INSTEAD OF INSERT
@@ -54,18 +61,46 @@ BEGIN
 	   INSERT ([Id], [Timestamp], [Data])
 	   VALUES ([Row].[Id], [Row].[Timestamp], [Row].[Data]);
    END
-   GO
+')
+
+EXEC('
+   CREATE TYPE [dbo].[Type_{0}_Insert] AS TABLE (
+	   [Id] varchar(256) NOT NULL,
+	   [Timestamp] datetime2(7) NOT NULL,
+	   [Data] varbinary(MAX) NOT NULL
+   )
+')
+
+EXEC('
+   CREATE PROCEDURE [dbo].[{0}_Insert]
+	   @Inserts [dbo].[Type_{0}_Insert] READONLY
+   AS
+   BEGIN
+	   -- SET NOCOUNT ON added to prevent extra result sets from
+	   -- interfering with SELECT statements.
+	   SET NOCOUNT ON;
+
+	   INSERT INTO [dbo].[{0}] ([Id], [Timestamp], [Data])
+	   SELECT [Id], [Timestamp], [Data]
+	   FROM @inserts;
+   END
+')
+
 END
-GO
 ";
       public static string GetCreateTableCommand( string tableName )
       {
          return string.Format( Ddl, tableName );
       }
 
-      public static string GetInsertCommand( string tableName )
+      public static string GetInsertParameterType( string tableName )
       {
-         return $"INSERT INTO [dbo].[{tableName}] ([Id], [Timestamp], [Data]) VALUES (@Id, @Timestamp, @Data)";
+         return $"[dbo].[Type_{tableName}_Insert]";
+      }
+
+      public static string GetInsertProcedureName( string tableName )
+      {
+         return $"[dbo].[{tableName}_Insert]";
       }
 
       public static string GetRangedDeleteCommand( string tableName )

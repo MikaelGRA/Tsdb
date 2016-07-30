@@ -8,20 +8,9 @@ using Xunit;
 
 namespace Vibrant.Tsdb.Ats.Tests
 {
-   public class ReadWriteTests
+   public abstract class AbstractStorageTests<TStorage>
+      where TStorage : IStorage
    {
-      private static readonly string ConnectionString;
-
-      static ReadWriteTests()
-      {
-         var builder = new ConfigurationBuilder()
-            .AddJsonFile( "appsettings.json" )
-            .AddJsonFile( "appsettings.Hidden.json", true );
-         var config = builder.Build();
-
-         var ats = config.GetSection( "AtsStorage" );
-         ConnectionString = ats.GetSection( "ConnectionString" ).Value;
-      }
 
       private static readonly string[] Ids = new[]
       {
@@ -56,14 +45,16 @@ namespace Vibrant.Tsdb.Ats.Tests
          return entries;
       }
 
+      public abstract IStorage GetStorage( string tableName );
+
       [Fact]
       public async Task Should_Write_And_Read_Basic_Rows()
       {
          TsdbTypeRegistry.Register<BasicEntry>();
 
-         var store = new AtsVolumeStorage( "Table1", ConnectionString );
+         var store = GetStorage( "Table1");
 
-         int count = 1000000;
+         int count = 500000;
 
          var from = new DateTime( 2016, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var to = from.AddSeconds( count );
@@ -84,6 +75,8 @@ namespace Vibrant.Tsdb.Ats.Tests
             }
             items.Add( item );
          }
+
+         var deletedCount = await store.DeleteMulti( Ids, from, to );
 
          foreach( var readResult in read )
          {
@@ -108,8 +101,6 @@ namespace Vibrant.Tsdb.Ats.Tests
                }
             }
          }
-
-         var deletedCount = await store.DeleteMulti( Ids, from, to );
       }
 
       [Fact]
@@ -117,9 +108,9 @@ namespace Vibrant.Tsdb.Ats.Tests
       {
          TsdbTypeRegistry.Register<BasicEntry>();
 
-         var store = new AtsVolumeStorage( "Table2", ConnectionString );
+         var store = GetStorage( "Table2" );
 
-         int count = 1000000;
+         int count = 500000;
 
          var from = new DateTime( 2016, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var to = from.AddSeconds( count );
@@ -142,7 +133,7 @@ namespace Vibrant.Tsdb.Ats.Tests
       {
          TsdbTypeRegistry.Register<BasicEntry>();
 
-         var store = new AtsVolumeStorage( "Table3", ConnectionString );
+         var store = GetStorage( "Table3" );
 
          int count = 1000;
 

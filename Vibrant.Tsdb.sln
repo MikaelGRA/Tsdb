@@ -16,7 +16,7 @@ Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Vibrant.Tsdb.Ats", "src\Vib
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{C2FF3C50-F3CE-4D4F-ADCC-97FACF8C17E3}"
 EndProject
-Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Vibrant.Tsdb.Ats.Tests", "test\Vibrant.Tsdb.Ats.Tests\Vibrant.Tsdb.Ats.Tests.xproj", "{95CCF888-2A5F-4D34-A0A5-2290A28376C3}"
+Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Vibrant.Tsdb.Tests", "test\Vibrant.Tsdb.Tests\Vibrant.Tsdb.Tests.xproj", "{95CCF888-2A5F-4D34-A0A5-2290A28376C3}"
 EndProject
 Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Vibrant.Tsdb.ConsoleApp", "test\Vibrant.Tsdb.ConsoleApp\Vibrant.Tsdb.ConsoleApp.xproj", "{BEC2BEDD-1794-4620-93F6-35809FC6294C}"
 EndProject
