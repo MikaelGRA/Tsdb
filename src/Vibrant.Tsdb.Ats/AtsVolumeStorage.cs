@@ -118,7 +118,7 @@ namespace Vibrant.Tsdb.Ats
       {
          var entries = await ReadLatest( id ).ConfigureAwait( false );
 
-         return entries.Cast<TEntry>();
+         return entries.As<TEntry>();
       }
 
       /// <summary>
@@ -146,7 +146,7 @@ namespace Vibrant.Tsdb.Ats
       {
          var entries = await Read( id ).ConfigureAwait( false );
 
-         return entries.Cast<TEntry>();
+         return entries.As<TEntry>();
       }
 
       /// <summary>
@@ -179,7 +179,95 @@ namespace Vibrant.Tsdb.Ats
       {
          var entries = await Read( id, from, to ).ConfigureAwait( false );
 
-         return entries.Cast<TEntry>();
+         return entries.As<TEntry>();
+      }
+
+      public async Task<int> DeleteMulti( IEnumerable<string> ids, DateTime from, DateTime to )
+      {
+         var tasks = new List<Task<int>>();
+         foreach( var id in ids )
+         {
+            tasks.Add( Delete( id, from, to ) );
+         }
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+         return tasks.Sum( x => x.Result );
+      }
+
+      public async Task<int> DeleteMulti( IEnumerable<string> ids )
+      {
+         var tasks = new List<Task<int>>();
+         foreach( var id in ids )
+         {
+            tasks.Add( Delete( id ) );
+         }
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+         return tasks.Sum( x => x.Result );
+      }
+
+      public async Task<MultiReadResult<IEntry>> ReadLatestMulti( IEnumerable<string> ids )
+      {
+         var tasks = new List<Task<ReadResult<IEntry>>>();
+         foreach( var id in ids )
+         {
+            tasks.Add( ReadLatest( id ) );
+         }
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+         return new MultiReadResult<IEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
+      }
+
+      public async Task<MultiReadResult<TEntry>> ReadLatestMultiAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
+      {
+         var tasks = new List<Task<ReadResult<TEntry>>>();
+         foreach( var id in ids )
+         {
+            tasks.Add( ReadLatestAs<TEntry>( id ) );
+         }
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+         return new MultiReadResult<TEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
+      }
+
+      public async Task<MultiReadResult<IEntry>> ReadMulti( IEnumerable<string> ids )
+      {
+         var tasks = new List<Task<ReadResult<IEntry>>>();
+         foreach( var id in ids )
+         {
+            tasks.Add( Read( id ) );
+         }
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+         return new MultiReadResult<IEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
+      }
+
+      public async Task<MultiReadResult<TEntry>> ReadMultiAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
+      {
+         var tasks = new List<Task<ReadResult<TEntry>>>();
+         foreach( var id in ids )
+         {
+            tasks.Add( ReadAs<TEntry>( id ) );
+         }
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+         return new MultiReadResult<TEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
+      }
+
+      public async Task<MultiReadResult<IEntry>> ReadMulti( IEnumerable<string> ids, DateTime from, DateTime to )
+      {
+         var tasks = new List<Task<ReadResult<IEntry>>>();
+         foreach( var id in ids )
+         {
+            tasks.Add( Read( id, from, to ) );
+         }
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+         return new MultiReadResult<IEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
+      }
+
+      public async Task<MultiReadResult<TEntry>> ReadMultiAs<TEntry>( IEnumerable<string> ids, DateTime from, DateTime to ) where TEntry : IEntry
+      {
+         var tasks = new List<Task<ReadResult<TEntry>>>();
+         foreach( var id in ids )
+         {
+            tasks.Add( ReadAs<TEntry>( id, from, to ) );
+         }
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+         return new MultiReadResult<TEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
       }
 
       #endregion

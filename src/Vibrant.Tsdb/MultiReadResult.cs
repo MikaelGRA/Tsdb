@@ -30,5 +30,10 @@ namespace Vibrant.Tsdb
       {
          return _results.Values.GetEnumerator();
       }
+      public MultiReadResult<TOutputEntry> As<TOutputEntry>()
+         where TOutputEntry : IEntry
+      {
+         return new MultiReadResult<TOutputEntry>( _results.ToDictionary( x => x.Key, x => x.Value.As<TOutputEntry>() ) );
+      }
    }
 }
