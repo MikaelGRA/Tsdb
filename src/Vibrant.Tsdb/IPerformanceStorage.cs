@@ -7,6 +7,8 @@ namespace Vibrant.Tsdb
 {
    public interface IPerformanceStorage : IStorage
    {
-      //Task<ReadResult<IEntry>> ReadAndDelete( string id );
+      Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime to );
+
+      Task<int> Delete( IEnumerable<string> ids, DateTime to );
    }
 }

@@ -40,6 +40,11 @@ namespace Vibrant.Tsdb.Sql
          return DeleteForIds( ids, from, to );
       }
 
+      public Task<int> Delete( IEnumerable<string> ids, DateTime to )
+      {
+         return DeleteForIds( ids, to );
+      }
+
       public Task<int> Delete( IEnumerable<string> ids )
       {
          return DeleteForIds( ids );
@@ -50,32 +55,19 @@ namespace Vibrant.Tsdb.Sql
          return RetrieveLatestForIds( ids );
       }
 
-      public async Task<MultiReadResult<TEntry>> ReadLatestAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
-      {
-         var result = await RetrieveLatestForIds( ids ).ConfigureAwait( false );
-         return result.As<TEntry>();
-      }
-
       public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids )
       {
          return RetrieveForIds( ids );
       }
 
-      public async Task<MultiReadResult<TEntry>> ReadAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
+      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime to )
       {
-         var result = await RetrieveForIds( ids ).ConfigureAwait( false );
-         return result.As<TEntry>();
+         return RetrieveForIds( ids, to );
       }
 
       public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          return RetrieveForIds( ids, from, to );
-      }
-
-      public async Task<MultiReadResult<TEntry>> ReadAs<TEntry>( IEnumerable<string> ids, DateTime from, DateTime to ) where TEntry : IEntry
-      {
-         var result = await RetrieveForIds( ids, from, to ).ConfigureAwait( false );
-         return result.As<TEntry>();
       }
 
       private async Task CreateTableLocked()
@@ -130,6 +122,22 @@ namespace Vibrant.Tsdb.Sql
 
                await command.ExecuteNonQueryAsync().ConfigureAwait( false );
             }
+         }
+      }
+
+      private async Task<MultiReadResult<IEntry>> RetrieveForIds( IEnumerable<string> ids, DateTime to )
+      {
+         await CreateTable().ConfigureAwait( false );
+
+         using( var connection = new SqlConnection( _connectionString ) )
+         {
+            await connection.OpenAsync().ConfigureAwait( false );
+
+            var sqlEntries = await connection.QueryAsync<SqlEntry>(
+               sql: Sql.GetBottomlessQuery( _tableName ),
+               param: new { Ids = ids, To = to } ).ConfigureAwait( false );
+
+            return CreateReadResult( sqlEntries, ids );
          }
       }
 
@@ -199,6 +207,20 @@ namespace Vibrant.Tsdb.Sql
             return await connection.ExecuteAsync(
                sql: Sql.GetRangedDeleteCommand( _tableName ),
                param: new { Ids = ids, From = from, To = to } ).ConfigureAwait( false );
+         }
+      }
+
+      private async Task<int> DeleteForIds( IEnumerable<string> ids, DateTime to )
+      {
+         await CreateTable().ConfigureAwait( false );
+
+         using( var connection = new SqlConnection( _connectionString ) )
+         {
+            await connection.OpenAsync().ConfigureAwait( false );
+
+            return await connection.ExecuteAsync(
+               sql: Sql.GetBottomlessDeleteCommand( _tableName ),
+               param: new { Ids = ids, To = to } ).ConfigureAwait( false );
          }
       }
 

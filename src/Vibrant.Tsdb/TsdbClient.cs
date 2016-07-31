@@ -5,13 +5,13 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class TsdbEngine
+   public class TsdbClient
    {
       private IPerformanceStorageSelector _performanceStorageSelector;
       private IVolumeStorageSelector _volumeStorageSelector;
       private IPublishSubscribe _publishSubscribe;
 
-      public TsdbEngine(
+      public TsdbClient(
          IPerformanceStorageSelector performanceStorageSelector,
          IVolumeStorageSelector volumeStorageSelector,
          IPublishSubscribe publishSubscribe )
@@ -21,12 +21,52 @@ namespace Vibrant.Tsdb
          _publishSubscribe = publishSubscribe;
       }
 
-      //public async Task Complete( string id )
-      //{
-      //   var result = await _performanceStorage.Read( id ).ConfigureAwait( false ); // do we need ReadAndDelete in single transaction??? I think we might
-      //   await _volumeStorage.Write( result.Entries ).ConfigureAwait( false );
-      //   await _performanceStorage.Delete( id ).ConfigureAwait( false );
-      //}
+      public async Task<int> MoveToVolumeStorage( IEnumerable<string> ids )
+      {
+         // read from performance storage
+         var readTasks = new List<Task<MultiReadResult<IEntry>>>();
+         readTasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Read( c.Lookups ) ) );
+         await Task.WhenAll( readTasks ).ConfigureAwait( false );
+
+         // write to volume storage
+         var entries = readTasks.SelectMany( x => x.Result ).SelectMany( x => x.Entries );
+         await WriteDirectlyToVolumeStorage( entries ).ConfigureAwait( false );
+
+         // delete from performance storage
+         var deleteTasks = new List<Task<int>>();
+         deleteTasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
+         await Task.WhenAll( deleteTasks ).ConfigureAwait( false );
+
+         // return amount deleted (also moved)
+         return deleteTasks.Sum( x => x.Result );
+      }
+
+      public async Task<int> MoveToVolumeStorage( IEnumerable<string> ids, DateTime to )
+      {
+         // read from performance storage
+         var readTasks = new List<Task<MultiReadResult<IEntry>>>();
+         readTasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Read( c.Lookups, to ) ) );
+         await Task.WhenAll( readTasks ).ConfigureAwait( false );
+
+         // write to volume storage
+         var entries = readTasks.SelectMany( x => x.Result ).SelectMany( x => x.Entries );
+         await WriteDirectlyToVolumeStorage( entries ).ConfigureAwait( false );
+
+         // delete from performance storage
+         var deleteTasks = new List<Task<int>>();
+         deleteTasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, to ) ) );
+         await Task.WhenAll( deleteTasks ).ConfigureAwait( false );
+
+         // return amount deleted (also moved)
+         return deleteTasks.Sum( x => x.Result );
+      }
+
+      public async Task WriteDirectlyToVolumeStorage( IEnumerable<IEntry> items )
+      {
+         var tasks = new List<Task>();
+         tasks.AddRange( LookupVolumeStorages( items ).Select( c => c.Storage.Write( c.Lookups ) ) );
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+      }
 
       public async Task Write( IEnumerable<IEntry> items )
       {
@@ -120,26 +160,6 @@ namespace Vibrant.Tsdb
          }
 
          return result;
-      }
-
-      public async Task<MultiReadResult<TEntry>> ReadAs<TEntry>( IEnumerable<string> ids )
-         where TEntry : IEntry
-      {
-         var tasks = new List<Task<MultiReadResult<TEntry>>>();
-         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.ReadAs<TEntry>( c.Lookups ) ) );
-         tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.ReadAs<TEntry>( c.Lookups ) ) );
-         await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return tasks.Select( x => x.Result ).Combine();
-      }
-
-      public async Task<MultiReadResult<TEntry>> ReadAs<TEntry>( IEnumerable<string> ids, DateTime from, DateTime to )
-         where TEntry : IEntry
-      {
-         var tasks = new List<Task<MultiReadResult<TEntry>>>();
-         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.ReadAs<TEntry>( c.Lookups, from, to ) ) );
-         tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.ReadAs<TEntry>( c.Lookups, from, to ) ) );
-         await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return tasks.Select( x => x.Result ).Combine();
       }
 
       public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids )

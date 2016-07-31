@@ -108,6 +108,11 @@ END
          return $"DELETE FROM [dbo].[{tableName}] WHERE [Id] IN @Ids AND [Timestamp] >= @From AND [Timestamp] < @To";
       }
 
+      public static string GetBottomlessDeleteCommand( string tableName )
+      {
+         return $"DELETE FROM [dbo].[{tableName}] WHERE [Id] IN @Ids AND [Timestamp] < @To";
+      }
+
       public static string GetDeleteCommand( string tableName )
       {
          return $"DELETE FROM [dbo].[{tableName}] WHERE [Id] IN @Ids";
@@ -116,6 +121,11 @@ END
       public static string GetRangedQuery( string tableName )
       {
          return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] IN @Ids AND [Timestamp] >= @From AND [Timestamp] < @To ORDER BY [Id] ASC, [Timestamp] DESC";
+      }
+
+      public static string GetBottomlessQuery( string tableName )
+      {
+         return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] IN @Ids AND [Timestamp] < @To ORDER BY [Id] ASC, [Timestamp] DESC";
       }
 
       public static string GetQuery( string tableName )
