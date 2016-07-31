@@ -7,7 +7,9 @@
       "dotnet-test-xunit": "2.2.0-preview2-build1029",
       "Microsoft.Extensions.Configuration": "1.0.0",
       "Microsoft.Extensions.Configuration.Json": "1.0.0",
-      "Vibrant.Tsdb.Sql": "1.0.0-*"
+      "Vibrant.Tsdb.Sql": "1.0.0-*",
+      "Vibrant.Tsdb.Redis": "1.0.0-*",
+      "Vibrant.Tsdb": "1.0.0-*"
    },
    "buildOptions": {
       "copyToOutput": {

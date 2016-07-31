@@ -63,7 +63,7 @@ namespace Vibrant.Tsdb.Ats.Serialization
                serializedEntries = new List<byte[]>( serializedEntries.Count );
             }
 
-            EntrySerializer.SerializeEntry( writer, entry, true );
+            EntrySerializer.SerializeEntry( writer, entry, true, false );
             writer.Flush(); // is this needed for a memory stream????
 
             var serializedEntry = stream.ToArray();
@@ -82,7 +82,6 @@ namespace Vibrant.Tsdb.Ats.Serialization
             var data = CreateData( currentSize, serializedEntries );
 
             results.Add( new AtsSerializationResult( from.Value, data ) );
-
          }
 
          writer.Dispose();

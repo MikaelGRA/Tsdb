@@ -16,7 +16,7 @@ namespace Vibrant.Tsdb.Sql.Serialization
 
          foreach( var entry in entries )
          {
-            EntrySerializer.SerializeEntry( writer, entry, false );
+            EntrySerializer.SerializeEntry( writer, entry, false, false );
             writer.Flush();
 
             var serializedEntry = stream.ToArray();

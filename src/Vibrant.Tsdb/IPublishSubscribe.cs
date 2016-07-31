@@ -7,10 +7,12 @@ namespace Vibrant.Tsdb
 {
    public interface IPublishSubscribe
    {
+      Task WaitWhileDisconnected();
+
       Task Publish( IEnumerable<IEntry> entries );
 
       Task<Func<Task>> Subscribe( IEnumerable<string> ids, Action<List<IEntry>> callback );
 
-      Task<Func<Task>> SubscribeToAll( Func<List<IEntry>> callback );
+      Task<Func<Task>> SubscribeToAll( Action<List<IEntry>> callback );
    }
 }
