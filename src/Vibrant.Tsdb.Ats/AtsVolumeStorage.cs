@@ -72,147 +72,12 @@ namespace Vibrant.Tsdb.Ats
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      /// <summary>
-      /// Deletes the entries with the specified id in the given range.
-      /// </summary>
-      /// <param name="id">The id of the entries to delete.</param>
-      /// <param name="from">The start of the range.</param>
-      /// <param name="to">The end of the range.</param>
-      /// <returns>The number of entries that were deleted.</returns>
-      public async Task<int> Delete( string id, DateTime from, DateTime to )
-      {
-         int count = await DeleteForId( id, from, to ).ConfigureAwait( false );
-
-         return count;
-      }
-
-      /// <summary>
-      /// Deletes all the entries with the specified id.
-      /// </summary>
-      /// <param name="id">The id of the entries to delete.</param>
-      /// <returns>The number of entries that were deleted.</returns>
-      public async Task<int> Delete( string id )
-      {
-         int count = await DeleteAllForId( id ).ConfigureAwait( false );
-
-         return count;
-      }
-
-      /// <summary>
-      /// Read the latest entry with the specified id.
-      /// </summary>
-      /// <param name="id">The id of the entry to read.</param>
-      /// <returns>The result of the read operation.</returns>
-      public async Task<ReadResult<IEntry>> ReadLatest( string id )
-      {
-         var results = await RetrieveLatestForId( id ).ConfigureAwait( false );
-
-         return new ReadResult<IEntry>(
-            id,
-            results.SelectMany( x => x.Entries ).Take( 1 )
-               .ToList() );
-      }
-
-      /// <summary>
-      /// Read the latest entry with the specified id.
-      /// </summary>
-      /// <param name="id">The id of the entry to read.</param>
-      /// <returns>The result of the read operation.</returns>
-      public async Task<ReadResult<TEntry>> ReadLatestAs<TEntry>( string id )
-         where TEntry : IEntry
-      {
-         var entries = await ReadLatest( id ).ConfigureAwait( false );
-
-         return entries.As<TEntry>();
-      }
-
-      //public async Task<SegmentedReadResult<IEntry>> ReadSegmented( string id, int segmentSize )
-      //{
-      //   var results = await RetrieveLatestForId( id ).ConfigureAwait( false );
-
-      //   // get the first query result
-      //   var result = results.FirstOrDefault();
-
-      //   var entryCount = result.Entries.Count;
-      //   if( entryCount > segmentSize )
-      //   {
-
-      //   }
-
-      //}
-
-      //public async Task<SegmentedReadResult<IEntry>> ReadSegmented( string id, object continuationToken )
-      //{
-
-      //}
-
-      /// <summary>
-      /// Reads all the entries with the specified id.
-      /// </summary>
-      /// <param name="id">The id of the entries to read.</param>
-      /// <returns>The result of the read operation.</returns>
-      public async Task<ReadResult<IEntry>> Read( string id )
-      {
-         var results = await RetrieveAllForId( id ).ConfigureAwait( false );
-
-         return new ReadResult<IEntry>(
-            id,
-            results.SelectMany( x => x.Entries )
-               .ToList() );
-      }
-
-      /// <summary>
-      /// Reads all the entries with the specified id.
-      /// </summary>
-      /// <param name="id">The id of the entries to read.</param>
-      /// <returns>The result of the read operation.</returns>
-      public async Task<ReadResult<TEntry>> ReadAs<TEntry>( string id )
-         where TEntry : IEntry
-      {
-         var entries = await Read( id ).ConfigureAwait( false );
-
-         return entries.As<TEntry>();
-      }
-
-      /// <summary>
-      /// Reads the entries with specified id in the given range.
-      /// </summary>
-      /// <param name="id">The id of the entries to read.</param>
-      /// <param name="from">The start of the range.</param>
-      /// <param name="to">The end of the range.</param>
-      /// <returns>The result of the read operation.</returns>
-      public async Task<ReadResult<IEntry>> Read( string id, DateTime from, DateTime to )
-      {
-         var results = await RetrieveRangeForId( id, from, to ).ConfigureAwait( false );
-
-         return new ReadResult<IEntry>(
-            id,
-            results.SelectMany( x => x.Entries )
-               .Where( x => x.GetTimestamp() >= from && x.GetTimestamp() < to )
-               .ToList() );
-      }
-
-      /// <summary>
-      /// Reads the entries with specified id in the given range.
-      /// </summary>
-      /// <param name="id">The id of the entries to read.</param>
-      /// <param name="from">The start of the range.</param>
-      /// <param name="to">The end of the range.</param>
-      /// <returns>The result of the read operation.</returns>
-      public async Task<ReadResult<TEntry>> ReadAs<TEntry>( string id, DateTime from, DateTime to )
-         where TEntry : IEntry
-      {
-         var entries = await Read( id, from, to ).ConfigureAwait( false );
-
-         return entries.As<TEntry>();
-      }
-
       public async Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          var tasks = new List<Task<int>>();
          foreach( var id in ids )
          {
-            tasks.Add( Delete( id, from, to ) );
+            tasks.Add( DeleteForId( id, from, to ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Sum( x => x.Result );
@@ -223,7 +88,7 @@ namespace Vibrant.Tsdb.Ats
          var tasks = new List<Task<int>>();
          foreach( var id in ids )
          {
-            tasks.Add( Delete( id ) );
+            tasks.Add( DeleteAllForId( id ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Sum( x => x.Result );
@@ -234,21 +99,10 @@ namespace Vibrant.Tsdb.Ats
          var tasks = new List<Task<ReadResult<IEntry>>>();
          foreach( var id in ids )
          {
-            tasks.Add( ReadLatest( id ) );
+            tasks.Add( ReadLatestForId( id ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return new MultiReadResult<IEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
-      }
-
-      public async Task<MultiReadResult<TEntry>> ReadLatestAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
-      {
-         var tasks = new List<Task<ReadResult<TEntry>>>();
-         foreach( var id in ids )
-         {
-            tasks.Add( ReadLatestAs<TEntry>( id ) );
-         }
-         await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return new MultiReadResult<TEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
+         return tasks.Select( x => x.Result ).Combine();
       }
 
       public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids )
@@ -256,21 +110,10 @@ namespace Vibrant.Tsdb.Ats
          var tasks = new List<Task<ReadResult<IEntry>>>();
          foreach( var id in ids )
          {
-            tasks.Add( Read( id ) );
+            tasks.Add( ReadForId( id ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return new MultiReadResult<IEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
-      }
-
-      public async Task<MultiReadResult<TEntry>> ReadAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
-      {
-         var tasks = new List<Task<ReadResult<TEntry>>>();
-         foreach( var id in ids )
-         {
-            tasks.Add( ReadAs<TEntry>( id ) );
-         }
-         await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return new MultiReadResult<TEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
       }
 
       public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to )
@@ -278,24 +121,44 @@ namespace Vibrant.Tsdb.Ats
          var tasks = new List<Task<ReadResult<IEntry>>>();
          foreach( var id in ids )
          {
-            tasks.Add( Read( id, from, to ) );
+            tasks.Add( ReadForId( id, from, to ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return new MultiReadResult<IEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
       }
 
-      public async Task<MultiReadResult<TEntry>> ReadAs<TEntry>( IEnumerable<string> ids, DateTime from, DateTime to ) where TEntry : IEntry
+      #endregion
+
+      private async Task<ReadResult<IEntry>> ReadLatestForId( string id )
       {
-         var tasks = new List<Task<ReadResult<TEntry>>>();
-         foreach( var id in ids )
-         {
-            tasks.Add( ReadAs<TEntry>( id, from, to ) );
-         }
-         await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return new MultiReadResult<TEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
+         var results = await RetrieveLatestForId( id ).ConfigureAwait( false );
+
+         return new ReadResult<IEntry>(
+            id,
+            results.SelectMany( x => x.Entries ).Take( 1 )
+               .ToList() );
       }
 
-      #endregion
+      private async Task<ReadResult<IEntry>> ReadForId( string id )
+      {
+         var results = await RetrieveAllForId( id ).ConfigureAwait( false );
+
+         return new ReadResult<IEntry>(
+            id,
+            results.SelectMany( x => x.Entries )
+               .ToList() );
+      }
+
+      private async Task<ReadResult<IEntry>> ReadForId( string id, DateTime from, DateTime to )
+      {
+         var results = await RetrieveRangeForId( id, from, to ).ConfigureAwait( false );
+
+         return new ReadResult<IEntry>(
+            id,
+            results.SelectMany( x => x.Entries )
+               .Where( x => x.GetTimestamp() >= from && x.GetTimestamp() < to )
+               .ToList() );
+      }
 
       private async Task<int> DeleteForId( string id, DateTime from, DateTime to )
       {

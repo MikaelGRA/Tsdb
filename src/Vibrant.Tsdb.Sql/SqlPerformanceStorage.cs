@@ -35,52 +35,6 @@ namespace Vibrant.Tsdb.Sql
          return StoreForAll( items );
       }
 
-      public Task<int> Delete( string id )
-      {
-         return DeleteForIds( new[] { id } );
-      }
-
-      public Task<int> Delete( string id, DateTime from, DateTime to )
-      {
-         return DeleteForIds( new[] { id }, from, to );
-      }
-
-      public async Task<ReadResult<IEntry>> Read( string id )
-      {
-         var multiResult = await RetrieveForIds( new[] { id } ).ConfigureAwait( false );
-         return multiResult.FindResult( id );
-      }
-
-      public async Task<ReadResult<IEntry>> Read( string id, DateTime from, DateTime to )
-      {
-         var multiResult = await RetrieveForIds( new[] { id }, from, to ).ConfigureAwait( false );
-         return multiResult.FindResult( id );
-      }
-
-      public async Task<ReadResult<TEntry>> ReadAs<TEntry>( string id ) where TEntry : IEntry
-      {
-         var multiResult = await RetrieveForIds( new[] { id } ).ConfigureAwait( false );
-         return multiResult.FindResult( id ).As<TEntry>();
-      }
-
-      public async Task<ReadResult<TEntry>> ReadAs<TEntry>( string id, DateTime from, DateTime to ) where TEntry : IEntry
-      {
-         var multiResult = await RetrieveForIds( new[] { id }, from, to ).ConfigureAwait( false );
-         return multiResult.FindResult( id ).As<TEntry>();
-      }
-
-      public async Task<ReadResult<IEntry>> ReadLatest( string id )
-      {
-         var multiResult = await RetrieveLatestForIds( new[] { id } ).ConfigureAwait( false );
-         return multiResult.FindResult( id );
-      }
-
-      public async Task<ReadResult<TEntry>> ReadLatestAs<TEntry>( string id ) where TEntry : IEntry
-      {
-         var multiResult = await RetrieveLatestForIds( new[] { id } ).ConfigureAwait( false );
-         return multiResult.FindResult( id ).As<TEntry>();
-      }
-
       public Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          return DeleteForIds( ids, from, to );

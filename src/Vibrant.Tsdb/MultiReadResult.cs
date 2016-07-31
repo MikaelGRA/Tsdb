@@ -31,24 +31,24 @@ namespace Vibrant.Tsdb
          return _results.TryGetValue( id, out readResult );
       }
 
-      internal void AddOrMerge( MultiReadResult<TEntry> result )
+      public void AddOrMerge( MultiReadResult<TEntry> result )
       {
          foreach( var item in result )
          {
-            AddOrMerge( item.Id, item );
+            AddOrMerge( item );
          }
       }
 
-      internal void AddOrMerge( string id, ReadResult<TEntry> result )
+      public void AddOrMerge( ReadResult<TEntry> result )
       {
          ReadResult<TEntry> existing;
-         if( _results.TryGetValue( id, out existing ) )
+         if( _results.TryGetValue( result.Id, out existing ) )
          {
             existing.MergeWith( result );
          }
          else
          {
-            _results.Add( id, result );
+            _results.Add( result.Id, result );
          }
       }
 
