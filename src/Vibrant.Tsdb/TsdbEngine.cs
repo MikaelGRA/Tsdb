@@ -53,6 +53,75 @@ namespace Vibrant.Tsdb
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
+      public async Task<MultiReadResult<TEntry>> ReadLatestAs<TEntry>( IEnumerable<string> ids )
+         where TEntry : IEntry
+      {
+         var tasks = new List<Task<MultiReadResult<TEntry>>>();
+         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.ReadLatestAs<TEntry>( c.Lookups ) ) );
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+         // at this point we need to check if we have a measurement for each id. We might not becuase we only looked in performance store
+         var result = tasks.Select( x => x.Result ).Combine();
+
+         // find missing ids
+         List<string> missingIds = new List<string>();
+         foreach( var id in ids )
+         {
+            var resultForId = result.FindResult( id );
+            if( resultForId.Entries.Count == 0 )
+            {
+               missingIds.Add( id );
+            }
+         }
+
+         // if missing ids, then we look at volume storage
+         if( missingIds.Count > 0 )
+         {
+            tasks = new List<Task<MultiReadResult<TEntry>>>();
+            tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.ReadLatestAs<TEntry>( c.Lookups ) ) );
+            await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+            var intiallyMissingResult = tasks.Select( x => x.Result ).Combine();
+            intiallyMissingResult.MergeInto( result );
+         }
+
+         return result;
+      }
+
+      public async Task<MultiReadResult<IEntry>> ReadLatest( IEnumerable<string> ids )
+      {
+         var tasks = new List<Task<MultiReadResult<IEntry>>>();
+         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.ReadLatest( c.Lookups ) ) );
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+         // at this point we need to check if we have a measurement for each id. We might not becuase we only looked in performance store
+         var result = tasks.Select( x => x.Result ).Combine();
+
+         // find missing ids
+         List<string> missingIds = new List<string>();
+         foreach( var id in ids )
+         {
+            var resultForId = result.FindResult( id );
+            if( resultForId.Entries.Count == 0 )
+            {
+               missingIds.Add( id );
+            }
+         }
+
+         // if missing ids, then we look at volume storage
+         if( missingIds.Count > 0 )
+         {
+            tasks = new List<Task<MultiReadResult<IEntry>>>();
+            tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.ReadLatest( c.Lookups ) ) );
+            await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+            var intiallyMissingResult = tasks.Select( x => x.Result ).Combine();
+            intiallyMissingResult.MergeInto( result );
+         }
+
+         return result;
+      }
+
       public async Task<MultiReadResult<TEntry>> ReadAs<TEntry>( IEnumerable<string> ids )
          where TEntry : IEntry
       {

@@ -76,5 +76,15 @@ namespace Vibrant.Tsdb
          }
          return this;
       }
+
+      public MultiReadResult<TEntry> MergeInto( MultiReadResult<TEntry> other )
+      {
+         foreach( var otherResult in other )
+         {
+            var thisResult = FindResult( otherResult.Id );
+            otherResult.MergeWith( thisResult );
+         }
+         return this;
+      }
    }
 }
