@@ -228,7 +228,7 @@ namespace Vibrant.Tsdb
                entriesForSubscriber = entriesById.ToList();
                foreach( var callback in subscribers )
                {
-                  _taskFactory.StartNew( () => callback( entriesForSubscriber ) ); // dont wait for this
+                  _taskFactory.StartNew( () => callback( entriesForSubscriber ) );
                }
             }
 
@@ -239,7 +239,7 @@ namespace Vibrant.Tsdb
                {
                   entriesForSubscriber = entriesById.ToList();
                }
-               callback.Key( entriesForSubscriber );
+               _taskFactory.StartNew( () => callback.Key( entriesForSubscriber ) );
             }
          }
 

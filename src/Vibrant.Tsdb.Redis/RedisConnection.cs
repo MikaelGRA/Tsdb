@@ -58,7 +58,7 @@ namespace Vibrant.Tsdb.Redis
          return _redisSubscriber.UnsubscribeAsync( id );
       }
 
-      public Task PublishAsync( int database, string id, IEnumerable<IEntry> entries )
+      public Task PublishAsync( string id, IEnumerable<IEntry> entries )
       {
          if( _connection == null )
          {

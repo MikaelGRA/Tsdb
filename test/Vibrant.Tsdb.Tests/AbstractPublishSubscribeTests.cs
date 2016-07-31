@@ -58,11 +58,34 @@ namespace Vibrant.Tsdb.Ats.Tests
             };
 
          await ps.Publish( toPublish );
-
-         await Task.Delay( 3000 );
+         await Task.Delay( 1500 );
 
          Assert.Equal( 2, received1 );
          Assert.Equal( 1, received2 );
+         Assert.Equal( 4, received3 );
+
+         await unsubscribe3();
+         await ps.Publish( toPublish );
+         await Task.Delay( 1500 );
+
+         Assert.Equal( 4, received1 );
+         Assert.Equal( 2, received2 );
+         Assert.Equal( 4, received3 );
+
+         await unsubscribe2();
+         await ps.Publish( toPublish );
+         await Task.Delay( 1500 );
+
+         Assert.Equal( 6, received1 );
+         Assert.Equal( 2, received2 );
+         Assert.Equal( 4, received3 );
+
+         await unsubscribe1();
+         await ps.Publish( toPublish );
+         await Task.Delay( 1500 );
+
+         Assert.Equal( 6, received1 );
+         Assert.Equal( 2, received2 );
          Assert.Equal( 4, received3 );
       }
    }

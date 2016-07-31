@@ -67,7 +67,7 @@ namespace Vibrant.Tsdb.Redis
          foreach( var entriesById in entries.GroupBy( x => x.GetId() ) )
          {
             var id = entriesById.Key;
-            tasks.Add( _connection.PublishAsync( 0, id, entriesById ) );
+            tasks.Add( _connection.PublishAsync( id, entriesById ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
@@ -111,7 +111,15 @@ namespace Vibrant.Tsdb.Redis
          {
             foreach( var callback in subscribers )
             {
-               _taskFactory.StartNew( () => callback( entries ) );
+               try
+               {
+                  // TODO: Schedule callback IF captured context?
+                  callback( entries );
+               }
+               catch( Exception )
+               {
+
+               }
             }
          }
       }
@@ -121,7 +129,15 @@ namespace Vibrant.Tsdb.Redis
          var id = entries[ 0 ].GetId();
          foreach( var callback in _allCallbacks )
          {
-            _taskFactory.StartNew( () => callback.Key( entries ) );
+            try
+            {
+               // TODO: Schedule callback IF captured context?
+               callback.Key( entries );
+            }
+            catch( Exception )
+            {
+
+            }
          }
       }
 
