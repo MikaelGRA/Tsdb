@@ -14,6 +14,8 @@ namespace Vibrant.Tsdb
 
       DateTime GetTimestamp();
 
+      void SetTimestamp( DateTime timestamp );
+
       byte GetTypeCode();
 
       void Write( BinaryWriter writer );

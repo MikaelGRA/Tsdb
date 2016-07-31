@@ -29,6 +29,11 @@ namespace Vibrant.Tsdb.ConsoleApp.Entries
          return Timestamp;
       }
 
+      public void SetTimestamp( DateTime timestamp )
+      {
+         Timestamp = timestamp;
+      }
+
       public byte GetTypeCode()
       {
          return 1;
@@ -36,13 +41,11 @@ namespace Vibrant.Tsdb.ConsoleApp.Entries
 
       public void Read( BinaryReader reader )
       {
-         Timestamp = new DateTime( reader.ReadInt64(), DateTimeKind.Utc );
          Value = reader.ReadDouble();
       }
 
       public void Write( BinaryWriter writer )
       {
-         writer.Write( Timestamp.Ticks );
          writer.Write( Value );
       }
    }

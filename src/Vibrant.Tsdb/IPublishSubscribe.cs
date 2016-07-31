@@ -5,8 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IPerformanceStorage : IStorage
-   {
-      //Task<ReadResult<IEntry>> ReadAndDelete( string id );
-   }
+    public interface IPublishSubscribe
+    {
+    }
 }

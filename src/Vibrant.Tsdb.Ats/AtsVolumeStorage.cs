@@ -100,7 +100,7 @@ namespace Vibrant.Tsdb.Ats
       /// <returns>The result of the read operation.</returns>
       public async Task<ReadResult<IEntry>> ReadLatest( string id )
       {
-         var results = await RetrieveAllForId( id ).ConfigureAwait( false );
+         var results = await RetrieveLatestForId( id ).ConfigureAwait( false );
 
          return new ReadResult<IEntry>(
             id,
@@ -120,6 +120,26 @@ namespace Vibrant.Tsdb.Ats
 
          return entries.As<TEntry>();
       }
+
+      //public async Task<SegmentedReadResult<IEntry>> ReadSegmented( string id, int segmentSize )
+      //{
+      //   var results = await RetrieveLatestForId( id ).ConfigureAwait( false );
+
+      //   // get the first query result
+      //   var result = results.FirstOrDefault();
+
+      //   var entryCount = result.Entries.Count;
+      //   if( entryCount > segmentSize )
+      //   {
+
+      //   }
+
+      //}
+
+      //public async Task<SegmentedReadResult<IEntry>> ReadSegmented( string id, object continuationToken )
+      //{
+
+      //}
 
       /// <summary>
       /// Reads all the entries with the specified id.

@@ -14,7 +14,7 @@ namespace Vibrant.Tsdb.Sql
       static Sql()
       {
          InsertParameterMetadata = new SqlMetaData[ 3 ];
-         InsertParameterMetadata[ 0 ] = new SqlMetaData( "Id", SqlDbType.NVarChar, 256 );
+         InsertParameterMetadata[ 0 ] = new SqlMetaData( "Id", SqlDbType.NVarChar, 128 );
          InsertParameterMetadata[ 1 ] = new SqlMetaData( "Timestamp", SqlDbType.DateTime2 );
          InsertParameterMetadata[ 2 ] = new SqlMetaData( "Data", SqlDbType.VarBinary, SqlMetaData.Max );
       }
@@ -29,7 +29,7 @@ BEGIN
    SET ANSI_PADDING ON
 
    CREATE TABLE [dbo].[{0}](
-	   [Id] [varchar](256) NOT NULL,
+	   [Id] [varchar](128) NOT NULL,
 	   [Timestamp] [datetime2](7) NOT NULL,
 	   [Data] [varbinary](max) NOT NULL,
     CONSTRAINT [PK_{0}] PRIMARY KEY CLUSTERED 
@@ -65,7 +65,7 @@ EXEC('
 
 EXEC('
    CREATE TYPE [dbo].[Type_{0}_Insert] AS TABLE (
-	   [Id] varchar(256) NOT NULL,
+	   [Id] varchar(128) NOT NULL,
 	   [Timestamp] datetime2(7) NOT NULL,
 	   [Data] varbinary(MAX) NOT NULL
    )

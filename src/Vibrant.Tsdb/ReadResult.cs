@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb
 {
@@ -28,6 +29,16 @@ namespace Vibrant.Tsdb
          where TOutputEntry : IEntry
       {
          return new ReadResult<TOutputEntry>( Id, Entries.Cast<TOutputEntry>().ToList() );
+      }
+
+      public ReadResult<TEntry> MergeWith( ReadResult<TEntry> other )
+      {
+         Entries = MergeSort.Sort(
+            collections: new[] { Entries, other.Entries },
+            comparer: new EntryComparer<TEntry>(),
+            resolveConflict: x => x.First() );
+
+         return this;
       }
    }
 }

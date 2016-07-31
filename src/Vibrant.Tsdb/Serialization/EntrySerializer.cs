@@ -21,17 +21,25 @@ namespace Vibrant.Tsdb.Serialization
          return writer;
       }
 
-      public static void SerializeEntry( BinaryWriter writer, IEntry entry )
+      public static void SerializeEntry( BinaryWriter writer, IEntry entry, bool emitTimestamp )
       {
          writer.Write( entry.GetTypeCode() );
+         if( emitTimestamp )
+         {
+            writer.Write( entry.GetTimestamp().Ticks );
+         }
          entry.Write( writer );
       }
 
-      public static IEntry DeserializeEntry( string id, BinaryReader reader )
+      public static IEntry DeserializeEntry( BinaryReader reader, string id, bool readTimestamp )
       {
          var typeCode = reader.ReadByte();
          var entry = TsdbTypeRegistry.CreateEntry( typeCode );
          entry.SetId( id );
+         if( readTimestamp )
+         {
+            entry.SetTimestamp( new DateTime( reader.ReadInt64(), DateTimeKind.Utc ) );
+         }
          entry.Read( reader );
          return entry;
       }
