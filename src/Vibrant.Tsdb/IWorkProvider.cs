@@ -5,9 +5,8 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public enum EntrySource
+   public interface IWorkProvider
    {
-      Remote = 1,
-      Local = 2
+      DateTime GetNextActionTime( string id );
    }
 }
