@@ -5,10 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Redis
 {
-    public class Class1
+    public class RedisPublishSubscribe : IPublishSubscribe
     {
-        public Class1()
-        {
-        }
     }
 }
