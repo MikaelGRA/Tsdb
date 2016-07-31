@@ -18,7 +18,7 @@ namespace Vibrant.Tsdb.Ats
    /// Implementation of IVolumeStorage that uses Azure Table Storage
    /// as its backend. 
    /// </summary>
-   public class AtsVolumeStorage : IVolumeStorage
+   public class AtsVolumeStorage : IVolumeStorage, IVolumeStorageSelector
    {
       private object _sync = new object();
       private SemaphoreSlim _getSemaphore;
@@ -29,6 +29,11 @@ namespace Vibrant.Tsdb.Ats
       private Task<CloudTable> _table;
 
       #region Public
+
+      public IVolumeStorage GetStorage( string id )
+      {
+         return this;
+      }
 
       /// <summary>
       /// Constructs an instance of IVolumeStorage.
@@ -202,7 +207,7 @@ namespace Vibrant.Tsdb.Ats
          return entries.As<TEntry>();
       }
 
-      public async Task<int> DeleteMulti( IEnumerable<string> ids, DateTime from, DateTime to )
+      public async Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          var tasks = new List<Task<int>>();
          foreach( var id in ids )
@@ -213,7 +218,7 @@ namespace Vibrant.Tsdb.Ats
          return tasks.Sum( x => x.Result );
       }
 
-      public async Task<int> DeleteMulti( IEnumerable<string> ids )
+      public async Task<int> Delete( IEnumerable<string> ids )
       {
          var tasks = new List<Task<int>>();
          foreach( var id in ids )
@@ -224,7 +229,7 @@ namespace Vibrant.Tsdb.Ats
          return tasks.Sum( x => x.Result );
       }
 
-      public async Task<MultiReadResult<IEntry>> ReadLatestMulti( IEnumerable<string> ids )
+      public async Task<MultiReadResult<IEntry>> ReadLatest( IEnumerable<string> ids )
       {
          var tasks = new List<Task<ReadResult<IEntry>>>();
          foreach( var id in ids )
@@ -235,7 +240,7 @@ namespace Vibrant.Tsdb.Ats
          return new MultiReadResult<IEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
       }
 
-      public async Task<MultiReadResult<TEntry>> ReadLatestMultiAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
+      public async Task<MultiReadResult<TEntry>> ReadLatestAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
       {
          var tasks = new List<Task<ReadResult<TEntry>>>();
          foreach( var id in ids )
@@ -246,7 +251,7 @@ namespace Vibrant.Tsdb.Ats
          return new MultiReadResult<TEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
       }
 
-      public async Task<MultiReadResult<IEntry>> ReadMulti( IEnumerable<string> ids )
+      public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids )
       {
          var tasks = new List<Task<ReadResult<IEntry>>>();
          foreach( var id in ids )
@@ -257,7 +262,7 @@ namespace Vibrant.Tsdb.Ats
          return new MultiReadResult<IEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
       }
 
-      public async Task<MultiReadResult<TEntry>> ReadMultiAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
+      public async Task<MultiReadResult<TEntry>> ReadAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
       {
          var tasks = new List<Task<ReadResult<TEntry>>>();
          foreach( var id in ids )
@@ -268,7 +273,7 @@ namespace Vibrant.Tsdb.Ats
          return new MultiReadResult<TEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
       }
 
-      public async Task<MultiReadResult<IEntry>> ReadMulti( IEnumerable<string> ids, DateTime from, DateTime to )
+      public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          var tasks = new List<Task<ReadResult<IEntry>>>();
          foreach( var id in ids )
@@ -279,7 +284,7 @@ namespace Vibrant.Tsdb.Ats
          return new MultiReadResult<IEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
       }
 
-      public async Task<MultiReadResult<TEntry>> ReadMultiAs<TEntry>( IEnumerable<string> ids, DateTime from, DateTime to ) where TEntry : IEntry
+      public async Task<MultiReadResult<TEntry>> ReadAs<TEntry>( IEnumerable<string> ids, DateTime from, DateTime to ) where TEntry : IEntry
       {
          var tasks = new List<Task<ReadResult<TEntry>>>();
          foreach( var id in ids )

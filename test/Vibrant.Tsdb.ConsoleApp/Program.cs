@@ -66,7 +66,7 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          store.Write( rows ).Wait();
 
-         var read = store.ReadMultiAs<BasicEntry>( Ids, from, to ).Result;
+         var read = store.ReadAs<BasicEntry>( Ids, from, to ).Result;
 
          Console.WriteLine( to );
          foreach( var r in read )
@@ -76,7 +76,7 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          var sum = read.Sum( x => x.Entries.Count );
 
-         var deletedCount = store.DeleteMulti( Ids, from, to ).Result;
+         var deletedCount = store.Delete( Ids, from, to ).Result;
 
          Console.WriteLine( sum );
 

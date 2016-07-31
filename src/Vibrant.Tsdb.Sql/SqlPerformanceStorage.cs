@@ -12,7 +12,7 @@ using Vibrant.Tsdb.Sql.Serialization;
 
 namespace Vibrant.Tsdb.Sql
 {
-   public class SqlPerformanceStorage : IPerformanceStorage
+   public class SqlPerformanceStorage : IPerformanceStorage, IPerformanceStorageSelector
    {
       private object _sync = new object();
       private string _tableName;
@@ -23,6 +23,11 @@ namespace Vibrant.Tsdb.Sql
       {
          _tableName = tableName;
          _connectionString = connectionString;
+      }
+
+      public IPerformanceStorage GetStorage( string id )
+      {
+         return this;
       }
 
       public Task Write( IEnumerable<IEntry> items )
@@ -76,44 +81,44 @@ namespace Vibrant.Tsdb.Sql
          return multiResult.FindResult( id ).As<TEntry>();
       }
 
-      public Task<int> DeleteMulti( IEnumerable<string> ids, DateTime from, DateTime to )
+      public Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          return DeleteForIds( ids, from, to );
       }
 
-      public Task<int> DeleteMulti( IEnumerable<string> ids )
+      public Task<int> Delete( IEnumerable<string> ids )
       {
          return DeleteForIds( ids );
       }
 
-      public Task<MultiReadResult<IEntry>> ReadLatestMulti( IEnumerable<string> ids )
+      public Task<MultiReadResult<IEntry>> ReadLatest( IEnumerable<string> ids )
       {
          return RetrieveLatestForIds( ids );
       }
 
-      public async Task<MultiReadResult<TEntry>> ReadLatestMultiAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
+      public async Task<MultiReadResult<TEntry>> ReadLatestAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
       {
          var result = await RetrieveLatestForIds( ids ).ConfigureAwait( false );
          return result.As<TEntry>();
       }
 
-      public Task<MultiReadResult<IEntry>> ReadMulti( IEnumerable<string> ids )
+      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids )
       {
          return RetrieveForIds( ids );
       }
 
-      public async Task<MultiReadResult<TEntry>> ReadMultiAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
+      public async Task<MultiReadResult<TEntry>> ReadAs<TEntry>( IEnumerable<string> ids ) where TEntry : IEntry
       {
          var result = await RetrieveForIds( ids ).ConfigureAwait( false );
          return result.As<TEntry>();
       }
 
-      public Task<MultiReadResult<IEntry>> ReadMulti( IEnumerable<string> ids, DateTime from, DateTime to )
+      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          return RetrieveForIds( ids, from, to );
       }
 
-      public async Task<MultiReadResult<TEntry>> ReadMultiAs<TEntry>( IEnumerable<string> ids, DateTime from, DateTime to ) where TEntry : IEntry
+      public async Task<MultiReadResult<TEntry>> ReadAs<TEntry>( IEnumerable<string> ids, DateTime from, DateTime to ) where TEntry : IEntry
       {
          var result = await RetrieveForIds( ids, from, to ).ConfigureAwait( false );
          return result.As<TEntry>();

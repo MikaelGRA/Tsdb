@@ -61,8 +61,8 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          var written = CreateRows( from, count );
          await store.Write( written );
-         var read = await store.ReadMultiAs<BasicEntry>( Ids, from, to );
-         var latest = await store.ReadLatestMultiAs<BasicEntry>( Ids );
+         var read = await store.ReadAs<BasicEntry>( Ids, from, to );
+         var latest = await store.ReadLatestAs<BasicEntry>( Ids );
 
          Dictionary<string, List<BasicEntry>> entries = new Dictionary<string, List<BasicEntry>>();
          foreach( var item in written )
@@ -76,7 +76,7 @@ namespace Vibrant.Tsdb.Ats.Tests
             items.Add( item );
          }
 
-         var deletedCount = await store.DeleteMulti( Ids, from, to );
+         var deletedCount = await store.Delete( Ids, from, to );
 
          foreach( var readResult in read )
          {
@@ -119,11 +119,11 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          await store.Write( written );
 
-         var deletedCount = await store.DeleteMulti( Ids, from, to );
+         var deletedCount = await store.Delete( Ids, from, to );
 
          Assert.Equal( count, deletedCount );
 
-         var read = await store.ReadMulti( Ids, from, to );
+         var read = await store.Read( Ids, from, to );
 
          Assert.Equal( 0, read.Sum( x => x.Entries.Count ) );
       }
@@ -146,15 +146,15 @@ namespace Vibrant.Tsdb.Ats.Tests
          await store.Write( written2 );
 
 
-         var rows = await store.ReadMulti( Ids );
+         var rows = await store.Read( Ids );
 
          Assert.Equal( count * 2, rows.Sum( x => x.Entries.Count ) );
 
-         var deletedCount = await store.DeleteMulti( Ids );
+         var deletedCount = await store.Delete( Ids );
 
          Assert.Equal( count * 2, deletedCount );
 
-         var read = await store.ReadMulti( Ids );
+         var read = await store.Read( Ids );
 
          Assert.Equal( 0, read.Sum( x => x.Entries.Count ) );
       }
