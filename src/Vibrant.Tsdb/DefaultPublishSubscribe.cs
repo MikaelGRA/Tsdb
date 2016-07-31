@@ -10,10 +10,10 @@ namespace Vibrant.Tsdb
    public class DefaultPublishSubscribe : IPublishSubscribe
    {
       private Task _completed = Task.FromResult( 0 );
-      private IDictionary<Action<List<IEntry>>, byte> _allCallbacks;
 
-      private IDictionary<string, HashSet<Action<List<IEntry>>>> _callbacks;
-      private readonly TaskFactory _taskFactory;
+      protected IDictionary<Action<List<IEntry>>, byte> _allCallbacks;
+      protected IDictionary<string, HashSet<Action<List<IEntry>>>> _callbacks;
+      protected readonly TaskFactory _taskFactory;
 
       public DefaultPublishSubscribe( bool continueOnCapturedSynchronizationContext )
       {
@@ -244,20 +244,6 @@ namespace Vibrant.Tsdb
          }
 
          return _completed;
-      }
-
-      protected void OnPublishedById( List<IEntry> entries )
-      {
-         var id = entries[ 0 ].GetId();
-
-         HashSet<Action<List<IEntry>>> subscribers;
-         if( _callbacks.TryGetValue( id, out subscribers ) )
-         {
-            foreach( var callback in subscribers )
-            {
-               _taskFactory.StartNew( () => callback( entries ) ); // dont wait for this
-            }
-         }
       }
    }
 }

@@ -74,7 +74,8 @@ namespace Vibrant.Tsdb
          tasks.AddRange( LookupPerformanceStorages( items ).Select( c => c.Storage.Write( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         // TODO: Publish
+         // QUESTION: Should we publish all??? Or just latest???
+         await _publishSubscribe.Publish( items ).ConfigureAwait( false );
       }
 
       public async Task Delete( IEnumerable<string> ids )

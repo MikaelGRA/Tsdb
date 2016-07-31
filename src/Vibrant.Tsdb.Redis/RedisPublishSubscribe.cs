@@ -77,7 +77,7 @@ namespace Vibrant.Tsdb.Redis
          List<Task> tasks = new List<Task>();
          foreach( var id in ids )
          {
-            tasks.Add( _connection.SubscribeAsync( id, OnPublishedById ) );
+            tasks.Add( _connection.SubscribeAsync( id, OnEntriesReceivedForId ) );
          }
          return Task.WhenAll( tasks );
       }
@@ -94,12 +94,35 @@ namespace Vibrant.Tsdb.Redis
 
       protected override Task OnSubscribedToAll()
       {
-         return _connection.SubscribeAsync( "*", OnPublishedById );
+         return _connection.SubscribeAsync( "*", OnEntriesReceivedForAll );
       }
 
       protected override Task OnUnsubscribedFromAll()
       {
          return _connection.UnsubscribeAsync( "*" );
+      }
+
+      private void OnEntriesReceivedForId( List<IEntry> entries )
+      {
+         var id = entries[ 0 ].GetId();
+
+         HashSet<Action<List<IEntry>>> subscribers;
+         if( _callbacks.TryGetValue( id, out subscribers ) )
+         {
+            foreach( var callback in subscribers )
+            {
+               _taskFactory.StartNew( () => callback( entries ) );
+            }
+         }
+      }
+
+      private void OnEntriesReceivedForAll( List<IEntry> entries )
+      {
+         var id = entries[ 0 ].GetId();
+         foreach( var callback in _allCallbacks )
+         {
+            _taskFactory.StartNew( () => callback.Key( entries ) );
+         }
       }
 
       internal async Task ConnectWithRetry()
@@ -137,6 +160,7 @@ namespace Vibrant.Tsdb.Redis
             await Task.Delay( ReconnectDelay ).ConfigureAwait( false );
          }
       }
+
       private async Task ConnectToRedisAsync()
       {
          if( _connection != null )

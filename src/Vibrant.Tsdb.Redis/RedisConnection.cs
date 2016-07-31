@@ -67,12 +67,10 @@ namespace Vibrant.Tsdb.Redis
 
          var arrays = RedisSerializer.Serialize( entries.ToList(), 64 * 1024 );
 
-         var keys = new RedisKey[] { id };
-
          var tasks = new List<Task>();
          foreach( var data in arrays )
          {
-            tasks.Add( _connection.GetDatabase( database ).PublishAsync( id, data ) );
+            tasks.Add( _redisSubscriber.PublishAsync( id, data ) );
          }
          return Task.WhenAll( tasks );
       }

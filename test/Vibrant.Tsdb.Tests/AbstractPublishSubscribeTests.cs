@@ -15,6 +15,8 @@ namespace Vibrant.Tsdb.Ats.Tests
       [Fact]
       public async Task Should_Subscribe_And_Publish()
       {
+         TsdbTypeRegistry.Register<BasicEntry>();
+
          var ps = CreatePublishSubscribe();
 
          await ps.WaitWhileDisconnected();
