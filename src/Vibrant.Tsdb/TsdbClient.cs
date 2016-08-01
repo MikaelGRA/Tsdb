@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class TsdbClient
+   public class TsdbClient : IStorage
    {
       private IPerformanceStorageSelector _performanceStorageSelector;
       private IVolumeStorageSelector _volumeStorageSelector;
@@ -68,30 +68,48 @@ namespace Vibrant.Tsdb
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      public async Task Write( IEnumerable<IEntry> items )
+      public Task Write( IEnumerable<IEntry> items )
+      {
+         return Write( items, Publish.None );
+      }
+
+      public async Task Write( IEnumerable<IEntry> items, Publish publish )
       {
          var tasks = new List<Task>();
          tasks.AddRange( LookupPerformanceStorages( items ).Select( c => c.Storage.Write( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         // QUESTION: Should we publish all??? Or just latest???
-         await _publishSubscribe.Publish( items ).ConfigureAwait( false );
+         switch( publish )
+         {
+            case Publish.None:
+               break;
+            case Publish.Latest:
+               await _publishSubscribe.Publish( FindLatestForEachId( items ) ).ConfigureAwait( false );
+               break;
+            case Publish.All:
+               await _publishSubscribe.Publish( items ).ConfigureAwait( false );
+               break;
+            default:
+               throw new ArgumentException( "publish" );
+         }
       }
 
-      public async Task Delete( IEnumerable<string> ids )
+      public async Task<int> Delete( IEnumerable<string> ids )
       {
-         var tasks = new List<Task>();
+         var tasks = new List<Task<int>>();
          tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
          tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
+         return tasks.Sum( x => x.Result );
       }
 
-      public async Task Delete( IEnumerable<string> ids, DateTime from, DateTime to )
+      public async Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to )
       {
-         var tasks = new List<Task>();
+         var tasks = new List<Task<int>>();
          tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, from, to ) ) );
          tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, from, to ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
+         return tasks.Sum( x => x.Result );
       }
 
       public async Task<MultiReadResult<TEntry>> ReadLatestAs<TEntry>( IEnumerable<string> ids )
@@ -182,6 +200,29 @@ namespace Vibrant.Tsdb
       }
 
       #region Lookup
+
+      private IEnumerable<IEntry> FindLatestForEachId( IEnumerable<IEntry> entries )
+      {
+         var foundEntries = new Dictionary<string, IEntry>();
+         foreach( var entry in entries )
+         {
+            var id = entry.GetId();
+
+            IEntry existingEntry;
+            if( !foundEntries.TryGetValue( id, out existingEntry ) )
+            {
+               foundEntries.Add( id, entry );
+            }
+            else
+            {
+               if( entry.GetTimestamp() > existingEntry.GetTimestamp() )
+               {
+                  foundEntries[ id ] = entry;
+               }
+            }
+         }
+         return foundEntries.Values;
+      }
 
       private IEnumerable<VolumeStorageLookupResult<IEntry>> LookupVolumeStorages( IEnumerable<IEntry> entries )
       {

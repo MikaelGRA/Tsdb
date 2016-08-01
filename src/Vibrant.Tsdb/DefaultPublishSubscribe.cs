@@ -14,6 +14,7 @@ namespace Vibrant.Tsdb
       protected IDictionary<Action<List<IEntry>>, byte> _allCallbacks;
       protected IDictionary<string, HashSet<Action<List<IEntry>>>> _callbacks;
       protected readonly TaskFactory _taskFactory;
+      protected bool _continueOnCapturedSynchronizationContext;
 
       public DefaultPublishSubscribe( bool continueOnCapturedSynchronizationContext )
       {
@@ -30,6 +31,7 @@ namespace Vibrant.Tsdb
             {
                var scheduler = TaskScheduler.FromCurrentSynchronizationContext();
                _taskFactory = new TaskFactory( scheduler );
+               _continueOnCapturedSynchronizationContext = true;
             }
          }
          else
@@ -218,30 +220,47 @@ namespace Vibrant.Tsdb
 
       protected Task OnPublished( IEnumerable<IEntry> entries )
       {
-         foreach( var entriesById in entries.GroupBy( x => x.GetId() ) )
+         _taskFactory.StartNew( () =>
          {
-            List<IEntry> entriesForSubscriber = null;
-
-            HashSet<Action<List<IEntry>>> subscribers;
-            if( _callbacks.TryGetValue( entriesById.Key, out subscribers ) )
+            foreach( var entriesById in entries.GroupBy( x => x.GetId() ) )
             {
-               entriesForSubscriber = entriesById.ToList();
-               foreach( var callback in subscribers )
-               {
-                  _taskFactory.StartNew( () => callback( entriesForSubscriber ) );
-               }
-            }
+               List<IEntry> entriesForSubscriber = null;
 
-            // then handle all
-            foreach( var callback in _allCallbacks )
-            {
-               if( entriesForSubscriber == null )
+               HashSet<Action<List<IEntry>>> subscribers;
+               if( _callbacks.TryGetValue( entriesById.Key, out subscribers ) )
                {
                   entriesForSubscriber = entriesById.ToList();
+                  foreach( var callback in subscribers )
+                  {
+                     try
+                     {
+                        callback( entriesForSubscriber );
+                     }
+                     catch( Exception )
+                     {
+
+                     }
+                  }
                }
-               _taskFactory.StartNew( () => callback.Key( entriesForSubscriber ) );
+
+               // then handle all
+               foreach( var callback in _allCallbacks )
+               {
+                  if( entriesForSubscriber == null )
+                  {
+                     entriesForSubscriber = entriesById.ToList();
+                  }
+                  try
+                  {
+                     callback.Key( entriesForSubscriber );
+                  }
+                  catch( Exception )
+                  {
+
+                  }
+               }
             }
-         }
+         } );
 
          return _completed;
       }

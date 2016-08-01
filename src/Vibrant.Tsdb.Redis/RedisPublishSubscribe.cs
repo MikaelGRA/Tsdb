@@ -104,8 +104,47 @@ namespace Vibrant.Tsdb.Redis
 
       private void OnEntriesReceivedForId( List<IEntry> entries )
       {
-         var id = entries[ 0 ].GetId();
+         if( _continueOnCapturedSynchronizationContext )
+         {
+            _taskFactory.StartNew( () => PublishToIndividual( entries ) );
+         }
+         else
+         {
+            PublishToIndividual( entries );
+         }
+      }
 
+      private void OnEntriesReceivedForAll( List<IEntry> entries )
+      {
+         if( _continueOnCapturedSynchronizationContext )
+         {
+            _taskFactory.StartNew( () => PublishToAll( entries ) );
+         }
+         else
+         {
+            PublishToAll( entries );
+         }
+      }
+
+      private void PublishToAll( List<IEntry> entries )
+      {
+         var id = entries[ 0 ].GetId();
+         foreach( var callback in _allCallbacks )
+         {
+            try
+            {
+               callback.Key( entries );
+            }
+            catch( Exception )
+            {
+
+            }
+         }
+      }
+
+      private void PublishToIndividual( List<IEntry> entries )
+      {
+         var id = entries[ 0 ].GetId();
          HashSet<Action<List<IEntry>>> subscribers;
          if( _callbacks.TryGetValue( id, out subscribers ) )
          {
@@ -113,30 +152,12 @@ namespace Vibrant.Tsdb.Redis
             {
                try
                {
-                  // TODO: Schedule callback IF captured context?
                   callback( entries );
                }
                catch( Exception )
                {
 
                }
-            }
-         }
-      }
-
-      private void OnEntriesReceivedForAll( List<IEntry> entries )
-      {
-         var id = entries[ 0 ].GetId();
-         foreach( var callback in _allCallbacks )
-         {
-            try
-            {
-               // TODO: Schedule callback IF captured context?
-               callback.Key( entries );
-            }
-            catch( Exception )
-            {
-
             }
          }
       }
