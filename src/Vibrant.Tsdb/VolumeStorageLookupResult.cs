@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-    public class VolumeStorageLookupResult<TItem> : StorageLookupResult<IVolumeStorage, TItem>
-    {
+   internal class VolumeStorageLookupResult<TItem> : StorageLookupResult<IVolumeStorage, TItem>
+   {
       public VolumeStorageLookupResult( IVolumeStorage storage )
          : base( storage )
       {

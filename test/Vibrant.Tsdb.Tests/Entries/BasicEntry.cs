@@ -34,7 +34,7 @@ namespace Vibrant.Tsdb.Ats.Tests.Entries
          Timestamp = timestamp;
       }
 
-      public byte GetTypeCode()
+      public ushort GetTypeCode()
       {
          return 1;
       }

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Sql
 {
-   public class SqlEntry
+   internal class SqlEntry
    {
       public string Id { get; set; }
 

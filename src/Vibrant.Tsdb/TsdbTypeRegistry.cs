@@ -7,12 +7,23 @@ using Vibrant.Tsdb.Exceptions;
 
 namespace Vibrant.Tsdb
 {
+   /// <summary>
+   /// Type registry for all implementation of IEntry that 
+   /// should can be used.
+   /// </summary>
    public static class TsdbTypeRegistry
    {
       private static readonly ConcurrentDictionary<int, Func<IEntry>> _entries = new ConcurrentDictionary<int, Func<IEntry>>();
 
+      /// <summary>
+      /// Gets or sets the max size of an entry in bytes.
+      /// </summary>
       public static int MaxEntrySizeInBytes = 1024;
 
+      /// <summary>
+      /// Registers the specified implementation of IEntry.
+      /// </summary>
+      /// <typeparam name="TEntry"></typeparam>
       public static void Register<TEntry>()
          where TEntry : IEntry, new()
       {
@@ -36,14 +47,14 @@ namespace Vibrant.Tsdb
          }
       }
 
-      public static IEntry CreateEntry( int typeCode )
+      /// <summary>
+      /// Creates an instance of IEntry identified by the given type code.
+      /// </summary>
+      /// <param name="typeCode"></param>
+      /// <returns></returns>
+      public static IEntry CreateEntry( ushort typeCode )
       {
          return _entries[ typeCode ]();
-      }
-
-      public static Func<IEntry> GetConstructor( int typeCode )
-      {
-         return _entries[ typeCode ];
       }
    }
 }

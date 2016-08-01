@@ -34,7 +34,7 @@ namespace Vibrant.Tsdb.ConsoleApp.Entries
          Timestamp = timestamp;
       }
 
-      public byte GetTypeCode()
+      public ushort GetTypeCode()
       {
          return 1;
       }

@@ -8,9 +8,9 @@ using Vibrant.Tsdb.Serialization;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public class TsdbTableEntity : TableEntity
+   internal class TsdbTableEntity : TableEntity
    {
-      public const int MaxByteCapacity = 63 * 1024;
+      public const int MaxByteCapacity = 64 * 1024;
       
       public byte[] P0 { get; set; }
 

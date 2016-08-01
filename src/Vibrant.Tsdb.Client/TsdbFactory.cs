@@ -8,6 +8,9 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.Client
 {
+   /// <summary>
+   /// Factory class that allows easy instantiation of TsdbClient and TsdbEngine.
+   /// </summary>
    public static class TsdbFactory
    {
       public static TsdbClient CreateClient( string sqlTableName, string sqlConnectionString, string atsTableNamme, string atsConnectionString )

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-    public class StorageLookupResult<TStorage, TItem>
+   internal class StorageLookupResult<TStorage, TItem>
       where TStorage : IStorage
     {
       public StorageLookupResult( TStorage storage )

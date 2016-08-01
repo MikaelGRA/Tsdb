@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
+   /// <summary>
+   /// Simple publish subscribe implementation that only works locally.
+   /// </summary>
    public class DefaultPublishSubscribe : IPublishSubscribe
    {
       private Task _completed = Task.FromResult( 0 );

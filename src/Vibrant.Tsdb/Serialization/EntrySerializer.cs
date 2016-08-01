@@ -37,7 +37,7 @@ namespace Vibrant.Tsdb.Serialization
 
       public static IEntry DeserializeEntry( BinaryReader reader, string id, bool readTimestamp )
       {
-         var typeCode = reader.ReadByte();
+         var typeCode = reader.ReadUInt16();
          var entry = TsdbTypeRegistry.CreateEntry( typeCode );
          entry.SetId( id );
          if( readTimestamp )
@@ -50,7 +50,7 @@ namespace Vibrant.Tsdb.Serialization
 
       public static IEntry DeserializeEntry( BinaryReader reader, bool readTimestamp )
       {
-         var typeCode = reader.ReadByte();
+         var typeCode = reader.ReadUInt16();
          var entry = TsdbTypeRegistry.CreateEntry( typeCode );
          entry.SetId( reader.ReadString() );
          if( readTimestamp )

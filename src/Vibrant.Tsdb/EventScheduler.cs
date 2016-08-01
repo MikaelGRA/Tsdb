@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class EventScheduler : IDisposable
+   internal class EventScheduler : IDisposable
    {
       private SortedDictionary<DateTime, HashSet<Action<DateTime>>> _sortedCommands = new SortedDictionary<DateTime, HashSet<Action<DateTime>>>();
       private Timer _timer;

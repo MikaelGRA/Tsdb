@@ -1,15 +1,41 @@
 ﻿{
    "version": "1.0.0-*",
+   "title": "SQL storage for TSDB client",
+   "description": "An easy-to-use timeseries database client that allows storing of masses of simple of data structures identified by a string id and a timestamp.",
+   "authors": [ "MikaelGRA" ],
+   "packOptions": {
+      "owners": [ "MikaelGRA" ],
+      "tags": [ "time", "nosql", "timeseries", "data", "dapper", "sql" ],
+      "projectUrl": "https://github.com/MikaelGRA/Tsdb",
+      "licenseUrl": "https://github.com/MikaelGRA/Tsdb/blob/master/LICENSE",
+      "releaseNotes": "https://github.com/MikaelGRA/Tsdb/blob/master/CHANGELOG.md"
+   },
+   "copyright": "Copyright (c) 2015-2016 MikaelGRA",
 
    "dependencies": {
       "Vibrant.Tsdb": "1.0.0-*",
-      "NETStandard.Library": "1.6.0",
       "Dapper": "1.50.2"
    },
 
    "frameworks": {
-      "netstandard1.6": {
+      "net45": {
+
+      },
+      "netstandard1.3": {
          "imports": "dnxcore50"
+      }
+   },
+   "scripts": {
+      "postcompile": [
+         "dotnet pack --no-build --configuration %compile:Configuration%"
+      ]
+   },
+   "configurations": {
+      "Release": {
+         "buildOptions": {
+            "optimize": true,
+            "xmlDoc": true
+         }
       }
    }
 }

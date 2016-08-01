@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Exceptions
 {
-
    public class TsdbException : Exception
    {
       public TsdbException() { }

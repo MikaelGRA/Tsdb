@@ -7,7 +7,7 @@ using Vibrant.Tsdb.Ats.Serialization;
 
 namespace Vibrant.Tsdb.Redis
 {
-   public class RedisConnection : IDisposable
+   internal class RedisConnection : IDisposable
    {
       public event Action<Exception> ConnectionFailed;
       public event Action<Exception> ConnectionRestored;
@@ -27,11 +27,11 @@ namespace Vibrant.Tsdb.Redis
          _redisSubscriber = _connection.GetSubscriber();
       }
 
-      public void Close( string key, bool allowCommandsToComplete = true )
+      public void Close( bool allowCommandsToComplete = true )
       {
          if( _redisSubscriber != null )
          {
-            _redisSubscriber.Unsubscribe( key );
+            _redisSubscriber.UnsubscribeAll();
          }
 
          if( _connection != null )

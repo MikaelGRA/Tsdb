@@ -11,7 +11,6 @@ namespace Vibrant.Tsdb.Redis
       private TaskCompletionSource<bool> _waitWhileDisconnected;
       private RedisConnection _connection;
       private string _connectionString;
-      private string _key;
       private int _state;
 
       public RedisPublishSubscribe( string connectionString, bool continueOnCapturedSynchronizationContext )
@@ -35,7 +34,7 @@ namespace Vibrant.Tsdb.Redis
       {
          if( _connection != null )
          {
-            _connection.Close( _key, allowCommandsToComplete: false );
+            _connection.Close( allowCommandsToComplete: false );
          }
 
          Interlocked.Exchange( ref _state, State.Disposed );
@@ -183,7 +182,7 @@ namespace Vibrant.Tsdb.Redis
 
                break;
             }
-            catch( Exception ex )
+            catch( Exception )
             {
                // Error connecting to redis
             }
