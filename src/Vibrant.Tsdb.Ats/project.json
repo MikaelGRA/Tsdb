@@ -22,10 +22,7 @@
 
       },
       "netstandard1.3": {
-         "imports": [
-            "dnxcore50",
-            "portable-net451+win8"
-         ]
+         "imports": "portable-net451+win8"
       }
    },
    "scripts": {
