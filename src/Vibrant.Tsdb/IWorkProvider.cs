@@ -7,6 +7,12 @@ namespace Vibrant.Tsdb
 {
    public interface IWorkProvider
    {
-      DateTime GetNextActionTime( string id );
+      event Action<TsdbVolumeMoval> MovalChangedOrAdded;
+
+      event Action<string> MovalRemoved;
+
+      Task<IEnumerable<TsdbVolumeMoval>> GetAllMovalsAsync( DateTime now );
+
+      Task<TsdbVolumeMoval> GetMovalAsync( string id );
    }
 }

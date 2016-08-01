@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class TsdbClient : IStorage
+   public class TsdbClient : IStorage, ISubscribe
    {
       private IPerformanceStorageSelector _performanceStorageSelector;
       private IVolumeStorageSelector _volumeStorageSelector;
@@ -197,6 +197,16 @@ namespace Vibrant.Tsdb
          tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Read( c.Lookups, from, to ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();
+      }
+
+      public Task<Func<Task>> Subscribe( IEnumerable<string> ids, Action<List<IEntry>> callback )
+      {
+         return _publishSubscribe.Subscribe( ids, callback );
+      }
+
+      public Task<Func<Task>> SubscribeToAll( Action<List<IEntry>> callback )
+      {
+         return _publishSubscribe.SubscribeToAll( callback );
       }
 
       #region Lookup
