@@ -20,7 +20,7 @@ namespace Vibrant.Tsdb
       public async void Execute( DateTime timestamp )
       {
          await _engine.Client.MoveToVolumeStorage( new[] { _moval.Id }, _moval.To ).ConfigureAwait( false );
-         var newMoval = await _engine.Work.GetMovalAsync( _moval.Id ).ConfigureAwait( false );
+         var newMoval = await _engine.Work.GetMovalAsync( _moval ).ConfigureAwait( false );
 
          if( newMoval != null )
          {

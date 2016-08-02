@@ -13,6 +13,6 @@ namespace Vibrant.Tsdb
 
       Task<IEnumerable<TsdbVolumeMoval>> GetAllMovalsAsync( DateTime now );
 
-      Task<TsdbVolumeMoval> GetMovalAsync( string id );
+      Task<TsdbVolumeMoval> GetMovalAsync( TsdbVolumeMoval completedMoval );
    }
 }
