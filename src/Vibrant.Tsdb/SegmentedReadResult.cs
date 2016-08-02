@@ -8,14 +8,14 @@ namespace Vibrant.Tsdb
    public class SegmentedReadResult<TEntry> : ReadResult<TEntry>
      where TEntry : IEntry
    {
-      public SegmentedReadResult( string id, object continuationToken, List<TEntry> entries )
-         : base( id, entries )
+      public SegmentedReadResult( string id, Sort sort, object continuationToken, List<TEntry> entries )
+         : base( id, sort, entries )
       {
          ContinuationToken = continuationToken;
       }
 
-      public SegmentedReadResult( string id, object continuationToken )
-         : base( id )
+      public SegmentedReadResult( string id, Sort sort, object continuationToken )
+         : base( id, sort )
       {
          ContinuationToken = continuationToken;
       }
@@ -25,7 +25,7 @@ namespace Vibrant.Tsdb
       public new ReadResult<TOutputEntry> As<TOutputEntry>()
          where TOutputEntry : IEntry
       {
-         return new ReadResult<TOutputEntry>( Id, Entries.Cast<TOutputEntry>().ToList() );
+         return new SegmentedReadResult<TOutputEntry>( Id, Sort, Entries.Cast<TOutputEntry>().ToList() );
       }
    }
 }

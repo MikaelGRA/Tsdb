@@ -10,13 +10,13 @@ namespace Vibrant.Tsdb.Ats
 {
    internal class TsdbTableEntity : TableEntity
    {
-      public const int MaxByteCapacity = 64 * 1024;
+      public const int MaxByteCapacity = ( 64 * 1024 ) - 4;
       
       public byte[] P0 { get; set; }
 
-      public List<IEntry> GetEntries()
+      public IEntry[] GetEntries( Sort sort )
       {
-         return AtsSerializer.Deserialize( PartitionKey, P0 );
+         return AtsSerializer.Deserialize( PartitionKey, P0, sort );
       }
 
       /// <summary>

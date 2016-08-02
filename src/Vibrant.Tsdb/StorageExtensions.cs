@@ -29,27 +29,27 @@ namespace Vibrant.Tsdb
          return mr.FindResult( id ).As<TEntry>();
       }
 
-      public async static Task<ReadResult<IEntry>> Read( this IStorage storage, string id )
+      public async static Task<ReadResult<IEntry>> Read( this IStorage storage, string id, Sort sort = Sort.Descending )
       {
-         var mr = await storage.Read( new[] { id } ).ConfigureAwait( false );
+         var mr = await storage.Read( new[] { id }, sort ).ConfigureAwait( false );
          return mr.FindResult( id );
       }
 
-      public async static Task<ReadResult<TEntry>> ReadAs<TEntry>( this IStorage storage, string id ) where TEntry : IEntry
+      public async static Task<ReadResult<TEntry>> ReadAs<TEntry>( this IStorage storage, string id, Sort sort = Sort.Descending ) where TEntry : IEntry
       {
-         var mr = await storage.Read( new[] { id } ).ConfigureAwait( false );
+         var mr = await storage.Read( new[] { id }, sort ).ConfigureAwait( false );
          return mr.FindResult( id ).As<TEntry>();
       }
 
-      public async static Task<ReadResult<IEntry>> Read( this IStorage storage, string id, DateTime from, DateTime to )
+      public async static Task<ReadResult<IEntry>> Read( this IStorage storage, string id, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
-         var mr = await storage.Read( new[] { id }, from, to ).ConfigureAwait( false );
+         var mr = await storage.Read( new[] { id }, from, to, sort ).ConfigureAwait( false );
          return mr.FindResult( id );
       }
 
-      public async static Task<ReadResult<TEntry>> ReadAs<TEntry>( this IStorage storage, string id, DateTime from, DateTime to ) where TEntry : IEntry
+      public async static Task<ReadResult<TEntry>> ReadAs<TEntry>( this IStorage storage, string id, DateTime from, DateTime to, Sort sort = Sort.Descending ) where TEntry : IEntry
       {
-         var mr = await storage.Read( new[] { id }, from, to ).ConfigureAwait( false );
+         var mr = await storage.Read( new[] { id }, from, to, sort ).ConfigureAwait( false );
          return mr.FindResult( id ).As<TEntry>();
       }
 
@@ -59,15 +59,15 @@ namespace Vibrant.Tsdb
          return mr.As<TEntry>();
       }
 
-      public async static Task<MultiReadResult<TEntry>> ReadAs<TEntry>( this IStorage storage, IEnumerable<string> ids ) where TEntry : IEntry
+      public async static Task<MultiReadResult<TEntry>> ReadAs<TEntry>( this IStorage storage, IEnumerable<string> ids, Sort sort = Sort.Descending ) where TEntry : IEntry
       {
-         var mr = await storage.Read( ids ).ConfigureAwait( false );
+         var mr = await storage.Read( ids, sort ).ConfigureAwait( false );
          return mr.As<TEntry>();
       }
 
-      public async static Task<MultiReadResult<TEntry>> ReadAs<TEntry>( this IStorage storage, IEnumerable<string> ids, DateTime from, DateTime to ) where TEntry : IEntry
+      public async static Task<MultiReadResult<TEntry>> ReadAs<TEntry>( this IStorage storage, IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending ) where TEntry : IEntry
       {
-         var mr = await storage.Read( ids, from, to ).ConfigureAwait( false );
+         var mr = await storage.Read( ids, from, to, sort ).ConfigureAwait( false );
          return mr.As<TEntry>();
       }
    }

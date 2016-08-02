@@ -59,7 +59,7 @@ namespace Vibrant.Tsdb.Ats
          List<Task> tasks = new List<Task>();
 
          // split all entries by their id
-         foreach( var entry in items.SplitEntriesById() )
+         foreach( var entry in items.SplitEntriesById( Sort.Descending ) )
          {
             var id = entry.Id;
             var from = entry.From;
@@ -105,23 +105,23 @@ namespace Vibrant.Tsdb.Ats
          return tasks.Select( x => x.Result ).Combine();
       }
 
-      public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids )
+      public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<ReadResult<IEntry>>>();
          foreach( var id in ids )
          {
-            tasks.Add( ReadForId( id ) );
+            tasks.Add( ReadForId( id, sort ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return new MultiReadResult<IEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
       }
 
-      public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to )
+      public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<ReadResult<IEntry>>>();
          foreach( var id in ids )
          {
-            tasks.Add( ReadForId( id, from, to ) );
+            tasks.Add( ReadForId( id, from, to, sort ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return new MultiReadResult<IEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
@@ -135,26 +135,29 @@ namespace Vibrant.Tsdb.Ats
 
          return new ReadResult<IEntry>(
             id,
+            Sort.Descending,
             results.SelectMany( x => x.Entries ).Take( 1 )
                .ToList() );
       }
 
-      private async Task<ReadResult<IEntry>> ReadForId( string id )
+      private async Task<ReadResult<IEntry>> ReadForId( string id, Sort sort )
       {
-         var results = await RetrieveAllForId( id ).ConfigureAwait( false );
+         var results = await RetrieveAllForId( id, sort ).ConfigureAwait( false );
 
          return new ReadResult<IEntry>(
             id,
+            sort,
             results.SelectMany( x => x.Entries )
                .ToList() );
       }
 
-      private async Task<ReadResult<IEntry>> ReadForId( string id, DateTime from, DateTime to )
+      private async Task<ReadResult<IEntry>> ReadForId( string id, DateTime from, DateTime to, Sort sort )
       {
-         var results = await RetrieveRangeForId( id, from, to ).ConfigureAwait( false );
+         var results = await RetrieveRangeForId( id, from, to, sort ).ConfigureAwait( false );
 
          return new ReadResult<IEntry>(
             id,
+            sort,
             results.SelectMany( x => x.Entries )
                .Where( x => x.GetTimestamp() >= from && x.GetTimestamp() < to )
                .ToList() );
@@ -162,7 +165,7 @@ namespace Vibrant.Tsdb.Ats
 
       private async Task<int> DeleteForId( string id, DateTime from, DateTime to )
       {
-         var retrievals = await RetrieveRangeForId( id, from, to ).ConfigureAwait( false );
+         var retrievals = await RetrieveRangeForId( id, from, to, Sort.Descending ).ConfigureAwait( false );
 
          var oldEntities = retrievals.ToDictionary( x => x.Row.RowKey, x => x.Row );
          var oldEntries = retrievals.SelectMany( x => x.Entries ).ToList();
@@ -182,7 +185,7 @@ namespace Vibrant.Tsdb.Ats
 
       private async Task<int> DeleteAllForId( string id )
       {
-         var retrievals = await RetrieveAllForId( id ).ConfigureAwait( false );
+         var retrievals = await RetrieveAllForId( id, Sort.Descending ).ConfigureAwait( false );
 
          var oldEntities = retrievals.ToDictionary( x => x.Row.RowKey, x => x.Row );
          var oldEntries = retrievals.SelectMany( x => x.Entries ).ToList();
@@ -204,14 +207,14 @@ namespace Vibrant.Tsdb.Ats
       private async Task StoreForId( string id, IEnumerable<IEntry> newEntries, DateTime from, DateTime to )
       {
          // retrieve existing entries for this period
-         var retrievals = await RetrieveRangeForId( id, from, to ).ConfigureAwait( false );
+         var retrievals = await RetrieveRangeForId( id, from, to, Sort.Descending ).ConfigureAwait( false );
          var oldEntities = retrievals.ToDictionary( x => x.Row.RowKey, x => x.Row );
 
          // merge results
          var oldEntries = retrievals.SelectMany( x => x.Entries ).ToList();
          var mergedEntries = MergeSort.Sort(
             collections: new IEnumerable<IEntry>[] { newEntries, oldEntries },
-            comparer: new EntryComparer<IEntry>(),
+            comparer: EntryComparer.GetComparer<IEntry>( Sort.Descending ),
             resolveConflict: x => x.First() ); // prioritize the item from the first collection (new one)
 
          // create new entities
@@ -323,7 +326,7 @@ namespace Vibrant.Tsdb.Ats
          return tableEntities;
       }
 
-      private async Task<List<AtsQueryResult>> RetrieveAllForId( string id )
+      private async Task<List<AtsQueryResult>> RetrieveAllForId( string id, Sort sort )
       {
          await _getSemaphore.WaitAsync().ConfigureAwait( false );
          try
@@ -331,7 +334,14 @@ namespace Vibrant.Tsdb.Ats
             var fullQuery = new TableQuery<TsdbTableEntity>()
                .Where( CreatePartitionFilter( id ) );
 
-            return await PerformQuery( fullQuery, true ).ConfigureAwait( false );
+            var query = await PerformQuery( fullQuery, true, sort ).ConfigureAwait( false );
+
+            if( sort == Sort.Ascending )
+            {
+               query.Reverse();
+            }
+
+            return query;
          }
          finally
          {
@@ -348,7 +358,9 @@ namespace Vibrant.Tsdb.Ats
                .Where( CreatePartitionFilter( id ) )
                .Take( 1 );
 
-            return await PerformQuery( fullQuery, false ).ConfigureAwait( false );
+            var query = await PerformQuery( fullQuery, false, Sort.Descending ).ConfigureAwait( false );
+
+            return query;
          }
          finally
          {
@@ -356,7 +368,7 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private async Task<List<AtsQueryResult>> RetrieveRangeForId( string id, DateTime from, DateTime to )
+      private async Task<List<AtsQueryResult>> RetrieveRangeForId( string id, DateTime from, DateTime to, Sort sort )
       {
          await _getSemaphore.WaitAsync().ConfigureAwait( false );
          try
@@ -368,12 +380,17 @@ namespace Vibrant.Tsdb.Ats
                .Where( CreateFirstFilter( id, from ) )
                .Take( 1 );
 
-            var generalQueryTask = PerformQuery( generalQuery, true );
-            var firstQueryTask = PerformQuery( firstQuery, false );
+            var generalQueryTask = PerformQuery( generalQuery, true, sort );
+            var firstQueryTask = PerformQuery( firstQuery, false, sort );
 
             await Task.WhenAll( generalQueryTask, firstQueryTask ).ConfigureAwait( false );
 
             firstQueryTask.Result.AddRange( generalQueryTask.Result );
+
+            if( sort == Sort.Ascending )
+            {
+               firstQueryTask.Result.Reverse();
+            }
 
             return firstQueryTask.Result;
          }
@@ -383,7 +400,7 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private async Task<List<AtsQueryResult>> PerformQuery( TableQuery<TsdbTableEntity> query, bool takeAll )
+      private async Task<List<AtsQueryResult>> PerformQuery( TableQuery<TsdbTableEntity> query, bool takeAll, Sort sort )
       {
          List<AtsQueryResult> results = new List<AtsQueryResult>();
 
@@ -392,7 +409,7 @@ namespace Vibrant.Tsdb.Ats
          {
             var table = await GetTable().ConfigureAwait( false );
             var rows = await table.ExecuteQuerySegmentedAsync( query, takeAll ? token : null ).ConfigureAwait( false );
-            results.AddRange( rows.Select( x => new AtsQueryResult( x ) ) );
+            results.AddRange( rows.Select( x => new AtsQueryResult( x, sort ) ) );
             token = rows.ContinuationToken;
          }
          while( token != null && takeAll );

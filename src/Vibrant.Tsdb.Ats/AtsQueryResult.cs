@@ -7,20 +7,22 @@ namespace Vibrant.Tsdb.Ats
 {
    internal class AtsQueryResult
    {
-      private List<IEntry> _entries;
+      private IEntry[] _entries;
+      private Sort _sort;
 
-      public AtsQueryResult( TsdbTableEntity row )
+      public AtsQueryResult( TsdbTableEntity row, Sort sort )
       {
          Row = row;
+         _sort = sort;
       }
 
       public TsdbTableEntity Row { get; private set; }
 
-      public List<IEntry> Entries
+      public IEntry[] Entries
       {
          get
          {
-            return _entries ?? ( _entries = Row.GetEntries() );
+            return _entries ?? ( _entries = Row.GetEntries( _sort ) );
          }
       }
    }

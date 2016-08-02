@@ -15,8 +15,8 @@ namespace Vibrant.Tsdb
 
       Task<MultiReadResult<IEntry>> ReadLatest( IEnumerable<string> ids );
 
-      Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids );
+      Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending );
 
-      Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to );
+      Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending );
    }
 }

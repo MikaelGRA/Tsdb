@@ -47,12 +47,14 @@ namespace Vibrant.Tsdb.Ats.Tests
 
       public abstract IStorage GetStorage( string tableName );
 
-      [Fact]
-      public async Task Should_Write_And_Read_Basic_Rows()
+      [Theory]
+      [InlineData( Sort.Descending )]
+      [InlineData( Sort.Ascending )]
+      public async Task Should_Write_And_Read_Basic_Rows( Sort sort )
       {
          TsdbTypeRegistry.Register<BasicEntry>();
 
-         var store = GetStorage( "Table1");
+         var store = GetStorage( "Table1" );
 
          int count = 500000;
 
@@ -61,7 +63,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          var written = CreateRows( from, count );
          await store.Write( written );
-         var read = await store.ReadAs<BasicEntry>( Ids, from, to );
+         var read = await store.ReadAs<BasicEntry>( Ids, from, to, sort );
          var latest = await store.ReadLatestAs<BasicEntry>( Ids );
 
          Dictionary<string, List<BasicEntry>> entries = new Dictionary<string, List<BasicEntry>>();
@@ -80,7 +82,11 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          foreach( var readResult in read )
          {
-            var sourceList = entries[ readResult.Id ].Reverse<BasicEntry>().ToList();
+            var sourceList = entries[ readResult.Id ].ToList();
+            if( sort == Sort.Descending )
+            {
+               sourceList.Reverse();
+            }
 
             Assert.Equal( sourceList.Count, readResult.Entries.Count );
             for( int i = 0 ; i < sourceList.Count ; i++ )
@@ -91,7 +97,7 @@ namespace Vibrant.Tsdb.Ats.Tests
                Assert.Equal( original.Value, readen.Value );
                Assert.Equal( original.Timestamp, readen.Timestamp );
 
-               if( i == 0 )
+               if( ( i == 0 && sort == Sort.Descending ) || ( i == sourceList.Count - 1 && sort == Sort.Ascending ) )
                {
                   var latestEntry = latest.First( x => x.Id == readResult.Id );
                   var entry = latestEntry.Entries[ 0 ];
@@ -103,8 +109,10 @@ namespace Vibrant.Tsdb.Ats.Tests
          }
       }
 
-      [Fact]
-      public async Task Should_Write_And_Delete_Basic_Rows()
+      [Theory]
+      [InlineData( Sort.Descending )]
+      [InlineData( Sort.Ascending )]
+      public async Task Should_Write_And_Delete_Basic_Rows( Sort sort )
       {
          TsdbTypeRegistry.Register<BasicEntry>();
 
@@ -123,13 +131,15 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          Assert.Equal( count, deletedCount );
 
-         var read = await store.Read( Ids, from, to );
+         var read = await store.Read( Ids, from, to, sort );
 
          Assert.Equal( 0, read.Sum( x => x.Entries.Count ) );
       }
 
-      [Fact]
-      public async Task Should_Write_Twice_Then_Delete_All_Basic_Rows()
+      [Theory]
+      [InlineData( Sort.Descending )]
+      [InlineData( Sort.Ascending )]
+      public async Task Should_Write_Twice_Then_Delete_All_Basic_Rows( Sort sort )
       {
          TsdbTypeRegistry.Register<BasicEntry>();
 
@@ -154,7 +164,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          Assert.Equal( count * 2, deletedCount );
 
-         var read = await store.Read( Ids );
+         var read = await store.Read( Ids, sort );
 
          Assert.Equal( 0, read.Sum( x => x.Entries.Count ) );
       }

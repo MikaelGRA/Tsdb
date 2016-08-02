@@ -55,19 +55,19 @@ namespace Vibrant.Tsdb.Sql
          return RetrieveLatestForIds( ids );
       }
 
-      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids )
+      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending )
       {
-         return RetrieveForIds( ids );
+         return RetrieveForIds( ids, sort );
       }
 
-      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime to )
+      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime to, Sort sort = Sort.Descending )
       {
-         return RetrieveForIds( ids, to );
+         return RetrieveForIds( ids, to, sort );
       }
 
-      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to )
+      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
-         return RetrieveForIds( ids, from, to );
+         return RetrieveForIds( ids, from, to, sort );
       }
 
       private async Task CreateTableLocked()
@@ -107,7 +107,7 @@ namespace Vibrant.Tsdb.Sql
             {
                SqlDataRecord record = new SqlDataRecord( Sql.InsertParameterMetadata );
                record.SetString( 0, entry.GetId() );
-               record.SetDateTime( 1, entry.GetTimestamp() ); 
+               record.SetDateTime( 1, entry.GetTimestamp() );
                record.SetSqlBinary( 2, new SqlBinary( data ) );
                records.Add( record );
             } );
@@ -125,7 +125,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<MultiReadResult<IEntry>> RetrieveForIds( IEnumerable<string> ids, DateTime to )
+      private async Task<MultiReadResult<IEntry>> RetrieveForIds( IEnumerable<string> ids, DateTime to, Sort sort )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -134,14 +134,14 @@ namespace Vibrant.Tsdb.Sql
             await connection.OpenAsync().ConfigureAwait( false );
 
             var sqlEntries = await connection.QueryAsync<SqlEntry>(
-               sql: Sql.GetBottomlessQuery( _tableName ),
+               sql: Sql.GetBottomlessQuery( _tableName, sort ),
                param: new { Ids = ids, To = to } ).ConfigureAwait( false );
 
-            return CreateReadResult( sqlEntries, ids );
+            return CreateReadResult( sqlEntries, ids, sort );
          }
       }
 
-      private async Task<MultiReadResult<IEntry>> RetrieveForIds( IEnumerable<string> ids, DateTime from, DateTime to )
+      private async Task<MultiReadResult<IEntry>> RetrieveForIds( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -150,14 +150,14 @@ namespace Vibrant.Tsdb.Sql
             await connection.OpenAsync().ConfigureAwait( false );
 
             var sqlEntries = await connection.QueryAsync<SqlEntry>(
-               sql: Sql.GetRangedQuery( _tableName ),
+               sql: Sql.GetRangedQuery( _tableName, sort ),
                param: new { Ids = ids, From = from, To = to } ).ConfigureAwait( false );
 
-            return CreateReadResult( sqlEntries, ids );
+            return CreateReadResult( sqlEntries, ids, sort );
          }
       }
 
-      private async Task<MultiReadResult<IEntry>> RetrieveForIds( IEnumerable<string> ids )
+      private async Task<MultiReadResult<IEntry>> RetrieveForIds( IEnumerable<string> ids, Sort sort )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -166,10 +166,10 @@ namespace Vibrant.Tsdb.Sql
             await connection.OpenAsync().ConfigureAwait( false );
 
             var sqlEntries = await connection.QueryAsync<SqlEntry>(
-               sql: Sql.GetQuery( _tableName ),
+               sql: Sql.GetQuery( _tableName, sort ),
                param: new { Ids = ids } ).ConfigureAwait( false );
 
-            return CreateReadResult( sqlEntries, ids );
+            return CreateReadResult( sqlEntries, ids, sort );
          }
       }
 
@@ -192,7 +192,7 @@ namespace Vibrant.Tsdb.Sql
 
             await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-            return CreateReadResult( tasks.SelectMany( x => x.Result ), ids );
+            return CreateReadResult( tasks.SelectMany( x => x.Result ), ids, Sort.Descending );
          }
       }
 
@@ -238,25 +238,25 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private MultiReadResult<IEntry> CreateReadResult( IEnumerable<SqlEntry> sqlEntries, IEnumerable<string> requiredIds )
+      private MultiReadResult<IEntry> CreateReadResult( IEnumerable<SqlEntry> sqlEntries, IEnumerable<string> requiredIds, Sort sort )
       {
          IDictionary<string, ReadResult<IEntry>> results = new Dictionary<string, ReadResult<IEntry>>();
          foreach( var id in requiredIds )
          {
-            results[ id ] = new ReadResult<IEntry>( id );
+            results[ id ] = new ReadResult<IEntry>( id, sort );
          }
+
+         ReadResult<IEntry> currentResult = null;
 
          foreach( var entry in SqlSerializer.Deserialize( sqlEntries ) )
          {
             var id = entry.GetId();
-
-            ReadResult<IEntry> readResult;
-            if( !results.TryGetValue( id, out readResult ) )
+            if( currentResult == null || currentResult.Id != id )
             {
-               readResult = new ReadResult<IEntry>( id );
-               results.Add( id, readResult );
+               currentResult = results[ id ];
             }
-            readResult.Entries.Add( entry );
+
+            currentResult.Entries.Add( entry );
          }
 
          return new MultiReadResult<IEntry>( results );

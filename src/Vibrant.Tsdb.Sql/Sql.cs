@@ -118,19 +118,40 @@ END
          return $"DELETE FROM [dbo].[{tableName}] WHERE [Id] IN @Ids";
       }
 
-      public static string GetRangedQuery( string tableName )
+      public static string GetRangedQuery( string tableName, Sort sort )
       {
-         return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] IN @Ids AND [Timestamp] >= @From AND [Timestamp] < @To ORDER BY [Id] ASC, [Timestamp] DESC";
+         if( sort == Sort.Ascending )
+         {
+            return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] IN @Ids AND [Timestamp] >= @From AND [Timestamp] < @To ORDER BY [Id] ASC, [Timestamp] ASC";
+         }
+         else
+         {
+            return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] IN @Ids AND [Timestamp] >= @From AND [Timestamp] < @To ORDER BY [Id] ASC, [Timestamp] DESC";
+         }
       }
 
-      public static string GetBottomlessQuery( string tableName )
+      public static string GetBottomlessQuery( string tableName, Sort sort )
       {
-         return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] IN @Ids AND [Timestamp] < @To ORDER BY [Id] ASC, [Timestamp] DESC";
+         if( sort == Sort.Ascending )
+         {
+            return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] IN @Ids AND [Timestamp] < @To ORDER BY [Id] ASC, [Timestamp] ASC";
+         }
+         else
+         {
+            return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] IN @Ids AND [Timestamp] < @To ORDER BY [Id] ASC, [Timestamp] DESC";
+         }
       }
 
-      public static string GetQuery( string tableName )
+      public static string GetQuery( string tableName, Sort sort )
       {
-         return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] IN @Ids ORDER BY [Id] ASC, [Timestamp] DESC";
+         if( sort == Sort.Ascending )
+         {
+            return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] IN @Ids ORDER BY [Id] ASC, [Timestamp] ASC";
+         }
+         else
+         {
+            return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] IN @Ids ORDER BY [Id] ASC, [Timestamp] DESC";
+         }
       }
 
       public static string GetLatestQuery( string tableName )

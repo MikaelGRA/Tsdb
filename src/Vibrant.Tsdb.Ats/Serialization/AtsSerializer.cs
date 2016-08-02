@@ -36,8 +36,15 @@ namespace Vibrant.Tsdb.Ats.Serialization
                int otherEntryYear = timestamp.Year;
                if( batchYear != otherEntryYear )
                {
+                  writer.Write( serializedEntries.Count );
+                  var length = stream.ToArray();
+
+                  // reset stream
+                  stream.Seek( 0, SeekOrigin.Begin );
+                  stream.SetLength( 0 );
+
                   // create big array from mall the small arrays
-                  var data = CreateData( currentSize, serializedEntries );
+                  var data = CreateData( currentSize, length, serializedEntries );
 
                   // add the created result
                   results.Add( new AtsSerializationResult( from.Value, data ) );
@@ -51,8 +58,15 @@ namespace Vibrant.Tsdb.Ats.Serialization
 
             if( currentSize + TsdbTypeRegistry.MaxEntrySizeInBytes > maxByteArraySize )
             {
+               writer.Write( serializedEntries.Count );
+               var length = stream.ToArray();
+
+               // reset stream
+               stream.Seek( 0, SeekOrigin.Begin );
+               stream.SetLength( 0 );
+
                // create big array from mall the small arrays
-               var data = CreateData( currentSize, serializedEntries );
+               var data = CreateData( currentSize, length, serializedEntries );
 
                // add the created result
                results.Add( new AtsSerializationResult( from.Value, data ) );
@@ -79,7 +93,14 @@ namespace Vibrant.Tsdb.Ats.Serialization
 
          if( currentSize > 0 )
          {
-            var data = CreateData( currentSize, serializedEntries );
+            writer.Write( serializedEntries.Count );
+            var length = stream.ToArray();
+
+            // reset stream
+            stream.Seek( 0, SeekOrigin.Begin );
+            stream.SetLength( 0 );
+
+            var data = CreateData( currentSize, length, serializedEntries );
 
             results.Add( new AtsSerializationResult( from.Value, data ) );
          }
@@ -89,10 +110,12 @@ namespace Vibrant.Tsdb.Ats.Serialization
          return results;
       }
 
-      private static byte[] CreateData( int size, List<byte[]> serializedEntries )
+      private static byte[] CreateData( int size, byte[] length, List<byte[]> serializedEntries )
       {
-         var data = new byte[ size ];
-         var copied = 0;
+         var data = new byte[ size + length.Length ];
+         Buffer.BlockCopy( length, 0, data, 0, length.Length );
+
+         var copied = length.Length;
          for( int j = serializedEntries.Count - 1 ; j > -1 ; j-- )
          {
             var serializedEntry = serializedEntries[ j ];
@@ -102,16 +125,30 @@ namespace Vibrant.Tsdb.Ats.Serialization
          return data;
       }
 
-      public static List<IEntry> Deserialize( string id, byte[] bytes )
+      public static IEntry[] Deserialize( string id, byte[] bytes, Sort sort )
       {
          var stream = new MemoryStream( bytes );
          var reader = EntrySerializer.CreateReader( stream );
-         List<IEntry> entries = new List<IEntry>();
+         var count = reader.ReadInt32();
+         IEntry[] entries = new IEntry[ count ];
 
-         while( stream.Length != stream.Position )
+         if( sort == Sort.Ascending )
          {
-            var entry = EntrySerializer.DeserializeEntry( reader, id, true );
-            entries.Add( entry );
+            int idx = count;
+            while( stream.Length != stream.Position )
+            {
+               var entry = EntrySerializer.DeserializeEntry( reader, id, true );
+               entries[ --idx ] = entry;
+            }
+         }
+         else
+         {
+            int idx = 0;
+            while( stream.Length != stream.Position )
+            {
+               var entry = EntrySerializer.DeserializeEntry( reader, id, true );
+               entries[ idx++ ] = entry;
+            }
          }
 
          return entries;

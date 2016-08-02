@@ -181,20 +181,20 @@ namespace Vibrant.Tsdb
          return result;
       }
 
-      public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids )
+      public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<IEntry>>>();
-         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Read( c.Lookups ) ) );
-         tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Read( c.Lookups ) ) );
+         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Read( c.Lookups, sort ) ) );
+         tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Read( c.Lookups, sort ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();
       }
 
-      public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to )
+      public async Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<IEntry>>>();
-         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Read( c.Lookups, from, to ) ) );
-         tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Read( c.Lookups, from, to ) ) );
+         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Read( c.Lookups, from, to, sort ) ) );
+         tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Read( c.Lookups, from, to, sort ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();
       }

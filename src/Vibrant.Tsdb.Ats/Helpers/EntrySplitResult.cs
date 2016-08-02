@@ -8,14 +8,12 @@ namespace Vibrant.Tsdb.Ats.Helpers
    internal class EntrySplitResult<TEntry>
       where TEntry : IEntry
    {
-      private IComparer<TEntry> _comparer;
       private List<TEntry> _entries;
 
       public EntrySplitResult( string id )
       {
          Id = id;
-
-         _comparer = new EntryComparer<TEntry>();
+         
          _entries = new List<TEntry>();
       }
 
@@ -26,9 +24,9 @@ namespace Vibrant.Tsdb.Ats.Helpers
          _entries.Add( entry );
       }
 
-      public void Sort()
+      public void Sort( Sort sort )
       {
-         _entries.Sort( _comparer );
+         _entries.Sort( EntryComparer.GetComparer<TEntry>( sort ) );
       }
 
       public IReadOnlyList<TEntry> Entries

@@ -5,12 +5,20 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class EntryComparer<TEntry> : IComparer<TEntry>
-      where TEntry : IEntry
+   public static class EntryComparer
    {
-      public int Compare( TEntry x, TEntry y )
+      public static IComparer<TEntry> GetComparer<TEntry>( Sort sort )
+         where TEntry : IEntry
       {
-         return y.GetTimestamp().CompareTo( x.GetTimestamp() );
+         switch( sort )
+         {
+            case Sort.Descending:
+               return new DescendingEntryComparer<TEntry>();
+            case Sort.Ascending:
+               return new AscendingEntryComparer<TEntry>();
+            default:
+               throw new ArgumentException( "sort" );
+         }
       }
    }
 }
