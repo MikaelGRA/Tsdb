@@ -26,6 +26,8 @@ Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Vibrant.Tsdb.Redis", "src\V
 EndProject
 Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Vibrant.Tsdb.Client", "src\Vibrant.Tsdb.Client\Vibrant.Tsdb.Client.xproj", "{2C511519-ED2D-4F43-9033-5C39A086746A}"
 EndProject
+Project("{8BB2217D-0F2D-49D1-97BC-3654ED321F3B}") = "Vibrant.Tsdb.InfluxDB", "src\Vibrant.Tsdb.InfluxDB\Vibrant.Tsdb.InfluxDB.xproj", "{0316DF2D-12B8-4DDC-85F6-73D0C143A364}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -60,6 +62,10 @@ Global
 		{2C511519-ED2D-4F43-9033-5C39A086746A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2C511519-ED2D-4F43-9033-5C39A086746A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2C511519-ED2D-4F43-9033-5C39A086746A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0316DF2D-12B8-4DDC-85F6-73D0C143A364}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0316DF2D-12B8-4DDC-85F6-73D0C143A364}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0316DF2D-12B8-4DDC-85F6-73D0C143A364}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0316DF2D-12B8-4DDC-85F6-73D0C143A364}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -72,5 +78,6 @@ Global
 		{6D79C9E5-9AB8-4D97-9621-D27E3A54B068} = {4AC69C99-B5CF-499D-93E8-2093E22AAA9C}
 		{EF40C55F-0356-4CD8-9BFC-661CC9134F5F} = {4AC69C99-B5CF-499D-93E8-2093E22AAA9C}
 		{2C511519-ED2D-4F43-9033-5C39A086746A} = {4AC69C99-B5CF-499D-93E8-2093E22AAA9C}
+		{0316DF2D-12B8-4DDC-85F6-73D0C143A364} = {4AC69C99-B5CF-499D-93E8-2093E22AAA9C}
 	EndGlobalSection
 EndGlobal
