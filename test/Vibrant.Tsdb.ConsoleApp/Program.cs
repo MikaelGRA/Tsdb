@@ -1,47 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Vibrant.Tsdb.Ats;
+using Vibrant.Tsdb.Client;
 using Vibrant.Tsdb.ConsoleApp.Entries;
 
 namespace Vibrant.Tsdb.ConsoleApp
 {
-   public class Program
+   public class Program : IWorkProvider
    {
-      private static readonly string[] Ids = new[]
-      {
-         "row1",
-         "row2",
-         "row3",
-         "row4",
-         "row5",
-         "row6",
-         "row7",
-      };
-
-      private static readonly Random _rng = new Random();
-
-      private static List<IEntry> CreateRows( DateTime startTime, int count )
-      {
-         List<IEntry> entries = new List<IEntry>();
-
-         DateTime current = startTime;
-         for( int i = 0 ; i < count ; i++ )
-         {
-            var entry = new BasicEntry();
-            entry.Id = Ids[ _rng.Next( Ids.Length ) ];
-            entry.Timestamp = current;
-            entry.Value = _rng.NextDouble();
-
-            current = current.AddSeconds( 1 );
-
-            entries.Add( entry );
-         }
-
-         return entries;
-      }
+      public event Action<TsdbVolumeMoval> MovalChangedOrAdded;
+      public event Action<string> MovalRemoved;
 
       public static void Main( string[] args )
       {
@@ -50,36 +23,87 @@ namespace Vibrant.Tsdb.ConsoleApp
             .AddJsonFile( "appsettings.Hidden.json", true );
          var config = builder.Build();
 
+         var program = new Program( config );
+
+         Console.ReadKey();
+      }
+
+      private DataSource[] _dataSources;
+
+      public Program( IConfiguration config )
+      {
          var ats = config.GetSection( "AtsStorage" );
-         var connectionString = ats.GetSection( "ConnectionString" ).Value;
-         var tableName = ats.GetSection( "Table" ).Value;
+         var sql = config.GetSection( "SqlStorage" );
+         var redis = config.GetSection( "RedisCache" );
 
          TsdbTypeRegistry.Register<BasicEntry>();
-         var store = new AtsVolumeStorage( tableName, connectionString );
 
-         int count = 1000000;
+         var startTime = DateTime.UtcNow;
 
-         var from = new DateTime( 2016, 12, 26, 0, 0, 0, DateTimeKind.Utc );
-         var to = from.AddSeconds( count - 1 );
-
-         var rows = CreateRows( from, count );
-
-         store.Write( rows ).Wait();
-
-         var read = store.ReadAs<BasicEntry>( Ids, from, to ).Result;
-
-         Console.WriteLine( to );
-         foreach( var r in read )
+         _dataSources = new DataSource[]
          {
-            Console.WriteLine( r.Entries[ 0 ].Timestamp );
+            new DataSource("m2", startTime, TimeSpan.FromMilliseconds( 10 ) ),
+            new DataSource("m3", startTime, TimeSpan.FromMilliseconds( 10 ) ),
+            new DataSource("m4", startTime, TimeSpan.FromMilliseconds( 10 ) ),
+            new DataSource("m5", startTime, TimeSpan.FromMilliseconds( 10 ) ),
+            new DataSource("m6", startTime, TimeSpan.FromMilliseconds( 10 ) ),
+            new DataSource("m7", startTime, TimeSpan.FromMilliseconds( 10 ) ),
+            new DataSource("m8", startTime, TimeSpan.FromMilliseconds( 10 ) ),
+            new DataSource("m9", startTime, TimeSpan.FromMilliseconds( 10 ) ),
+            new DataSource("m1", startTime, TimeSpan.FromMilliseconds( 10 ) ),
+            new DataSource("m10", startTime, TimeSpan.FromMilliseconds( 10 ) ),
+         };
+
+         var client = TsdbFactory.CreateClient(
+            sql.GetSection( "Table" ).Value,
+            sql.GetSection( "ConnectionString" ).Value,
+            ats.GetSection( "Table" ).Value,
+            ats.GetSection( "ConnectionString" ).Value );
+
+         // redis.GetSection( "ConnectionString" ).Value
+
+         var batcher = new TsdbWriteBatcher( client, Publish.None, TimeSpan.FromSeconds( 5 ) );
+
+         var engine = new TsdbEngine( this, client );
+
+         engine.StartAsync().Wait();
+
+         while( true )
+         {
+            var now = DateTime.UtcNow;
+            foreach( var ds in _dataSources )
+            {
+               try
+               {
+                  client.Write( ds.GetEntries( now ) ).Wait();
+               }
+               catch( SqlException e )
+               {
+                  Console.WriteLine( e.Message );
+               }
+               catch( AggregateException e )
+               {
+                  Console.WriteLine( e.InnerExceptions[ 0 ].Message );
+               }
+            }
          }
+      }
 
-         var sum = read.Sum( x => x.Entries.Count );
+      public Task<IEnumerable<TsdbVolumeMoval>> GetAllMovalsAsync( DateTime now )
+      {
+         // move data that is two minutes old, every minute
+         var movalTime = now + TimeSpan.FromMinutes( 1 );
+         var moveUntil = movalTime - TimeSpan.FromMinutes( 2 );
+         return Task.FromResult( _dataSources.Select( x => new TsdbVolumeMoval( x.Id, movalTime, moveUntil ) ) );
 
-         var deletedCount = store.Delete( Ids, from, to ).Result;
+      }
 
-         Console.WriteLine( sum );
-
+      public Task<TsdbVolumeMoval> GetMovalAsync( TsdbVolumeMoval completedMoval )
+      {
+         // move data that is two minutes old, every minute
+         var movalTime = completedMoval.Timestamp + TimeSpan.FromMinutes( 1 );
+         var moveUntil = movalTime - TimeSpan.FromMinutes( 2 );
+         return Task.FromResult( new TsdbVolumeMoval( completedMoval.Id, movalTime, moveUntil ) );
       }
    }
 }
