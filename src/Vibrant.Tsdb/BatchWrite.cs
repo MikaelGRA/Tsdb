@@ -5,15 +5,16 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   internal class BatchWrite
+   internal class BatchWrite<TEntry>
+      where TEntry : IEntry
    {
       private TaskCompletionSource<bool> _tcs;
-      private List<IEntry> _entries;
+      private List<TEntry> _entries;
 
       public BatchWrite()
       {
          _tcs = new TaskCompletionSource<bool>();
-         _entries = new List<IEntry>();
+         _entries = new List<TEntry>();
       }
 
       public void Complete()
@@ -26,12 +27,12 @@ namespace Vibrant.Tsdb
          _tcs.SetException( e );
       }
 
-      public void Add( IEnumerable<IEntry> entries )
+      public void Add( IEnumerable<TEntry> entries )
       {
          _entries.AddRange( entries );
       }
 
-      public List<IEntry> Entries
+      public List<TEntry> Entries
       {
          get
          {

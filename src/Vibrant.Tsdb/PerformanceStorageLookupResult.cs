@@ -5,9 +5,10 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-    internal class PerformanceStorageLookupResult<TLookup> : StorageLookupResult<IPerformanceStorage, TLookup>
+    internal class PerformanceStorageLookupResult<TLookup, TEntry> : StorageLookupResult<IPerformanceStorage<TEntry>, TEntry, TLookup>
+      where TEntry : IEntry
     {
-      public PerformanceStorageLookupResult( IPerformanceStorage storage )
+      public PerformanceStorageLookupResult( IPerformanceStorage<TEntry> storage )
          : base( storage )
       {
 

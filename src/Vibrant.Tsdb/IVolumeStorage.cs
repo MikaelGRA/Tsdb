@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IVolumeStorage : IStorage
+   public interface IVolumeStorage<TEntry> : IStorage<TEntry> where TEntry : IEntry
    {
    }
 }

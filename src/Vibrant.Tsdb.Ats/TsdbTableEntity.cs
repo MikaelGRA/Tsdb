@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage.Table;
 using Vibrant.Tsdb.Ats.Serialization;
-using Vibrant.Tsdb.Serialization;
 
 namespace Vibrant.Tsdb.Ats
 {
@@ -14,9 +13,10 @@ namespace Vibrant.Tsdb.Ats
       
       public byte[] P0 { get; set; }
 
-      public IEntry[] GetEntries( Sort sort )
+      public TEntry[] GetEntries<TEntry>( Sort sort )
+         where TEntry : IAtsEntry
       {
-         return AtsSerializer.Deserialize( PartitionKey, P0, sort );
+         return AtsSerializer.Deserialize<TEntry>( PartitionKey, P0, sort );
       }
 
       /// <summary>

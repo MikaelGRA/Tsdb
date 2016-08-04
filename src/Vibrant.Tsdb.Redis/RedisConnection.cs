@@ -42,13 +42,14 @@ namespace Vibrant.Tsdb.Redis
          _connection.Dispose();
       }
 
-      public Task SubscribeAsync( string id, Action<List<IEntry>> onMessage )
+      public Task SubscribeAsync<TEntry>( string id, Action<List<TEntry>> onMessage )
+         where TEntry : IRedisEntry
       {
          // TODO: Multiple at the same time...
 
          return _redisSubscriber.SubscribeAsync( id, ( channel, data ) =>
          {
-            var entries = RedisSerializer.Deserialize( data );
+            var entries = RedisSerializer.Deserialize<TEntry>( data );
             onMessage( entries );
          } );
       }
@@ -58,7 +59,8 @@ namespace Vibrant.Tsdb.Redis
          return _redisSubscriber.UnsubscribeAsync( id );
       }
 
-      public Task PublishAsync( string id, IEnumerable<IEntry> entries )
+      public Task PublishAsync<TEntry>( string id, IEnumerable<TEntry> entries )
+         where TEntry : IRedisEntry
       {
          if( _connection == null )
          {

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Ats.Helpers
 {
    internal class EntrySplitResult<TEntry>
-      where TEntry : IEntry
+      where TEntry : IAtsEntry
    {
       private List<TEntry> _entries;
 

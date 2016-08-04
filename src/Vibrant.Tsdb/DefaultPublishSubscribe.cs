@@ -10,19 +10,20 @@ namespace Vibrant.Tsdb
    /// <summary>
    /// Simple publish subscribe implementation that only works locally.
    /// </summary>
-   public class DefaultPublishSubscribe : IPublishSubscribe
+   public class DefaultPublishSubscribe<TEntry> : IPublishSubscribe<TEntry>
+      where TEntry : IEntry
    {
       private Task _completed = Task.FromResult( 0 );
 
-      protected IDictionary<Action<List<IEntry>>, byte> _allCallbacks;
-      protected IDictionary<string, HashSet<Action<List<IEntry>>>> _callbacks;
+      protected IDictionary<Action<List<TEntry>>, byte> _allCallbacks;
+      protected IDictionary<string, HashSet<Action<List<TEntry>>>> _callbacks;
       protected readonly TaskFactory _taskFactory;
       protected bool _continueOnCapturedSynchronizationContext;
 
       public DefaultPublishSubscribe( bool continueOnCapturedSynchronizationContext )
       {
-         _callbacks = new ConcurrentDictionary<string, HashSet<Action<List<IEntry>>>>();
-         _allCallbacks = new ConcurrentDictionary<Action<List<IEntry>>, byte>();
+         _callbacks = new ConcurrentDictionary<string, HashSet<Action<List<TEntry>>>>();
+         _allCallbacks = new ConcurrentDictionary<Action<List<TEntry>>, byte>();
 
          if( continueOnCapturedSynchronizationContext )
          {
@@ -48,12 +49,12 @@ namespace Vibrant.Tsdb
          return _completed;
       }
 
-      public virtual Task Publish( IEnumerable<IEntry> entries )
+      public virtual Task Publish( IEnumerable<TEntry> entries )
       {
          return OnPublished( entries );
       }
 
-      public async Task<Func<Task>> Subscribe( IEnumerable<string> ids, Action<List<IEntry>> callback )
+      public async Task<Func<Task>> Subscribe( IEnumerable<string> ids, Action<List<TEntry>> callback )
       {
          var newSubscriptions = AddSubscriptions( ids, callback );
          if( newSubscriptions.Count > 0 )
@@ -73,7 +74,7 @@ namespace Vibrant.Tsdb
          return () => Unsubscribe( ids, callback );
       }
 
-      private async Task Unsubscribe( IEnumerable<string> ids, Action<List<IEntry>> callback )
+      private async Task Unsubscribe( IEnumerable<string> ids, Action<List<TEntry>> callback )
       {
          var removedSubscriptions = RemoveSubscriptions( ids, callback );
          if( removedSubscriptions.Count > 0 )
@@ -91,7 +92,7 @@ namespace Vibrant.Tsdb
          }
       }
 
-      public async Task<Func<Task>> SubscribeToAll( Action<List<IEntry>> callback )
+      public async Task<Func<Task>> SubscribeToAll( Action<List<TEntry>> callback )
       {
          bool subscribeToAll = false;
 
@@ -125,7 +126,7 @@ namespace Vibrant.Tsdb
          return () => UnsubscribeFromAll( callback );
       }
 
-      public async Task UnsubscribeFromAll( Action<List<IEntry>> callback )
+      public async Task UnsubscribeFromAll( Action<List<TEntry>> callback )
       {
          bool unsubscribeFromAll = false;
 
@@ -157,17 +158,17 @@ namespace Vibrant.Tsdb
          }
       }
 
-      private List<string> AddSubscriptions( IEnumerable<string> ids, Action<List<IEntry>> callback )
+      private List<string> AddSubscriptions( IEnumerable<string> ids, Action<List<TEntry>> callback )
       {
          List<string> newSubscriptions = new List<string>();
          lock( _callbacks )
          {
             foreach( var id in ids )
             {
-               HashSet<Action<List<IEntry>>> subscribers;
+               HashSet<Action<List<TEntry>>> subscribers;
                if( !_callbacks.TryGetValue( id, out subscribers ) )
                {
-                  subscribers = new HashSet<Action<List<IEntry>>>();
+                  subscribers = new HashSet<Action<List<TEntry>>>();
                   _callbacks.Add( id, subscribers );
                   newSubscriptions.Add( id );
                }
@@ -178,14 +179,14 @@ namespace Vibrant.Tsdb
          return newSubscriptions;
       }
 
-      private List<string> RemoveSubscriptions( IEnumerable<string> ids, Action<List<IEntry>> callback )
+      private List<string> RemoveSubscriptions( IEnumerable<string> ids, Action<List<TEntry>> callback )
       {
          List<string> subscriptionsRemoved = new List<string>();
          lock( _callbacks )
          {
             foreach( var id in ids )
             {
-               HashSet<Action<List<IEntry>>> subscribers;
+               HashSet<Action<List<TEntry>>> subscribers;
                if( _callbacks.TryGetValue( id, out subscribers ) )
                {
                   subscribers.Remove( callback );
@@ -221,15 +222,15 @@ namespace Vibrant.Tsdb
          return _completed;
       }
 
-      protected Task OnPublished( IEnumerable<IEntry> entries )
+      protected Task OnPublished( IEnumerable<TEntry> entries )
       {
          _taskFactory.StartNew( () =>
          {
             foreach( var entriesById in entries.GroupBy( x => x.GetId() ) )
             {
-               List<IEntry> entriesForSubscriber = null;
+               List<TEntry> entriesForSubscriber = null;
 
-               HashSet<Action<List<IEntry>>> subscribers;
+               HashSet<Action<List<TEntry>>> subscribers;
                if( _callbacks.TryGetValue( entriesById.Key, out subscribers ) )
                {
                   entriesForSubscriber = entriesById.ToList();

@@ -5,13 +5,14 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class TsdbScheduledMoval
+   public class TsdbScheduledMoval<TEntry>
+      where TEntry : IEntry
    {
       private TsdbVolumeMoval _moval;
-      private TsdbEngine _engine;
+      private TsdbEngine<TEntry> _engine;
       private Func<bool> _unsubscribe;
 
-      public TsdbScheduledMoval( TsdbEngine engine, TsdbVolumeMoval moval )
+      public TsdbScheduledMoval( TsdbEngine<TEntry> engine, TsdbVolumeMoval moval )
       {
          _engine = engine;
          _moval = moval;

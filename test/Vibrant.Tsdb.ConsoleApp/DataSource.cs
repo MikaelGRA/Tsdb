@@ -25,9 +25,9 @@ namespace Vibrant.Tsdb.ConsoleApp
 
       public TimeSpan Interval { get; private set; }
 
-      public IEnumerable<IEntry> GetEntries( DateTime now )
+      public IEnumerable<BasicEntry> GetEntries( DateTime now )
       {
-         List<IEntry> entries = new List<IEntry>();
+         List<BasicEntry> entries = new List<BasicEntry>();
 
          for( var timestamp = _currentTimestamp ; timestamp < now ; timestamp += Interval )
          {

@@ -9,7 +9,7 @@ using Xunit;
 namespace Vibrant.Tsdb.Ats.Tests
 {
    public abstract class AbstractStorageTests<TStorage>
-      where TStorage : IStorage
+      where TStorage : IStorage<BasicEntry>
    {
 
       private static readonly string[] Ids = new[]
@@ -45,7 +45,7 @@ namespace Vibrant.Tsdb.Ats.Tests
          return entries;
       }
 
-      public abstract IStorage GetStorage( string tableName );
+      public abstract IStorage<BasicEntry> GetStorage( string tableName );
 
       [Theory]
       [InlineData( Sort.Descending )]
@@ -63,8 +63,8 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          var written = CreateRows( from, count );
          await store.Write( written );
-         var read = await store.ReadAs<BasicEntry>( Ids, from, to, sort );
-         var latest = await store.ReadLatestAs<BasicEntry>( Ids );
+         var read = await store.Read( Ids, from, to, sort );
+         var latest = await store.ReadLatest( Ids );
 
          Dictionary<string, List<BasicEntry>> entries = new Dictionary<string, List<BasicEntry>>();
          foreach( var item in written )

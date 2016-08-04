@@ -55,7 +55,7 @@ namespace Vibrant.Tsdb.ConsoleApp
             new DataSource("m10", startTime, TimeSpan.FromMilliseconds( 10 ) ),
          };
 
-         var client = TsdbFactory.CreateClient(
+         var client = TsdbFactory.CreateClient<BasicEntry>(
             sql.GetSection( "Table" ).Value,
             sql.GetSection( "ConnectionString" ).Value,
             ats.GetSection( "Table" ).Value,
@@ -63,13 +63,9 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          // redis.GetSection( "ConnectionString" ).Value
 
-         var sqlStorage = new SqlPerformanceStorage(
-            sql.GetSection( "Table" ).Value,
-            sql.GetSection( "ConnectionString" ).Value );
+         var batcher = new TsdbWriteBatcher<BasicEntry>( client, Publish.None, TimeSpan.FromSeconds( 5 ), 10000 );
 
-         var batcher = new TsdbWriteBatcher( client, Publish.None, TimeSpan.FromSeconds( 5 ), 10000 );
-
-         var engine = new TsdbEngine( this, client );
+         var engine = new TsdbEngine<BasicEntry>( this, client );
 
          engine.StartAsync().Wait();
 

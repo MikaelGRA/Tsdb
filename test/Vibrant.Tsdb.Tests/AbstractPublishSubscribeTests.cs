@@ -8,7 +8,7 @@ using Xunit;
 namespace Vibrant.Tsdb.Ats.Tests
 {
    public abstract class AbstractPublishSubscribeTests<TPublishSubscribe>
-     where TPublishSubscribe : IPublishSubscribe
+     where TPublishSubscribe : IPublishSubscribe<BasicEntry>
    {
       public abstract TPublishSubscribe CreatePublishSubscribe();
 

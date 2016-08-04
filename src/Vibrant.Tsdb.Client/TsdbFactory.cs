@@ -13,25 +13,28 @@ namespace Vibrant.Tsdb.Client
    /// </summary>
    public static class TsdbFactory
    {
-      public static TsdbClient CreateClient( string sqlTableName, string sqlConnectionString, string atsTableNamme, string atsConnectionString )
+      public static TsdbClient<TEntry> CreateClient<TEntry>( string sqlTableName, string sqlConnectionString, string atsTableNamme, string atsConnectionString )
+         where TEntry : IEntry, IAtsEntry, ISqlEntry
       {
-         var sql = new SqlPerformanceStorage( sqlTableName, sqlConnectionString );
-         var ats = new AtsVolumeStorage( atsTableNamme, atsConnectionString );
-         var sub = new DefaultPublishSubscribe( false );
-         return new TsdbClient( sql, ats, sub );
+         var sql = new SqlPerformanceStorage<TEntry>( sqlTableName, sqlConnectionString );
+         var ats = new AtsVolumeStorage<TEntry>( atsTableNamme, atsConnectionString );
+         var sub = new DefaultPublishSubscribe<TEntry>( false );
+         return new TsdbClient<TEntry>( sql, ats, sub );
       }
 
-      public static TsdbClient CreateClient( string sqlTableName, string sqlConnectionString, string atsTableNamme, string atsConnectionString, string redisConnectionString )
+      public static TsdbClient<TEntry> CreateClient<TEntry>( string sqlTableName, string sqlConnectionString, string atsTableNamme, string atsConnectionString, string redisConnectionString )
+         where TEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry
       {
-         var sql = new SqlPerformanceStorage( sqlTableName, sqlConnectionString );
-         var ats = new AtsVolumeStorage( atsTableNamme, atsConnectionString );
-         var sub = new RedisPublishSubscribe( redisConnectionString, false );
-         return new TsdbClient( sql, ats, sub );
+         var sql = new SqlPerformanceStorage<TEntry>( sqlTableName, sqlConnectionString );
+         var ats = new AtsVolumeStorage<TEntry>( atsTableNamme, atsConnectionString );
+         var sub = new RedisPublishSubscribe<TEntry>( redisConnectionString, false );
+         return new TsdbClient<TEntry>( sql, ats, sub );
       }
 
-      public static TsdbEngine CreateEngine( IWorkProvider workProvider, TsdbClient client )
+      public static TsdbEngine<TEntry> CreateEngine<TEntry>( IWorkProvider workProvider, TsdbClient<TEntry> client )
+         where TEntry : IEntry
       {
-         return new TsdbEngine( workProvider, client );
+         return new TsdbEngine<TEntry>( workProvider, client );
       }
    }
 }

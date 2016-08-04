@@ -5,9 +5,10 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
-   internal class AtsQueryResult
+   internal class AtsQueryResult<TEntry>
+      where TEntry : IAtsEntry
    {
-      private IEntry[] _entries;
+      private TEntry[] _entries;
       private Sort _sort;
 
       public AtsQueryResult( TsdbTableEntity row, Sort sort )
@@ -18,11 +19,11 @@ namespace Vibrant.Tsdb.Ats
 
       public TsdbTableEntity Row { get; private set; }
 
-      public IEntry[] Entries
+      public TEntry[] Entries
       {
          get
          {
-            return _entries ?? ( _entries = Row.GetEntries( _sort ) );
+            return _entries ?? ( _entries = Row.GetEntries<TEntry>( _sort ) );
          }
       }
    }

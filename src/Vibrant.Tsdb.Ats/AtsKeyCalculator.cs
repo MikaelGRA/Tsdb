@@ -12,7 +12,7 @@ namespace Vibrant.Tsdb.Ats
       private static readonly string MaxPartitionKeyRange = "0000";
 
       public static string CalcuatePartitionKey<TEntry>( TEntry entity )
-         where TEntry : IEntry
+         where TEntry : IAtsEntry
       {
          StringBuilder builder = new StringBuilder();
 

@@ -3,11 +3,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Vibrant.Tsdb.Ats;
+using Vibrant.Tsdb.Redis;
+using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.ConsoleApp.Entries
 {
-   public class BasicEntry : IEntry
+   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry
    {
+      private KeyValuePair<string, string>[] _empty = new KeyValuePair<string, string>[ 0 ];
+
       public string Id { get; set; }
 
       public DateTime Timestamp { get; set; }

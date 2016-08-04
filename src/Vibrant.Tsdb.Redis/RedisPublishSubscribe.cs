@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Redis
 {
-   public class RedisPublishSubscribe : DefaultPublishSubscribe, IDisposable
+   public class RedisPublishSubscribe<TEntry> : DefaultPublishSubscribe<TEntry>, IDisposable
+      where TEntry : IRedisEntry
    {
       private TaskCompletionSource<bool> _waitWhileDisconnected;
       private RedisConnection _connection;
@@ -60,7 +61,7 @@ namespace Vibrant.Tsdb.Redis
          return _waitWhileDisconnected.Task;
       }
 
-      public override async Task Publish( IEnumerable<IEntry> entries )
+      public override async Task Publish( IEnumerable<TEntry> entries )
       {
          var tasks = new List<Task>();
          foreach( var entriesById in entries.GroupBy( x => x.GetId() ) )
@@ -76,7 +77,7 @@ namespace Vibrant.Tsdb.Redis
          List<Task> tasks = new List<Task>();
          foreach( var id in ids )
          {
-            tasks.Add( _connection.SubscribeAsync( id, OnEntriesReceivedForId ) );
+            tasks.Add( _connection.SubscribeAsync<TEntry>( id, OnEntriesReceivedForId ) );
          }
          return Task.WhenAll( tasks );
       }
@@ -93,7 +94,7 @@ namespace Vibrant.Tsdb.Redis
 
       protected override Task OnSubscribedToAll()
       {
-         return _connection.SubscribeAsync( "*", OnEntriesReceivedForAll );
+         return _connection.SubscribeAsync<TEntry>( "*", OnEntriesReceivedForAll );
       }
 
       protected override Task OnUnsubscribedFromAll()
@@ -101,7 +102,7 @@ namespace Vibrant.Tsdb.Redis
          return _connection.UnsubscribeAsync( "*" );
       }
 
-      private void OnEntriesReceivedForId( List<IEntry> entries )
+      private void OnEntriesReceivedForId( List<TEntry> entries )
       {
          if( _continueOnCapturedSynchronizationContext )
          {
@@ -113,7 +114,7 @@ namespace Vibrant.Tsdb.Redis
          }
       }
 
-      private void OnEntriesReceivedForAll( List<IEntry> entries )
+      private void OnEntriesReceivedForAll( List<TEntry> entries )
       {
          if( _continueOnCapturedSynchronizationContext )
          {
@@ -125,7 +126,7 @@ namespace Vibrant.Tsdb.Redis
          }
       }
 
-      private void PublishToAll( List<IEntry> entries )
+      private void PublishToAll( List<TEntry> entries )
       {
          var id = entries[ 0 ].GetId();
          foreach( var callback in _allCallbacks )
@@ -141,10 +142,10 @@ namespace Vibrant.Tsdb.Redis
          }
       }
 
-      private void PublishToIndividual( List<IEntry> entries )
+      private void PublishToIndividual( List<TEntry> entries )
       {
          var id = entries[ 0 ].GetId();
-         HashSet<Action<List<IEntry>>> subscribers;
+         HashSet<Action<List<TEntry>>> subscribers;
          if( _callbacks.TryGetValue( id, out subscribers ) )
          {
             foreach( var callback in subscribers )

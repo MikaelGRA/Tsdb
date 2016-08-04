@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Vibrant.Tsdb.Ats.Tests.Entries;
 using Vibrant.Tsdb.Redis;
 
 namespace Vibrant.Tsdb.Ats.Tests
 {
-   public class RedisPublishSubscribeTests : AbstractPublishSubscribeTests<RedisPublishSubscribe>
+   public class RedisPublishSubscribeTests : AbstractPublishSubscribeTests<RedisPublishSubscribe<BasicEntry>>
    {
       private static readonly string ConnectionString;
 
@@ -22,9 +23,9 @@ namespace Vibrant.Tsdb.Ats.Tests
          ConnectionString = ats.GetSection( "ConnectionString" ).Value;
       }
 
-      public override RedisPublishSubscribe CreatePublishSubscribe()
+      public override RedisPublishSubscribe<BasicEntry> CreatePublishSubscribe()
       {
-         return new RedisPublishSubscribe( ConnectionString, false );
+         return new RedisPublishSubscribe<BasicEntry>( ConnectionString, false );
       }
    }
 }

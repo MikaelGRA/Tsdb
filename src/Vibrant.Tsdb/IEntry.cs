@@ -18,8 +18,8 @@ namespace Vibrant.Tsdb
 
       ushort GetTypeCode();
 
-      void Write( BinaryWriter writer );
+      //void Write( BinaryWriter writer );
 
-      void Read( BinaryReader reader );
+      //void Read( BinaryReader reader );
    }
 }

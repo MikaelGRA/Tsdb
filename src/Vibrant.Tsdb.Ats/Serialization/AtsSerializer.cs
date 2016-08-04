@@ -4,17 +4,48 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Vibrant.Tsdb.Serialization;
 
 namespace Vibrant.Tsdb.Ats.Serialization
 {
    internal static class AtsSerializer
    {
-      public static List<AtsSerializationResult> Serialize( List<IEntry> entries, int maxByteArraySize )
+      public static BinaryReader CreateReader( Stream stream )
+      {
+         var reader = new BinaryReader( stream, Encoding.ASCII );
+         return reader;
+      }
+
+      public static BinaryWriter CreateWriter( Stream stream )
+      {
+         var writer = new BinaryWriter( stream, Encoding.ASCII );
+         return writer;
+      }
+
+      public static void SerializeEntry<TEntry>( BinaryWriter writer, TEntry entry )
+         where TEntry : IAtsEntry
+      {
+         writer.Write( entry.GetTypeCode() );
+         writer.Write( entry.GetTimestamp().Ticks );
+         entry.Write( writer );
+      }
+
+      public static TEntry DeserializeEntry<TEntry>( BinaryReader reader, string id )
+         where TEntry : IAtsEntry
+      {
+         var typeCode = reader.ReadUInt16();
+         var entry = (TEntry)TsdbTypeRegistry.CreateEntry( typeCode );
+         entry.SetId( id );
+         entry.SetTimestamp( new DateTime( reader.ReadInt64(), DateTimeKind.Utc ) );
+         entry.Read( reader );
+         return entry;
+      }
+
+      public static List<AtsSerializationResult> Serialize<TEntry>( List<TEntry> entries, int maxByteArraySize )
+         where TEntry : IAtsEntry
       {
          var results = new List<AtsSerializationResult>();
          var stream = new MemoryStream();
-         var writer = EntrySerializer.CreateWriter( stream );
+         var writer = CreateWriter( stream );
          DateTime? from = null;
          int batchYear = 0;
 
@@ -77,7 +108,7 @@ namespace Vibrant.Tsdb.Ats.Serialization
                serializedEntries = new List<byte[]>( serializedEntries.Count );
             }
 
-            EntrySerializer.SerializeEntry( writer, entry, true, false );
+            SerializeEntry( writer, entry );
             writer.Flush(); // is this needed for a memory stream????
 
             var serializedEntry = stream.ToArray();
@@ -125,19 +156,20 @@ namespace Vibrant.Tsdb.Ats.Serialization
          return data;
       }
 
-      public static IEntry[] Deserialize( string id, byte[] bytes, Sort sort )
+      public static TEntry[] Deserialize<TEntry>( string id, byte[] bytes, Sort sort )
+         where TEntry : IAtsEntry
       {
          var stream = new MemoryStream( bytes );
-         var reader = EntrySerializer.CreateReader( stream );
+         var reader = CreateReader( stream );
          var count = reader.ReadInt32();
-         IEntry[] entries = new IEntry[ count ];
+         TEntry[] entries = new TEntry[ count ];
 
          if( sort == Sort.Ascending )
          {
             int idx = count;
             while( stream.Length != stream.Position )
             {
-               var entry = EntrySerializer.DeserializeEntry( reader, id, true );
+               var entry = DeserializeEntry<TEntry>( reader, id );
                entries[ --idx ] = entry;
             }
          }
@@ -146,7 +178,7 @@ namespace Vibrant.Tsdb.Ats.Serialization
             int idx = 0;
             while( stream.Length != stream.Position )
             {
-               var entry = EntrySerializer.DeserializeEntry( reader, id, true );
+               var entry = DeserializeEntry<TEntry>( reader, id );
                entries[ idx++ ] = entry;
             }
          }

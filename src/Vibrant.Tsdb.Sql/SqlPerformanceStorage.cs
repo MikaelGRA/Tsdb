@@ -7,12 +7,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.SqlServer.Server;
-using Vibrant.Tsdb.Serialization;
 using Vibrant.Tsdb.Sql.Serialization;
 
 namespace Vibrant.Tsdb.Sql
 {
-   public class SqlPerformanceStorage : IPerformanceStorage, IPerformanceStorageSelector
+   public class SqlPerformanceStorage<TEntry> : IPerformanceStorage<TEntry>, IPerformanceStorageSelector<TEntry>
+      where TEntry : ISqlEntry
    {
       private object _sync = new object();
       private string _tableName;
@@ -25,12 +25,12 @@ namespace Vibrant.Tsdb.Sql
          _connectionString = connectionString;
       }
 
-      public IPerformanceStorage GetStorage( string id )
+      public IPerformanceStorage<TEntry> GetStorage( string id )
       {
          return this;
       }
 
-      public Task Write( IEnumerable<IEntry> items )
+      public Task Write( IEnumerable<TEntry> items )
       {
          return StoreForAll( items );
       }
@@ -50,22 +50,22 @@ namespace Vibrant.Tsdb.Sql
          return DeleteForIds( ids );
       }
 
-      public Task<MultiReadResult<IEntry>> ReadLatest( IEnumerable<string> ids )
+      public Task<MultiReadResult<TEntry>> ReadLatest( IEnumerable<string> ids )
       {
          return RetrieveLatestForIds( ids );
       }
 
-      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending )
       {
          return RetrieveForIds( ids, sort );
       }
 
-      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime to, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime to, Sort sort = Sort.Descending )
       {
          return RetrieveForIds( ids, to, sort );
       }
 
-      public Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          return RetrieveForIds( ids, from, to, sort );
       }
@@ -94,7 +94,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task StoreForAll( IEnumerable<IEntry> entries )
+      private async Task StoreForAll( IEnumerable<TEntry> entries )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -125,7 +125,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<MultiReadResult<IEntry>> RetrieveForIds( IEnumerable<string> ids, DateTime to, Sort sort )
+      private async Task<MultiReadResult<TEntry>> RetrieveForIds( IEnumerable<string> ids, DateTime to, Sort sort )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -141,7 +141,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<MultiReadResult<IEntry>> RetrieveForIds( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort )
+      private async Task<MultiReadResult<TEntry>> RetrieveForIds( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -157,7 +157,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<MultiReadResult<IEntry>> RetrieveForIds( IEnumerable<string> ids, Sort sort )
+      private async Task<MultiReadResult<TEntry>> RetrieveForIds( IEnumerable<string> ids, Sort sort )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -173,7 +173,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<MultiReadResult<IEntry>> RetrieveLatestForIds( IEnumerable<string> ids )
+      private async Task<MultiReadResult<TEntry>> RetrieveLatestForIds( IEnumerable<string> ids )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -238,17 +238,17 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private MultiReadResult<IEntry> CreateReadResult( IEnumerable<SqlEntry> sqlEntries, IEnumerable<string> requiredIds, Sort sort )
+      private MultiReadResult<TEntry> CreateReadResult( IEnumerable<SqlEntry> sqlEntries, IEnumerable<string> requiredIds, Sort sort )
       {
-         IDictionary<string, ReadResult<IEntry>> results = new Dictionary<string, ReadResult<IEntry>>();
+         IDictionary<string, ReadResult<TEntry>> results = new Dictionary<string, ReadResult<TEntry>>();
          foreach( var id in requiredIds )
          {
-            results[ id ] = new ReadResult<IEntry>( id, sort );
+            results[ id ] = new ReadResult<TEntry>( id, sort );
          }
 
-         ReadResult<IEntry> currentResult = null;
+         ReadResult<TEntry> currentResult = null;
 
-         foreach( var entry in SqlSerializer.Deserialize( sqlEntries ) )
+         foreach( var entry in SqlSerializer.Deserialize<TEntry>( sqlEntries ) )
          {
             var id = entry.GetId();
             if( currentResult == null || currentResult.Id != id )
@@ -259,7 +259,7 @@ namespace Vibrant.Tsdb.Sql
             currentResult.Entries.Add( entry );
          }
 
-         return new MultiReadResult<IEntry>( results );
+         return new MultiReadResult<TEntry>( results );
       }
    }
 }

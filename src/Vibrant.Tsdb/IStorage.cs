@@ -5,18 +5,18 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IStorage
+   public interface IStorage<TEntry> where TEntry : IEntry
    {
-      Task Write( IEnumerable<IEntry> items );
+      Task Write( IEnumerable<TEntry> items );
 
       Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to );
 
       Task<int> Delete( IEnumerable<string> ids );
 
-      Task<MultiReadResult<IEntry>> ReadLatest( IEnumerable<string> ids );
+      Task<MultiReadResult<TEntry>> ReadLatest( IEnumerable<string> ids );
 
-      Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending );
+      Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending );
 
-      Task<MultiReadResult<IEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending );
+      Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending );
    }
 }

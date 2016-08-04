@@ -8,7 +8,7 @@ namespace Vibrant.Tsdb.Ats.Helpers
    internal static class EntryExtensions
    {
       public static IEnumerable<EntrySplitResult<TEntry>> SplitEntriesById<TEntry>( this IEnumerable<TEntry> entries, Sort sort )
-         where TEntry : IEntry
+         where TEntry : IAtsEntry
       {
          var splitEntries = new Dictionary<string, EntrySplitResult<TEntry>>();
          foreach( var entry in entries )

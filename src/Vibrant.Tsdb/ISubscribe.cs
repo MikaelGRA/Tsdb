@@ -5,10 +5,11 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface ISubscribe
+   public interface ISubscribe<TEntry>
+      where TEntry : IEntry
    {
-      Task<Func<Task>> Subscribe( IEnumerable<string> ids, Action<List<IEntry>> callback );
+      Task<Func<Task>> Subscribe( IEnumerable<string> ids, Action<List<TEntry>> callback );
 
-      Task<Func<Task>> SubscribeToAll( Action<List<IEntry>> callback );
+      Task<Func<Task>> SubscribeToAll( Action<List<TEntry>> callback );
    }
 }

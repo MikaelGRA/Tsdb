@@ -5,16 +5,17 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   internal class StorageLookupResult<TStorage, TItem>
-      where TStorage : IStorage
+   internal class StorageLookupResult<TStorage, TEntry, TLookup>
+      where TStorage : IStorage<TEntry>
+      where TEntry : IEntry
     {
       public StorageLookupResult( TStorage storage )
       {
-         Lookups = new List<TItem>();
+         Lookups = new List<TLookup>();
          Storage = storage;
       }
 
-      public List<TItem> Lookups { get; private set; }
+      public List<TLookup> Lookups { get; private set; }
 
       public TStorage Storage { get; private set; }
    }

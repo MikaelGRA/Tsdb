@@ -3,11 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
+using Vibrant.Tsdb.Ats.Tests.Entries;
 using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.Ats.Tests
 {
-    public class SqlStorageTests : AbstractStorageTests<SqlPerformanceStorage>
+    public class SqlStorageTests : AbstractStorageTests<SqlPerformanceStorage<BasicEntry>>
    {
       private static readonly string ConnectionString;
 
@@ -22,9 +23,9 @@ namespace Vibrant.Tsdb.Ats.Tests
          ConnectionString = ats.GetSection( "ConnectionString" ).Value;
       }
 
-      public override IStorage GetStorage( string tableName )
+      public override IStorage<BasicEntry> GetStorage( string tableName )
       {
-         return new SqlPerformanceStorage( tableName, ConnectionString );
+         return new SqlPerformanceStorage<BasicEntry>( tableName, ConnectionString );
       }
    }
 }
