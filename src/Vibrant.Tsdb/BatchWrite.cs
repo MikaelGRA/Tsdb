@@ -8,12 +8,12 @@ namespace Vibrant.Tsdb
    internal class BatchWrite
    {
       private TaskCompletionSource<bool> _tcs;
-      private List<IEnumerable<IEntry>> _entries;
+      private List<IEntry> _entries;
 
       public BatchWrite()
       {
          _tcs = new TaskCompletionSource<bool>();
-         _entries = new List<IEnumerable<IEntry>>();
+         _entries = new List<IEntry>();
       }
 
       public void Complete()
@@ -28,14 +28,14 @@ namespace Vibrant.Tsdb
 
       public void Add( IEnumerable<IEntry> entries )
       {
-         _entries.Add( entries );
+         _entries.AddRange( entries );
       }
 
-      public IEnumerable<IEntry> Entries
+      public List<IEntry> Entries
       {
          get
          {
-            return _entries.SelectMany( x => x );
+            return _entries;
          }
       }
       

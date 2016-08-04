@@ -11,19 +11,23 @@ namespace Vibrant.Tsdb
       private object _sync = new object();
       private TsdbClient _client;
       private BatchWrite _currentBatch;
+      private Queue<BatchWrite> _batches;
       private TimeSpan _writeInterval;
       private Publish _publish;
       private bool _disposed = false;
       private CancellationTokenSource _cts;
+      private int _maxBatchSize;
 
-      public TsdbWriteBatcher( TsdbClient client, Publish publish, TimeSpan writeInterval )
+      public TsdbWriteBatcher( TsdbClient client, Publish publish, TimeSpan writeInterval, int maxBatchSize )
       {
          _client = client;
          _writeInterval = writeInterval;
          _publish = publish;
+         _maxBatchSize = maxBatchSize;
+         _batches = new Queue<BatchWrite>();
          _cts = new CancellationTokenSource();
 
-         Task.Run( new Action( WriteLoop ), _cts.Token );
+         ThreadPool.QueueUserWorkItem( WriteLoop );
       }
 
       public Task Write( IEnumerable<IEntry> entries )
@@ -34,22 +38,41 @@ namespace Vibrant.Tsdb
             {
                _currentBatch = new BatchWrite();
             }
+            if( _currentBatch.Entries.Count + entries.Count() > _maxBatchSize )
+            {
+               _batches.Enqueue( _currentBatch );
+               _currentBatch = new BatchWrite();
+            }
+
             _currentBatch.Add( entries );
 
             return _currentBatch.Task;
          }
       }
 
-      private async void WriteLoop()
+      private BatchWrite GetBatchToWrite()
+      {
+         lock( _sync )
+         {
+            BatchWrite batch = null;
+            if( _batches.Count != 0 )
+            {
+               batch = _batches.Dequeue();
+            }
+            else if( _currentBatch != null )
+            {
+               batch = _currentBatch;
+               _currentBatch = null;
+            }
+            return batch;
+         }
+      }
+
+      private async void WriteLoop( object state )
       {
          while( !_disposed )
          {
-            BatchWrite write;
-            lock( _sync )
-            {
-               write = _currentBatch;
-               _currentBatch = null;
-            }
+            BatchWrite write = GetBatchToWrite();
 
             if( write != null )
             {
@@ -66,7 +89,10 @@ namespace Vibrant.Tsdb
 
             try
             {
-               await Task.Delay( _writeInterval, _cts.Token ).ConfigureAwait( false );
+               if( _batches.Count == 0 )
+               {
+                  await Task.Delay( _writeInterval, _cts.Token ).ConfigureAwait( false );
+               }
             }
             catch( OperationCanceledException )
             {

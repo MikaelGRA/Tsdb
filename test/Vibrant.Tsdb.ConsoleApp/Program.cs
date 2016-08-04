@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Vibrant.Tsdb.Ats;
 using Vibrant.Tsdb.Client;
 using Vibrant.Tsdb.ConsoleApp.Entries;
+using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.ConsoleApp
 {
@@ -62,7 +63,11 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          // redis.GetSection( "ConnectionString" ).Value
 
-         var batcher = new TsdbWriteBatcher( client, Publish.None, TimeSpan.FromSeconds( 5 ) );
+         var sqlStorage = new SqlPerformanceStorage(
+            sql.GetSection( "Table" ).Value,
+            sql.GetSection( "ConnectionString" ).Value );
+
+         var batcher = new TsdbWriteBatcher( client, Publish.None, TimeSpan.FromSeconds( 5 ), 10000 );
 
          var engine = new TsdbEngine( this, client );
 
@@ -73,19 +78,24 @@ namespace Vibrant.Tsdb.ConsoleApp
             var now = DateTime.UtcNow;
             foreach( var ds in _dataSources )
             {
-               try
+               var entries = ds.GetEntries( now ).ToList();
+
+               Console.WriteLine( $"Writing {entries.Count} entries..." );
+
+               batcher.Write( entries ).ContinueWith( t =>
                {
-                  client.Write( ds.GetEntries( now ) ).Wait();
-               }
-               catch( SqlException e )
-               {
-                  Console.WriteLine( e.Message );
-               }
-               catch( AggregateException e )
-               {
-                  Console.WriteLine( e.InnerExceptions[ 0 ].Message );
-               }
+                  if( t.IsFaulted || t.IsCanceled )
+                  {
+                     Console.WriteLine( t.Exception.Message );
+                  }
+                  else
+                  {
+                     Console.WriteLine( "Batch write completed!" );
+                  }
+               } );
             }
+
+            Thread.Sleep( 1000 );
          }
       }
 
