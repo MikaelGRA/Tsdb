@@ -56,7 +56,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          var store = GetStorage( "Table1" );
 
-         int count = 500000;
+         int count = 50000;
 
          var from = new DateTime( 2016, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var to = from.AddSeconds( count );
@@ -78,7 +78,7 @@ namespace Vibrant.Tsdb.Ats.Tests
             items.Add( item );
          }
 
-         var deletedCount = await store.Delete( Ids, from, to );
+         await store.Delete( Ids, from, to );
 
          foreach( var readResult in read )
          {
@@ -118,7 +118,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          var store = GetStorage( "Table2" );
 
-         int count = 500000;
+         int count = 50000;
 
          var from = new DateTime( 2016, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var to = from.AddSeconds( count );
@@ -127,9 +127,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          await store.Write( written );
 
-         var deletedCount = await store.Delete( Ids, from, to );
-
-         Assert.Equal( count, deletedCount );
+         await store.Delete( Ids, from, to );
 
          var read = await store.Read( Ids, from, to, sort );
 
@@ -147,25 +145,22 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          int count = 1000;
 
-         var from1 = new DateTime( 2016, 12, 26, 0, 0, 0, DateTimeKind.Utc );
+         var from1 = new DateTime( 2012, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var written1 = CreateRows( from1, count );
          await store.Write( written1 );
 
-         var from2 = new DateTime( 2017, 12, 26, 0, 0, 0, DateTimeKind.Utc );
+         var from2 = new DateTime( 2013, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var written2 = CreateRows( from2, count );
          await store.Write( written2 );
 
 
          var rows = await store.Read( Ids );
-
-         Assert.Equal( count * 2, rows.Sum( x => x.Entries.Count ) );
-
-         var deletedCount = await store.Delete( Ids );
-
-         Assert.Equal( count * 2, deletedCount );
+         
+         await store.Delete( Ids );
 
          var read = await store.Read( Ids, sort );
 
+         Assert.Equal( count * 2, rows.Sum( x => x.Entries.Count ) );
          Assert.Equal( 0, read.Sum( x => x.Entries.Count ) );
       }
    }
