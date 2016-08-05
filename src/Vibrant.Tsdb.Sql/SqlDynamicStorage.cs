@@ -11,7 +11,7 @@ using Vibrant.Tsdb.Sql.Serialization;
 
 namespace Vibrant.Tsdb.Sql
 {
-   public class SqlPerformanceStorage<TEntry> : IPerformanceStorage<TEntry>, IPerformanceStorageSelector<TEntry>
+   public class SqlDynamicStorage<TEntry> : IDynamicStorage<TEntry>, IDynamicStorageSelector<TEntry>
       where TEntry : ISqlEntry
    {
       private object _sync = new object();
@@ -19,13 +19,13 @@ namespace Vibrant.Tsdb.Sql
       private string _connectionString;
       private Task _createTable;
 
-      public SqlPerformanceStorage( string tableName, string connectionString )
+      public SqlDynamicStorage( string tableName, string connectionString )
       {
          _tableName = tableName;
          _connectionString = connectionString;
       }
 
-      public IPerformanceStorage<TEntry> GetStorage( string id )
+      public IDynamicStorage<TEntry> GetStorage( string id )
       {
          return this;
       }

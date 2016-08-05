@@ -8,34 +8,34 @@ namespace Vibrant.Tsdb
    public class TsdbClient<TEntry> : IStorage<TEntry>, ISubscribe<TEntry>
       where TEntry : IEntry
    {
-      private IPerformanceStorageSelector<TEntry> _performanceStorageSelector;
+      private IDynamicStorageSelector<TEntry> _dynamicStorageSelector;
       private IVolumeStorageSelector<TEntry> _volumeStorageSelector;
       private IPublishSubscribe<TEntry> _publishSubscribe;
 
       public TsdbClient(
-         IPerformanceStorageSelector<TEntry> performanceStorageSelector,
+         IDynamicStorageSelector<TEntry> dynamicStorageSelector,
          IVolumeStorageSelector<TEntry> volumeStorageSelector,
          IPublishSubscribe<TEntry> publishSubscribe )
       {
-         _performanceStorageSelector = performanceStorageSelector;
+         _dynamicStorageSelector = dynamicStorageSelector;
          _volumeStorageSelector = volumeStorageSelector;
          _publishSubscribe = publishSubscribe;
       }
 
       public async Task<int> MoveToVolumeStorage( IEnumerable<string> ids )
       {
-         // read from performance storage
+         // read from dynamic storage
          var readTasks = new List<Task<MultiReadResult<TEntry>>>();
-         readTasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Read( c.Lookups ) ) );
+         readTasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Read( c.Lookups ) ) );
          await Task.WhenAll( readTasks ).ConfigureAwait( false );
 
          // write to volume storage
          var entries = readTasks.SelectMany( x => x.Result ).SelectMany( x => x.Entries );
          await WriteDirectlyToVolumeStorage( entries ).ConfigureAwait( false );
 
-         // delete from performance storage
+         // delete from dynamic storage
          var deleteTasks = new List<Task<int>>();
-         deleteTasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
+         deleteTasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
          await Task.WhenAll( deleteTasks ).ConfigureAwait( false );
 
          // return amount deleted (also moved)
@@ -44,18 +44,18 @@ namespace Vibrant.Tsdb
 
       public async Task<int> MoveToVolumeStorage( IEnumerable<string> ids, DateTime to )
       {
-         // read from performance storage
+         // read from dynamic storage
          var readTasks = new List<Task<MultiReadResult<TEntry>>>();
-         readTasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Read( c.Lookups, to ) ) );
+         readTasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Read( c.Lookups, to ) ) );
          await Task.WhenAll( readTasks ).ConfigureAwait( false );
 
          // write to volume storage
          var entries = readTasks.SelectMany( x => x.Result ).SelectMany( x => x.Entries );
          await WriteDirectlyToVolumeStorage( entries ).ConfigureAwait( false );
 
-         // delete from performance storage
+         // delete from dynamic storage
          var deleteTasks = new List<Task<int>>();
-         deleteTasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, to ) ) );
+         deleteTasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, to ) ) );
          await Task.WhenAll( deleteTasks ).ConfigureAwait( false );
 
          // return amount deleted (also moved)
@@ -77,7 +77,7 @@ namespace Vibrant.Tsdb
       public async Task Write( IEnumerable<TEntry> items, Publish publish )
       {
          var tasks = new List<Task>();
-         tasks.AddRange( LookupPerformanceStorages( items ).Select( c => c.Storage.Write( c.Lookups ) ) );
+         tasks.AddRange( LookupDynamicStorages( items ).Select( c => c.Storage.Write( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
          switch( publish )
@@ -98,7 +98,7 @@ namespace Vibrant.Tsdb
       public async Task<int> Delete( IEnumerable<string> ids )
       {
          var tasks = new List<Task<int>>();
-         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
+         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
          tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Sum( x => x.Result );
@@ -107,54 +107,19 @@ namespace Vibrant.Tsdb
       public async Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          var tasks = new List<Task<int>>();
-         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, from, to ) ) );
+         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, from, to ) ) );
          tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, from, to ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Sum( x => x.Result );
       }
 
-      //public async Task<MultiReadResult<TEntry>> ReadLatestAs<TEntry>( IEnumerable<string> ids )
-      //   where TEntry : IEntry
-      //{
-      //   var tasks = new List<Task<MultiReadResult<TEntry>>>();
-      //   tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.ReadLatestAs<TEntry>( c.Lookups ) ) );
-      //   await Task.WhenAll( tasks ).ConfigureAwait( false );
-
-      //   // at this point we need to check if we have a measurement for each id. We might not becuase we only looked in performance store
-      //   var result = tasks.Select( x => x.Result ).Combine();
-
-      //   // find missing ids
-      //   List<string> missingIds = new List<string>();
-      //   foreach( var id in ids )
-      //   {
-      //      var resultForId = result.FindResult( id );
-      //      if( resultForId.Entries.Count == 0 )
-      //      {
-      //         missingIds.Add( id );
-      //      }
-      //   }
-
-      //   // if missing ids, then we look at volume storage
-      //   if( missingIds.Count > 0 )
-      //   {
-      //      tasks = new List<Task<MultiReadResult<TEntry>>>();
-      //      tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.ReadLatestAs<TEntry>( c.Lookups ) ) );
-      //      await Task.WhenAll( tasks ).ConfigureAwait( false );
-
-      //      var intiallyMissingResult = tasks.Select( x => x.Result ).Combine();
-      //      intiallyMissingResult.MergeInto( result );
-      //   }
-
-      //   return result;
-      //}
-
       public async Task<MultiReadResult<TEntry>> ReadLatest( IEnumerable<string> ids )
       {
          var tasks = new List<Task<MultiReadResult<TEntry>>>();
-         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.ReadLatest( c.Lookups ) ) );
+         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.ReadLatest( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         // at this point we need to check if we have a measurement for each id. We might not becuase we only looked in performance store
+         // at this point we need to check if we have a measurement for each id. We might not becuase we only looked in dynamic store
          var result = tasks.Select( x => x.Result ).Combine();
 
          // find missing ids
@@ -185,7 +150,7 @@ namespace Vibrant.Tsdb
       public async Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<TEntry>>>();
-         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Read( c.Lookups, sort ) ) );
+         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Read( c.Lookups, sort ) ) );
          tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Read( c.Lookups, sort ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();
@@ -194,7 +159,7 @@ namespace Vibrant.Tsdb
       public async Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<TEntry>>>();
-         tasks.AddRange( LookupPerformanceStorages( ids ).Select( c => c.Storage.Read( c.Lookups, from, to, sort ) ) );
+         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Read( c.Lookups, from, to, sort ) ) );
          tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Read( c.Lookups, from, to, sort ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();
@@ -256,18 +221,18 @@ namespace Vibrant.Tsdb
          return result.Values;
       }
 
-      private IEnumerable<PerformanceStorageLookupResult<TEntry, TEntry>> LookupPerformanceStorages( IEnumerable<TEntry> entries )
+      private IEnumerable<DynamicStorageLookupResult<TEntry, TEntry>> LookupDynamicStorages( IEnumerable<TEntry> entries )
       {
-         var result = new Dictionary<IStorage<TEntry>, PerformanceStorageLookupResult<TEntry, TEntry>>();
+         var result = new Dictionary<IStorage<TEntry>, DynamicStorageLookupResult<TEntry, TEntry>>();
 
          foreach( var entry in entries )
          {
-            var storageForId = _performanceStorageSelector.GetStorage( entry.GetId() );
+            var storageForId = _dynamicStorageSelector.GetStorage( entry.GetId() );
 
-            PerformanceStorageLookupResult<TEntry, TEntry> existingStorage;
+            DynamicStorageLookupResult<TEntry, TEntry> existingStorage;
             if( !result.TryGetValue( storageForId, out existingStorage ) )
             {
-               existingStorage = new PerformanceStorageLookupResult<TEntry, TEntry>( storageForId );
+               existingStorage = new DynamicStorageLookupResult<TEntry, TEntry>( storageForId );
                result.Add( storageForId, existingStorage );
             }
 
@@ -298,18 +263,18 @@ namespace Vibrant.Tsdb
          return result.Values;
       }
 
-      private IEnumerable<PerformanceStorageLookupResult<string, TEntry>> LookupPerformanceStorages( IEnumerable<string> ids )
+      private IEnumerable<DynamicStorageLookupResult<string, TEntry>> LookupDynamicStorages( IEnumerable<string> ids )
       {
-         var result = new Dictionary<IStorage<TEntry>, PerformanceStorageLookupResult<string, TEntry>>();
+         var result = new Dictionary<IStorage<TEntry>, DynamicStorageLookupResult<string, TEntry>>();
 
          foreach( var id in ids )
          {
-            var storageForId = _performanceStorageSelector.GetStorage( id );
+            var storageForId = _dynamicStorageSelector.GetStorage( id );
 
-            PerformanceStorageLookupResult<string, TEntry> existingStorage;
+            DynamicStorageLookupResult<string, TEntry> existingStorage;
             if( !result.TryGetValue( storageForId, out existingStorage ) )
             {
-               existingStorage = new PerformanceStorageLookupResult<string, TEntry>( storageForId );
+               existingStorage = new DynamicStorageLookupResult<string, TEntry>( storageForId );
                result.Add( storageForId, existingStorage );
             }
 

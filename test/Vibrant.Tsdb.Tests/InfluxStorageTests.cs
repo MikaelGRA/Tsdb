@@ -9,7 +9,7 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.Ats.Tests
 {
-   public class InfluxStorageTests : AbstractStorageTests<InfluxPerformanceStorage<BasicEntry>>
+   public class InfluxStorageTests : AbstractStorageTests<InfluxDynamicStorage<BasicEntry>>
    {
       private static readonly string Endpoint;
       private static readonly string Database;
@@ -28,7 +28,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
       public override IStorage<BasicEntry> GetStorage( string tableName )
       {
-         return new InfluxPerformanceStorage<BasicEntry>( new Uri( Endpoint ), Database );
+         return new InfluxDynamicStorage<BasicEntry>( new Uri( Endpoint ), Database );
       }
    }
 }

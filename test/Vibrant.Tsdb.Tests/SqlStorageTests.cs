@@ -8,7 +8,7 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.Ats.Tests
 {
-    public class SqlStorageTests : AbstractStorageTests<SqlPerformanceStorage<BasicEntry>>
+    public class SqlStorageTests : AbstractStorageTests<SqlDynamicStorage<BasicEntry>>
    {
       private static readonly string ConnectionString;
 
@@ -25,7 +25,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
       public override IStorage<BasicEntry> GetStorage( string tableName )
       {
-         return new SqlPerformanceStorage<BasicEntry>( tableName, ConnectionString );
+         return new SqlDynamicStorage<BasicEntry>( tableName, ConnectionString );
       }
    }
 }

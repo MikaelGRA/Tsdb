@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IPerformanceStorage<TEntry> : IStorage<TEntry> where TEntry : IEntry
+   public interface IDynamicStorage<TEntry> : IStorage<TEntry> where TEntry : IEntry
    {
       Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime to, Sort sort = Sort.Descending );
 

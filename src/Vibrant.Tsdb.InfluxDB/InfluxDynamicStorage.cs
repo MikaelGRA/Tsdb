@@ -9,7 +9,7 @@ using System.Text;
 
 namespace Vibrant.Tsdb.InfluxDB
 {
-   public class InfluxPerformanceStorage<TEntry> : IPerformanceStorage<TEntry>
+   public class InfluxDynamicStorage<TEntry> : IDynamicStorage<TEntry>, IDynamicStorageSelector<TEntry>
       where TEntry : IEntry, IInfluxEntry, new()
    {
       private DateTime _maxFrom = new DateTime( 2050, 1, 1, 0, 0, 0, DateTimeKind.Utc );
@@ -18,7 +18,7 @@ namespace Vibrant.Tsdb.InfluxDB
       private string _database;
       private Task _createDatabase;
 
-      public InfluxPerformanceStorage( Uri endpoint, string database, string username, string password )
+      public InfluxDynamicStorage( Uri endpoint, string database, string username, string password )
       {
          _client = new InfluxClient( endpoint, username, password );
          _database = database;
@@ -27,10 +27,15 @@ namespace Vibrant.Tsdb.InfluxDB
          _client.DefaultWriteOptions.Precision = TimestampPrecision.Nanosecond;
       }
 
-      public InfluxPerformanceStorage( Uri endpoint, string database )
+      public InfluxDynamicStorage( Uri endpoint, string database )
          : this( endpoint, database, null, null )
       {
 
+      }
+
+      public IDynamicStorage<TEntry> GetStorage( string id )
+      {
+         return this;
       }
 
       public async Task Write( IEnumerable<TEntry> items )
