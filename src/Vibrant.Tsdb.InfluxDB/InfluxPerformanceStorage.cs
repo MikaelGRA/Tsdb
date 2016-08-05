@@ -63,28 +63,28 @@ namespace Vibrant.Tsdb.InfluxDB
       public async Task<MultiReadResult<TEntry>> ReadLatest( IEnumerable<string> ids )
       {
          await CreateDatabase().ConfigureAwait( false );
-         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateLimitedSelectQuery( ids ) ).ConfigureAwait( false );
+         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateLatestSelectQuery( ids ) ).ConfigureAwait( false );
          return Convert( ids, resultSet, Sort.Descending );
       }
 
       public async Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending )
       {
          await CreateDatabase().ConfigureAwait( false );
-         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( ids ) ).ConfigureAwait( false );
+         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( ids, sort ) ).ConfigureAwait( false );
          return Convert( ids, resultSet, sort );
       }
 
       public async Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime to, Sort sort = Sort.Descending )
       {
          await CreateDatabase().ConfigureAwait( false );
-         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( ids, to ) ).ConfigureAwait( false );
+         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( ids, to, sort ) ).ConfigureAwait( false );
          return Convert( ids, resultSet, sort );
       }
 
       public async Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          await CreateDatabase().ConfigureAwait( false );
-         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( ids, from, to ) ).ConfigureAwait( false );
+         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( ids, from, to, sort ) ).ConfigureAwait( false );
          return Convert( ids, resultSet, sort );
       }
 
@@ -118,44 +118,56 @@ namespace Vibrant.Tsdb.InfluxDB
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
-      private string CreateSelectQuery( IEnumerable<string> ids, DateTime from, DateTime to )
+      private string CreateSelectQuery( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort )
       {
          StringBuilder sb = new StringBuilder();
          foreach( var id in ids )
          {
-            sb.Append( $"SELECT * FROM \"{id}\" WHERE '{from.ToIso8601()}' <= time AND time < '{to.ToIso8601()}';" );
+            sb.Append( $"SELECT * FROM \"{id}\" WHERE '{from.ToIso8601()}' <= time AND time < '{to.ToIso8601()}' ORDER BY {GetQuery( sort )};" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
-      private string CreateSelectQuery( IEnumerable<string> ids, DateTime to )
+      private string CreateSelectQuery( IEnumerable<string> ids, DateTime to, Sort sort )
       {
          StringBuilder sb = new StringBuilder();
          foreach( var id in ids )
          {
-            sb.Append( $"SELECT * FROM \"{id}\" WHERE time < '{to.ToIso8601()}';" );
+            sb.Append( $"SELECT * FROM \"{id}\" WHERE time < '{to.ToIso8601()}' ORDER BY {GetQuery( sort )};" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
-      private string CreateSelectQuery( IEnumerable<string> ids )
+      private string CreateSelectQuery( IEnumerable<string> ids, Sort sort )
       {
          StringBuilder sb = new StringBuilder();
          foreach( var id in ids )
          {
-            sb.Append( $"SELECT * FROM \"{id}\" WHERE time < '{_maxFrom.ToIso8601()}';" );
+            sb.Append( $"SELECT * FROM \"{id}\" WHERE time < '{_maxFrom.ToIso8601()}' ORDER BY {GetQuery( sort )};" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
-      private string CreateLimitedSelectQuery( IEnumerable<string> ids )
+      private string CreateLatestSelectQuery( IEnumerable<string> ids )
       {
          StringBuilder sb = new StringBuilder();
          foreach( var id in ids )
          {
-            sb.Append( $"SELECT * FROM \"{id}\" WHERE time < '{_maxFrom.ToIso8601()}' LIMIT 1;" );
+            sb.Append( $"SELECT * FROM \"{id}\" WHERE time < '{_maxFrom.ToIso8601()}' ORDER BY time DESC LIMIT 1;" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
+      }
+
+      private string GetQuery( Sort sort )
+      {
+         if( sort == Sort.Ascending )
+         {
+            return "ASC";
+         }
+         else
+         {
+            return "DESC";
+         }
       }
 
       private MultiReadResult<TEntry> Convert( IEnumerable<string> requiredIds, InfluxResultSet<TEntry> resultSet, Sort sort )
