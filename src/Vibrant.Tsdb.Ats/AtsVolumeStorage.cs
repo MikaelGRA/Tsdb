@@ -136,7 +136,7 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TEntry>(
             id,
             Sort.Descending,
-            results.SelectMany( x => x.Entries ).Take( 1 )
+            results.SelectMany( x => x.GetEntries<TEntry>( Sort.Descending ) ).Take( 1 )
                .ToList() );
       }
 
@@ -147,7 +147,7 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TEntry>(
             id,
             sort,
-            results.SelectMany( x => x.Entries )
+            results.SelectMany( x => x.GetEntries<TEntry>( sort ) )
                .ToList() );
       }
 
@@ -158,7 +158,7 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TEntry>(
             id,
             sort,
-            results.SelectMany( x => x.Entries )
+            results.SelectMany( x => x.GetEntries<TEntry>( sort ) )
                .Where( x => x.GetTimestamp() >= from && x.GetTimestamp() < to )
                .ToList() );
       }
@@ -167,8 +167,8 @@ namespace Vibrant.Tsdb.Ats
       {
          var retrievals = await RetrieveRangeForId( id, from, to, Sort.Descending ).ConfigureAwait( false );
 
-         var oldEntities = retrievals.ToDictionary( x => x.Row.RowKey, x => x.Row );
-         var oldEntries = retrievals.SelectMany( x => x.Entries ).ToList();
+         var oldEntities = retrievals.ToDictionary( x => x.RowKey );
+         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TEntry>( Sort.Descending ) ).ToList();
 
          // remove items between from and to
          int count = oldEntries.RemoveAll( x => x.GetTimestamp() >= from && x.GetTimestamp() < to );
@@ -187,8 +187,8 @@ namespace Vibrant.Tsdb.Ats
       {
          var retrievals = await RetrieveAllForId( id, Sort.Descending ).ConfigureAwait( false );
 
-         var oldEntities = retrievals.ToDictionary( x => x.Row.RowKey, x => x.Row );
-         var oldEntries = retrievals.SelectMany( x => x.Entries ).ToList();
+         var oldEntities = retrievals.ToDictionary( x => x.RowKey );
+         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TEntry>( Sort.Descending ) ).ToList();
 
          // remove items between from and to
          int count = oldEntries.Count;
@@ -208,10 +208,10 @@ namespace Vibrant.Tsdb.Ats
       {
          // retrieve existing entries for this period
          var retrievals = await RetrieveRangeForId( id, from, to, Sort.Descending ).ConfigureAwait( false );
-         var oldEntities = retrievals.ToDictionary( x => x.Row.RowKey, x => x.Row );
+         var oldEntities = retrievals.ToDictionary( x => x.RowKey );
 
          // merge results
-         var oldEntries = retrievals.SelectMany( x => x.Entries ).ToList();
+         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TEntry>( Sort.Descending ) ).ToList();
          var mergedEntries = MergeSort.Sort(
             collections: new IEnumerable<TEntry>[] { newEntries, oldEntries },
             comparer: EntryComparer.GetComparer<TEntry>( Sort.Descending ),
@@ -326,7 +326,7 @@ namespace Vibrant.Tsdb.Ats
          return tableEntities;
       }
 
-      private async Task<List<AtsQueryResult<TEntry>>> RetrieveAllForId( string id, Sort sort )
+      private async Task<List<TsdbTableEntity>> RetrieveAllForId( string id, Sort sort )
       {
          await _getSemaphore.WaitAsync().ConfigureAwait( false );
          try
@@ -349,7 +349,7 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private async Task<List<AtsQueryResult<TEntry>>> RetrieveLatestForId( string id )
+      private async Task<List<TsdbTableEntity>> RetrieveLatestForId( string id )
       {
          await _getSemaphore.WaitAsync().ConfigureAwait( false );
          try
@@ -368,7 +368,7 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private async Task<List<AtsQueryResult<TEntry>>> RetrieveRangeForId( string id, DateTime from, DateTime to, Sort sort )
+      private async Task<List<TsdbTableEntity>> RetrieveRangeForId( string id, DateTime from, DateTime to, Sort sort )
       {
          await _getSemaphore.WaitAsync().ConfigureAwait( false );
          try
@@ -400,16 +400,16 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private async Task<List<AtsQueryResult<TEntry>>> PerformQuery( TableQuery<TsdbTableEntity> query, bool takeAll, Sort sort )
+      private async Task<List<TsdbTableEntity>> PerformQuery( TableQuery<TsdbTableEntity> query, bool takeAll, Sort sort )
       {
-         List<AtsQueryResult<TEntry>> results = new List<AtsQueryResult<TEntry>>();
+         List<TsdbTableEntity> results = new List<TsdbTableEntity>();
 
          TableContinuationToken token = null;
          do
          {
             var table = await GetTable().ConfigureAwait( false );
             var rows = await table.ExecuteQuerySegmentedAsync( query, takeAll ? token : null ).ConfigureAwait( false );
-            results.AddRange( rows.Select( x => new AtsQueryResult<TEntry>( x, sort ) ) );
+            results.AddRange( rows );
             token = rows.ContinuationToken;
          }
          while( token != null && takeAll );
