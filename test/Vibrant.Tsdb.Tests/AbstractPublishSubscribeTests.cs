@@ -15,8 +15,6 @@ namespace Vibrant.Tsdb.Ats.Tests
       [Fact]
       public async Task Should_Subscribe_And_Publish()
       {
-         TsdbTypeRegistry.Register<BasicEntry>();
-
          var ps = CreatePublishSubscribe();
 
          await ps.WaitWhileDisconnected();
@@ -58,7 +56,7 @@ namespace Vibrant.Tsdb.Ats.Tests
             };
 
          await ps.Publish( toPublish );
-         await Task.Delay( 1500 );
+         await Task.Delay( 2000 );
 
          Assert.Equal( 2, received1 );
          Assert.Equal( 1, received2 );
@@ -66,7 +64,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          await unsubscribe3();
          await ps.Publish( toPublish );
-         await Task.Delay( 1500 );
+         await Task.Delay( 2000 );
 
          Assert.Equal( 4, received1 );
          Assert.Equal( 2, received2 );
@@ -74,7 +72,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          await unsubscribe2();
          await ps.Publish( toPublish );
-         await Task.Delay( 1500 );
+         await Task.Delay( 2000 );
 
          Assert.Equal( 6, received1 );
          Assert.Equal( 2, received2 );
@@ -82,7 +80,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          await unsubscribe1();
          await ps.Publish( toPublish );
-         await Task.Delay( 1500 );
+         await Task.Delay( 2000 );
 
          Assert.Equal( 6, received1 );
          Assert.Equal( 2, received2 );

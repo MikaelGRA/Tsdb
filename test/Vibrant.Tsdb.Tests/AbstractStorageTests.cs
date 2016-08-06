@@ -52,8 +52,6 @@ namespace Vibrant.Tsdb.Ats.Tests
       [InlineData( Sort.Ascending )]
       public async Task Should_Write_And_Read_Basic_Rows( Sort sort )
       {
-         TsdbTypeRegistry.Register<BasicEntry>();
-
          var store = GetStorage( "Table1" );
 
          int count = 50000;
@@ -114,8 +112,6 @@ namespace Vibrant.Tsdb.Ats.Tests
       [InlineData( Sort.Ascending )]
       public async Task Should_Write_And_Delete_Basic_Rows( Sort sort )
       {
-         TsdbTypeRegistry.Register<BasicEntry>();
-
          var store = GetStorage( "Table2" );
 
          int count = 50000;
@@ -139,8 +135,6 @@ namespace Vibrant.Tsdb.Ats.Tests
       [InlineData( Sort.Ascending )]
       public async Task Should_Write_Twice_Then_Delete_All_Basic_Rows( Sort sort )
       {
-         TsdbTypeRegistry.Register<BasicEntry>();
-
          var store = GetStorage( "Table3" );
 
          int count = 1000;

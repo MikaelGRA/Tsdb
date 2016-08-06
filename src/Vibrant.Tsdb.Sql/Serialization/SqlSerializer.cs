@@ -24,15 +24,13 @@ namespace Vibrant.Tsdb.Sql.Serialization
       public static void SerializeEntry<TEntry>( BinaryWriter writer, TEntry entry )
          where TEntry : ISqlEntry
       {
-         writer.Write( entry.GetTypeCode() );
          entry.Write( writer );
       }
 
       public static TEntry DeserializeEntry<TEntry>( BinaryReader reader, string id )
-         where TEntry : ISqlEntry
+         where TEntry : ISqlEntry, new()
       {
-         var typeCode = reader.ReadUInt16();
-         var entry = (TEntry)TsdbTypeRegistry.CreateEntry( typeCode );
+         var entry = new TEntry();
          entry.SetId( id );
          entry.Read( reader );
          return entry;
@@ -62,7 +60,7 @@ namespace Vibrant.Tsdb.Sql.Serialization
       }
 
       public static List<TEntry> Deserialize<TEntry>( IEnumerable<SqlEntry> sqlEntries )
-         where TEntry : ISqlEntry
+         where TEntry : ISqlEntry, new()
       {
          List<TEntry> entries = new List<TEntry>();
 

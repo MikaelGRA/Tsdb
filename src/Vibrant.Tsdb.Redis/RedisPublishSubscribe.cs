@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Redis
 {
    public class RedisPublishSubscribe<TEntry> : DefaultPublishSubscribe<TEntry>, IDisposable
-      where TEntry : IRedisEntry
+      where TEntry : IRedisEntry, new()
    {
       private TaskCompletionSource<bool> _waitWhileDisconnected;
       private RedisConnection _connection;

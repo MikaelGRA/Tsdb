@@ -9,6 +9,8 @@ namespace Vibrant.Tsdb.Ats.Serialization
 {
    internal static class AtsSerializer
    {
+      private static readonly int MaxEntrySizeInBytes = 1024;
+
       public static BinaryReader CreateReader( Stream stream )
       {
          var reader = new BinaryReader( stream, Encoding.ASCII );
@@ -24,16 +26,14 @@ namespace Vibrant.Tsdb.Ats.Serialization
       public static void SerializeEntry<TEntry>( BinaryWriter writer, TEntry entry )
          where TEntry : IAtsEntry
       {
-         writer.Write( entry.GetTypeCode() );
          writer.Write( entry.GetTimestamp().Ticks );
          entry.Write( writer );
       }
 
       public static TEntry DeserializeEntry<TEntry>( BinaryReader reader, string id )
-         where TEntry : IAtsEntry
+         where TEntry : IAtsEntry, new()
       {
-         var typeCode = reader.ReadUInt16();
-         var entry = (TEntry)TsdbTypeRegistry.CreateEntry( typeCode );
+         var entry = new TEntry();
          entry.SetId( id );
          entry.SetTimestamp( new DateTime( reader.ReadInt64(), DateTimeKind.Utc ) );
          entry.Read( reader );
@@ -87,7 +87,7 @@ namespace Vibrant.Tsdb.Ats.Serialization
                }
             }
 
-            if( currentSize + TsdbTypeRegistry.MaxEntrySizeInBytes > maxByteArraySize )
+            if( currentSize + MaxEntrySizeInBytes > maxByteArraySize )
             {
                writer.Write( serializedEntries.Count );
                var length = stream.ToArray();
@@ -157,7 +157,7 @@ namespace Vibrant.Tsdb.Ats.Serialization
       }
 
       public static TEntry[] Deserialize<TEntry>( string id, byte[] bytes, Sort sort )
-         where TEntry : IAtsEntry
+         where TEntry : IAtsEntry, new()
       {
          var stream = new MemoryStream( bytes );
          var reader = CreateReader( stream );

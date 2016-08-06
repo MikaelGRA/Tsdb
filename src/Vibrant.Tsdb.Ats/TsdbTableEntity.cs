@@ -14,7 +14,7 @@ namespace Vibrant.Tsdb.Ats
       public byte[] P0 { get; set; }
 
       public TEntry[] GetEntries<TEntry>( Sort sort )
-         where TEntry : IAtsEntry
+         where TEntry : IAtsEntry, new()
       {
          return AtsSerializer.Deserialize<TEntry>( PartitionKey, P0, sort );
       }

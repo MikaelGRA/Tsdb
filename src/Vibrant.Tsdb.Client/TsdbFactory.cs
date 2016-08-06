@@ -14,7 +14,7 @@ namespace Vibrant.Tsdb.Client
    public static class TsdbFactory
    {
       public static TsdbClient<TEntry> CreateClient<TEntry>( string sqlTableName, string sqlConnectionString, string atsTableNamme, string atsConnectionString )
-         where TEntry : IEntry, IAtsEntry, ISqlEntry
+         where TEntry : IEntry, IAtsEntry, ISqlEntry, new()
       {
          var sql = new SqlDynamicStorage<TEntry>( sqlTableName, sqlConnectionString );
          var ats = new AtsVolumeStorage<TEntry>( atsTableNamme, atsConnectionString );
@@ -23,7 +23,7 @@ namespace Vibrant.Tsdb.Client
       }
 
       public static TsdbClient<TEntry> CreateClient<TEntry>( string sqlTableName, string sqlConnectionString, string atsTableNamme, string atsConnectionString, string redisConnectionString )
-         where TEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry
+         where TEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, new()
       {
          var sql = new SqlDynamicStorage<TEntry>( sqlTableName, sqlConnectionString );
          var ats = new AtsVolumeStorage<TEntry>( atsTableNamme, atsConnectionString );

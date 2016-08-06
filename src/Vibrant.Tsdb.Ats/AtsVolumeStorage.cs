@@ -18,7 +18,7 @@ namespace Vibrant.Tsdb.Ats
    /// as its backend. 
    /// </summary>
    public class AtsVolumeStorage<TEntry> : IVolumeStorage<TEntry>, IVolumeStorageSelector<TEntry>
-      where TEntry : IAtsEntry
+      where TEntry : IAtsEntry, new()
    {
       private object _sync = new object();
       private SemaphoreSlim _read;

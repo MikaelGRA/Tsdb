@@ -12,7 +12,7 @@ using Vibrant.Tsdb.Sql.Serialization;
 namespace Vibrant.Tsdb.Sql
 {
    public class SqlDynamicStorage<TEntry> : IDynamicStorage<TEntry>, IDynamicStorageSelector<TEntry>
-      where TEntry : ISqlEntry
+      where TEntry : ISqlEntry, new()
    {
       private object _sync = new object();
       private string _tableName;

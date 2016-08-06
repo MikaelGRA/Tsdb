@@ -43,7 +43,7 @@ namespace Vibrant.Tsdb.Redis
       }
 
       public Task SubscribeAsync<TEntry>( string id, Action<List<TEntry>> onMessage )
-         where TEntry : IRedisEntry
+         where TEntry : IRedisEntry, new()
       {
          // TODO: Multiple at the same time...
 

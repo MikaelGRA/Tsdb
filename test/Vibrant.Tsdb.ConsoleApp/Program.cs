@@ -37,8 +37,6 @@ namespace Vibrant.Tsdb.ConsoleApp
          var sql = config.GetSection( "SqlStorage" );
          var redis = config.GetSection( "RedisCache" );
 
-         TsdbTypeRegistry.Register<BasicEntry>();
-
          var startTime = DateTime.UtcNow;
 
          _dataSources = new DataSource[]

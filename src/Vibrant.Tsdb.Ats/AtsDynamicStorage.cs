@@ -11,7 +11,7 @@ using Vibrant.Tsdb.Ats.Serialization;
 namespace Vibrant.Tsdb.Ats
 {
    public class AtsDynamicStorage<TEntry> : IDynamicStorage<TEntry>, IDynamicStorageSelector<TEntry>
-     where TEntry : IAtsEntry
+     where TEntry : IAtsEntry, new()
    {
       private object _sync = new object();
       private SemaphoreSlim _read;
