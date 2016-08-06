@@ -35,17 +35,17 @@ namespace Vibrant.Tsdb.Sql
          return StoreForAll( items );
       }
 
-      public Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to )
+      public Task Delete( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          return DeleteForIds( ids, from, to );
       }
 
-      public Task<int> Delete( IEnumerable<string> ids, DateTime to )
+      public Task Delete( IEnumerable<string> ids, DateTime to )
       {
          return DeleteForIds( ids, to );
       }
 
-      public Task<int> Delete( IEnumerable<string> ids )
+      public Task Delete( IEnumerable<string> ids )
       {
          return DeleteForIds( ids );
       }

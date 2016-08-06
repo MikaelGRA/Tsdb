@@ -14,24 +14,31 @@ namespace Vibrant.Tsdb.Ats
      where TEntry : IAtsEntry
    {
       private object _sync = new object();
-      private SemaphoreSlim _sem;
+      private SemaphoreSlim _read;
+      private SemaphoreSlim _write;
       private string _tableName;
       private CloudStorageAccount _account;
       private CloudTableClient _client;
       private Task<CloudTable> _table;
       private IPartitionProvider _partitioningProvider;
 
-      public AtsDynamicStorage( string tableName, string connectionString, IPartitionProvider partitioningProvider )
+      public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IPartitionProvider partitioningProvider )
       {
-         _sem = new SemaphoreSlim( 25 );
+         _read = new SemaphoreSlim( readParallelism );
+         _write = new SemaphoreSlim( writeParallelism );
          _tableName = tableName;
          _account = CloudStorageAccount.Parse( connectionString );
          _client = _account.CreateCloudTableClient();
          _partitioningProvider = partitioningProvider;
       }
 
+      public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism )
+         : this( tableName, connectionString, readParallelism, writeParallelism, new YearlyPartitioningProvider() )
+      {
+      }
+
       public AtsDynamicStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, new YearlyPartitioningProvider() )
+         : this( tableName, connectionString, 25, 25, new YearlyPartitioningProvider() )
       {
       }
 
@@ -40,17 +47,17 @@ namespace Vibrant.Tsdb.Ats
          return this;
       }
 
-      public Task<int> Delete( IEnumerable<string> ids )
+      public Task Delete( IEnumerable<string> ids )
       {
          return DeleteAllInternal( ids );
       }
 
-      public Task<int> Delete( IEnumerable<string> ids, DateTime to )
+      public Task Delete( IEnumerable<string> ids, DateTime to )
       {
          return DeleteUntilInternal( ids, to );
       }
 
-      public Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to )
+      public Task Delete( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          return DeleteRangeInternal( ids, from, to );
       }
@@ -244,7 +251,7 @@ namespace Vibrant.Tsdb.Ats
          TableContinuationToken token = null;
          do
          {
-            await _sem.WaitAsync().ConfigureAwait( false );
+            await _read.WaitAsync().ConfigureAwait( false );
             try
             {
                var rows = await table.ExecuteQuerySegmentedAsync( query, takeAll ? token : null ).ConfigureAwait( false );
@@ -254,7 +261,7 @@ namespace Vibrant.Tsdb.Ats
             }
             finally
             {
-               _sem.Release();
+               _read.Release();
             }
          }
          while( token != null && takeAll );
@@ -278,7 +285,7 @@ namespace Vibrant.Tsdb.Ats
          {
             TableQuerySegment<TsdbTableEntity> rows;
 
-            await _sem.WaitAsync().ConfigureAwait( false );
+            await _read.WaitAsync().ConfigureAwait( false );
             try
             {
                rows = await table.ExecuteQuerySegmentedAsync( query, token : null ).ConfigureAwait( false );
@@ -290,7 +297,7 @@ namespace Vibrant.Tsdb.Ats
             }
             finally
             {
-               _sem.Release();
+               _read.Release();
             }
 
             // iterate by partition and 100s
@@ -317,7 +324,7 @@ namespace Vibrant.Tsdb.Ats
       {
          int count = 0;
 
-         await _sem.WaitAsync().ConfigureAwait( false );
+         await _write.WaitAsync().ConfigureAwait( false );
          try
          {
             var operation = new TableBatchOperation();
@@ -331,7 +338,7 @@ namespace Vibrant.Tsdb.Ats
          }
          finally
          {
-            _sem.Release();
+            _write.Release();
          }
 
          return count;
@@ -355,7 +362,7 @@ namespace Vibrant.Tsdb.Ats
 
       private async Task WriteInternalLocked( string partitionKey, IEnumerable<TEntry> entries )
       {
-         await _sem.WaitAsync().ConfigureAwait( false );
+         await _write.WaitAsync().ConfigureAwait( false );
          try
          {
             var operation = new TableBatchOperation();
@@ -368,7 +375,7 @@ namespace Vibrant.Tsdb.Ats
          }
          finally
          {
-            _sem.Release();
+            _write.Release();
          }
       }
 

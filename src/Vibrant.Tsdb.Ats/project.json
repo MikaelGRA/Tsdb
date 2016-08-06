@@ -19,10 +19,15 @@
 
    "frameworks": {
       "net45": {
-
+         "buildOptions": {
+            "define": ["NET"]
+         }
       },
       "netstandard1.3": {
-         "imports": "portable-net451+win8"
+         "imports": "portable-net451+win8",
+         "buildOptions": {
+            "define": ["COREFX"]
+         }
       }
    },
    "scripts": {

@@ -9,6 +9,6 @@ namespace Vibrant.Tsdb
    {
       Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime to, Sort sort = Sort.Descending );
 
-      Task<int> Delete( IEnumerable<string> ids, DateTime to );
+      Task Delete( IEnumerable<string> ids, DateTime to );
    }
 }

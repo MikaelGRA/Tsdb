@@ -44,25 +44,22 @@ namespace Vibrant.Tsdb.InfluxDB
          await _client.WriteAsync( _database, items ).ConfigureAwait( false );
       }
 
-      public async Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to )
+      public async Task Delete( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          await CreateDatabase().ConfigureAwait( false );
          var resultSet = await _client.ReadAsync<TEntry>( _database, CreateDeleteQuery( ids, from, to ) ).ConfigureAwait( false );
-         return 0;
       }
 
-      public async Task<int> Delete( IEnumerable<string> ids, DateTime to )
+      public async Task Delete( IEnumerable<string> ids, DateTime to )
       {
          await CreateDatabase().ConfigureAwait( false );
          var resultSet = await _client.ReadAsync<TEntry>( _database, CreateDeleteQuery( ids, to ) ).ConfigureAwait( false );
-         return 0;
       }
 
-      public async Task<int> Delete( IEnumerable<string> ids )
+      public async Task Delete( IEnumerable<string> ids )
       {
          await CreateDatabase().ConfigureAwait( false );
          var resultSet = await _client.ReadAsync<TEntry>( _database, CreateDeleteQuery( ids ) ).ConfigureAwait( false );
-         return 0;
       }
 
       public async Task<MultiReadResult<TEntry>> ReadLatest( IEnumerable<string> ids )

@@ -22,7 +22,7 @@ namespace Vibrant.Tsdb
          _publishSubscribe = publishSubscribe;
       }
 
-      public async Task<int> MoveToVolumeStorage( IEnumerable<string> ids )
+      public async Task MoveToVolumeStorage( IEnumerable<string> ids )
       {
          // read from dynamic storage
          var readTasks = new List<Task<MultiReadResult<TEntry>>>();
@@ -34,15 +34,12 @@ namespace Vibrant.Tsdb
          await WriteDirectlyToVolumeStorage( entries ).ConfigureAwait( false );
 
          // delete from dynamic storage
-         var deleteTasks = new List<Task<int>>();
+         var deleteTasks = new List<Task>();
          deleteTasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
          await Task.WhenAll( deleteTasks ).ConfigureAwait( false );
-
-         // return amount deleted (also moved)
-         return deleteTasks.Sum( x => x.Result );
       }
 
-      public async Task<int> MoveToVolumeStorage( IEnumerable<string> ids, DateTime to )
+      public async Task MoveToVolumeStorage( IEnumerable<string> ids, DateTime to )
       {
          // read from dynamic storage
          var readTasks = new List<Task<MultiReadResult<TEntry>>>();
@@ -54,12 +51,9 @@ namespace Vibrant.Tsdb
          await WriteDirectlyToVolumeStorage( entries ).ConfigureAwait( false );
 
          // delete from dynamic storage
-         var deleteTasks = new List<Task<int>>();
+         var deleteTasks = new List<Task>();
          deleteTasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, to ) ) );
          await Task.WhenAll( deleteTasks ).ConfigureAwait( false );
-
-         // return amount deleted (also moved)
-         return deleteTasks.Sum( x => x.Result );
       }
 
       public async Task WriteDirectlyToVolumeStorage( IEnumerable<TEntry> items )
@@ -82,35 +76,32 @@ namespace Vibrant.Tsdb
 
          switch( publish )
          {
-            case Publish.None:
-               break;
             case Publish.Latest:
                await _publishSubscribe.Publish( FindLatestForEachId( items ) ).ConfigureAwait( false );
                break;
             case Publish.All:
                await _publishSubscribe.Publish( items ).ConfigureAwait( false );
                break;
+            case Publish.None:
             default:
                throw new ArgumentException( "publish" );
          }
       }
 
-      public async Task<int> Delete( IEnumerable<string> ids )
+      public async Task Delete( IEnumerable<string> ids )
       {
-         var tasks = new List<Task<int>>();
+         var tasks = new List<Task>();
          tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
          tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return tasks.Sum( x => x.Result );
       }
 
-      public async Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to )
+      public async Task Delete( IEnumerable<string> ids, DateTime from, DateTime to )
       {
-         var tasks = new List<Task<int>>();
+         var tasks = new List<Task>();
          tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, from, to ) ) );
          tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, from, to ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return tasks.Sum( x => x.Result );
       }
 
       public async Task<MultiReadResult<TEntry>> ReadLatest( IEnumerable<string> ids )

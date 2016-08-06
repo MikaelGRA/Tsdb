@@ -9,9 +9,9 @@ namespace Vibrant.Tsdb
    {
       Task Write( IEnumerable<TEntry> items );
 
-      Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to );
+      Task Delete( IEnumerable<string> ids, DateTime from, DateTime to );
 
-      Task<int> Delete( IEnumerable<string> ids );
+      Task Delete( IEnumerable<string> ids );
 
       Task<MultiReadResult<TEntry>> ReadLatest( IEnumerable<string> ids );
 

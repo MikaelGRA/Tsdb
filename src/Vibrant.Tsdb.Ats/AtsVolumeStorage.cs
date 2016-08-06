@@ -21,8 +21,8 @@ namespace Vibrant.Tsdb.Ats
       where TEntry : IAtsEntry
    {
       private object _sync = new object();
-      private SemaphoreSlim _getSemaphore;
-      private SemaphoreSlim _setSemaphore;
+      private SemaphoreSlim _read;
+      private SemaphoreSlim _write;
       private string _tableName;
       private CloudStorageAccount _account;
       private CloudTableClient _client;
@@ -34,19 +34,26 @@ namespace Vibrant.Tsdb.Ats
       /// </summary>
       /// <param name="tableName">The name of the table to use in Azure Table Storage.</param>
       /// <param name="connectionString">The connection string used to connect to a storage account.</param>
+      /// <param name="readParallelism"></param>
+      /// <param name="writeParallelism"></param>
       /// <param name="provider">The provider of partitioning keys</param>
-      public AtsVolumeStorage( string tableName, string connectionString, IPartitionProvider provider )
+      public AtsVolumeStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IPartitionProvider provider )
       {
-         _getSemaphore = new SemaphoreSlim( 25 );
-         _setSemaphore = new SemaphoreSlim( 10 );
+         _read = new SemaphoreSlim( readParallelism );
+         _write = new SemaphoreSlim( writeParallelism );
          _tableName = tableName;
          _account = CloudStorageAccount.Parse( connectionString );
          _client = _account.CreateCloudTableClient();
          _provider = provider;
       }
 
+      public AtsVolumeStorage( string tableName, string connectionString, int readParallelism, int writeParallelism )
+         : this( tableName, connectionString, readParallelism, writeParallelism, new YearlyPartitioningProvider() )
+      {
+      }
+
       public AtsVolumeStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, new YearlyPartitioningProvider() )
+         : this( tableName, connectionString, 10, 25, new YearlyPartitioningProvider() )
       {
       }
 
@@ -80,7 +87,7 @@ namespace Vibrant.Tsdb.Ats
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      public async Task<int> Delete( IEnumerable<string> ids, DateTime from, DateTime to )
+      public async Task Delete( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          var tasks = new List<Task<int>>();
          foreach( var id in ids )
@@ -88,10 +95,9 @@ namespace Vibrant.Tsdb.Ats
             tasks.Add( DeleteForId( id, from, to ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return tasks.Sum( x => x.Result );
       }
 
-      public async Task<int> Delete( IEnumerable<string> ids )
+      public async Task Delete( IEnumerable<string> ids )
       {
          var tasks = new List<Task<int>>();
          foreach( var id in ids )
@@ -99,7 +105,6 @@ namespace Vibrant.Tsdb.Ats
             tasks.Add( DeleteAllForId( id ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return tasks.Sum( x => x.Result );
       }
 
       public async Task<MultiReadResult<TEntry>> ReadLatest( IEnumerable<string> ids )
@@ -303,7 +308,7 @@ namespace Vibrant.Tsdb.Ats
 
       private async Task ExecuteBatchOperation( TableBatchOperation operation )
       {
-         await _setSemaphore.WaitAsync().ConfigureAwait( false );
+         await _write.WaitAsync().ConfigureAwait( false );
          try
          {
             var table = await GetTable();
@@ -312,7 +317,7 @@ namespace Vibrant.Tsdb.Ats
          }
          finally
          {
-            _setSemaphore.Release();
+            _write.Release();
          }
       }
 
@@ -336,7 +341,7 @@ namespace Vibrant.Tsdb.Ats
 
       private async Task<List<TsdbTableEntity>> RetrieveAllForId( string id, Sort sort )
       {
-         await _getSemaphore.WaitAsync().ConfigureAwait( false );
+         await _read.WaitAsync().ConfigureAwait( false );
          try
          {
             var fullQuery = new TableQuery<TsdbTableEntity>()
@@ -353,13 +358,13 @@ namespace Vibrant.Tsdb.Ats
          }
          finally
          {
-            _getSemaphore.Release();
+            _read.Release();
          }
       }
 
       private async Task<List<TsdbTableEntity>> RetrieveLatestForId( string id )
       {
-         await _getSemaphore.WaitAsync().ConfigureAwait( false );
+         await _read.WaitAsync().ConfigureAwait( false );
          try
          {
             var fullQuery = new TableQuery<TsdbTableEntity>()
@@ -372,13 +377,13 @@ namespace Vibrant.Tsdb.Ats
          }
          finally
          {
-            _getSemaphore.Release();
+            _read.Release();
          }
       }
 
       private async Task<List<TsdbTableEntity>> RetrieveRangeForId( string id, DateTime from, DateTime to, Sort sort )
       {
-         await _getSemaphore.WaitAsync().ConfigureAwait( false );
+         await _read.WaitAsync().ConfigureAwait( false );
          try
          {
             var generalQuery = new TableQuery<TsdbTableEntity>()
@@ -404,7 +409,7 @@ namespace Vibrant.Tsdb.Ats
          }
          finally
          {
-            _getSemaphore.Release();
+            _read.Release();
          }
       }
 

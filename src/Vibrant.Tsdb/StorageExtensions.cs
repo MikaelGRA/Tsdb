@@ -7,13 +7,13 @@ namespace Vibrant.Tsdb
 {
    public static class StorageExtensions
    {
-      public static Task<int> Delete<TStorageEntry>( this IStorage<TStorageEntry> storage, string id, DateTime from, DateTime to )
+      public static Task Delete<TStorageEntry>( this IStorage<TStorageEntry> storage, string id, DateTime from, DateTime to )
          where TStorageEntry : IEntry
       {
          return storage.Delete( new[] { id }, from, to );
       }
 
-      public static Task<int> Delete<TEntry>( this IStorage<TEntry> storage, string id )
+      public static Task Delete<TEntry>( this IStorage<TEntry> storage, string id )
          where TEntry : IEntry
       {
          return storage.Delete( new[] { id } );
