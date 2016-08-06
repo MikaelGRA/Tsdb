@@ -10,7 +10,7 @@ using Vibrant.Tsdb.Ats.Serialization;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public class AtsDynamicStorage<TEntry> : IDynamicStorage<TEntry>, IDynamicStorageSelector<TEntry>
+   public class AtsDynamicStorage<TEntry> : IDynamicStorage<TEntry>, IDynamicStorageSelector<TEntry>, IDisposable
      where TEntry : IAtsEntry, new()
    {
       private object _sync = new object();
@@ -541,5 +541,31 @@ namespace Vibrant.Tsdb.Ats
             TableOperators.And,
             TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.LessThanOrEqual, toPartitionKey ) );
       }
+
+      #region IDisposable Support
+
+      private bool _disposed = false; // To detect redundant calls
+
+      protected virtual void Dispose( bool disposing )
+      {
+         if( !_disposed )
+         {
+            if( disposing )
+            {
+               _read.Dispose();
+               _write.Dispose();
+            }
+
+            _disposed = true;
+         }
+      }
+      
+      // This code added to correctly implement the disposable pattern.
+      public void Dispose()
+      {
+         Dispose( true );
+      }
+
+      #endregion
    }
 }

@@ -9,7 +9,7 @@ using System.Text;
 
 namespace Vibrant.Tsdb.InfluxDB
 {
-   public class InfluxDynamicStorage<TEntry> : IDynamicStorage<TEntry>, IDynamicStorageSelector<TEntry>
+   public class InfluxDynamicStorage<TEntry> : IDynamicStorage<TEntry>, IDynamicStorageSelector<TEntry>, IDisposable
       where TEntry : IEntry, IInfluxEntry, new()
    {
       private DateTime _maxFrom = new DateTime( 2050, 1, 1, 0, 0, 0, DateTimeKind.Utc );
@@ -203,5 +203,30 @@ namespace Vibrant.Tsdb.InfluxDB
          }
          return _createDatabase;
       }
+
+      #region IDisposable Support
+
+      private bool _dispose = false; // To detect redundant calls
+
+      protected virtual void Dispose( bool disposing )
+      {
+         if( !_dispose )
+         {
+            if( disposing )
+            {
+               _client.Dispose();
+            }
+
+            _dispose = true;
+         }
+      }
+      
+      // This code added to correctly implement the disposable pattern.
+      public void Dispose()
+      {
+         Dispose( true );
+      }
+
+      #endregion
    }
 }
