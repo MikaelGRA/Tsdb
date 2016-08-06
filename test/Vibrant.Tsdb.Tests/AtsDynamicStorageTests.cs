@@ -7,11 +7,11 @@ using Vibrant.Tsdb.Ats.Tests.Entries;
 
 namespace Vibrant.Tsdb.Ats.Tests
 {
-   public class AtsStorageTests : AbstractStorageTests<AtsVolumeStorage<BasicEntry>>
+   public class AtsDynamicStorageTests : AbstractStorageTests<AtsVolumeStorage<BasicEntry>>
    {
       private static readonly string ConnectionString;
 
-      static AtsStorageTests()
+      static AtsDynamicStorageTests()
       {
          var builder = new ConfigurationBuilder()
             .AddJsonFile( "appsettings.json" )
@@ -24,7 +24,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
       public override IStorage<BasicEntry> GetStorage( string tableName )
       {
-         return new AtsVolumeStorage<BasicEntry>( tableName, ConnectionString );
+         return new AtsDynamicStorage<BasicEntry>( tableName + "Dynamic", ConnectionString );
       }
    }
 }

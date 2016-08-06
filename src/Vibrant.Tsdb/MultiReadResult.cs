@@ -16,6 +16,11 @@ namespace Vibrant.Tsdb
          _results = results;
       }
 
+      public MultiReadResult( IEnumerable<ReadResult<TEntry>> results )
+      {
+         _results = results.ToDictionary( x => x.Id );
+      }
+
       public MultiReadResult()
       {
          _results = new Dictionary<string, ReadResult<TEntry>>();

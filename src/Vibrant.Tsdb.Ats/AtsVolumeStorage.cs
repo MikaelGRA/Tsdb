@@ -27,26 +27,34 @@ namespace Vibrant.Tsdb.Ats
       private CloudStorageAccount _account;
       private CloudTableClient _client;
       private Task<CloudTable> _table;
-
-      #region Public
-
-      public IVolumeStorage<TEntry> GetStorage( string id )
-      {
-         return this;
-      }
+      private IPartitionProvider _provider;
 
       /// <summary>
       /// Constructs an instance of IVolumeStorage.
       /// </summary>
       /// <param name="tableName">The name of the table to use in Azure Table Storage.</param>
       /// <param name="connectionString">The connection string used to connect to a storage account.</param>
-      public AtsVolumeStorage( string tableName, string connectionString )
+      /// <param name="provider">The provider of partitioning keys</param>
+      public AtsVolumeStorage( string tableName, string connectionString, IPartitionProvider provider )
       {
          _getSemaphore = new SemaphoreSlim( 25 );
          _setSemaphore = new SemaphoreSlim( 10 );
          _tableName = tableName;
          _account = CloudStorageAccount.Parse( connectionString );
          _client = _account.CreateCloudTableClient();
+         _provider = provider;
+      }
+
+      public AtsVolumeStorage( string tableName, string connectionString )
+         : this( tableName, connectionString, new YearlyPartitioningProvider() )
+      {
+      }
+
+      #region Public
+
+      public IVolumeStorage<TEntry> GetStorage( string id )
+      {
+         return this;
       }
 
       /// <summary>
@@ -318,7 +326,7 @@ namespace Vibrant.Tsdb.Ats
             var entity = new TsdbTableEntity();
             entity.SetData( result.Data );
             entity.RowKey = AtsKeyCalculator.CalculateRowKey( result.From );
-            entity.PartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, result.From );
+            entity.PartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, result.From, _provider );
 
             tableEntities.Add( entity );
          }
@@ -436,12 +444,12 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private static string CreateGeneralFilter( string id, DateTime from, DateTime to )
+      private string CreateGeneralFilter( string id, DateTime from, DateTime to )
       {
          var fromRowKey = AtsKeyCalculator.CalculateRowKey( from );
          var toRowKey = AtsKeyCalculator.CalculateRowKey( to );
-         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, from );
-         var toPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, to.AddTicks( -1 ) ); // -1 tick because it is an approximation value and we use gte operation
+         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, from, _provider );
+         var toPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, to.AddTicks( -1 ), _provider ); // -1 tick because it is an approximation value and we use gte operation
 
          return TableQuery.CombineFilters(
                TableQuery.CombineFilters(
@@ -455,11 +463,11 @@ namespace Vibrant.Tsdb.Ats
                   TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.GreaterThan, toRowKey ) ) );
       }
 
-      private static string CreateFirstFilter( string id, DateTime from )
+      private string CreateFirstFilter( string id, DateTime from )
       {
          var fromRowKey = AtsKeyCalculator.CalculateRowKey( from );
-         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, from ); // 7125
-         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id ); // 9999
+         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, from, _provider ); // 7125
+         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, _provider ); // 9999
 
          return TableQuery.CombineFilters(
             TableQuery.CombineFilters(
@@ -470,10 +478,10 @@ namespace Vibrant.Tsdb.Ats
             TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.GreaterThan, fromRowKey ) );
       }
 
-      private static string CreatePartitionFilter( string id )
+      private string CreatePartitionFilter( string id )
       {
-         var fromPartitionKey = AtsKeyCalculator.CalculateMaxPartitionKey( id ); // 0000
-         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id ); // 9999
+         var fromPartitionKey = AtsKeyCalculator.CalculateMaxPartitionKey( id, _provider ); // 0000
+         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, _provider ); // 9999
 
          return TableQuery.CombineFilters(
             TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.GreaterThanOrEqual, fromPartitionKey ),

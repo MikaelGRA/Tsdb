@@ -58,7 +58,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          int count = 50000;
 
-         var from = new DateTime( 2016, 12, 26, 0, 0, 0, DateTimeKind.Utc );
+         var from = new DateTime( 2016, 12, 31, 0, 0, 0, DateTimeKind.Utc );
          var to = from.AddSeconds( count );
 
          var written = CreateRows( from, count );
@@ -120,7 +120,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          int count = 50000;
 
-         var from = new DateTime( 2016, 12, 26, 0, 0, 0, DateTimeKind.Utc );
+         var from = new DateTime( 2016, 12, 31, 0, 0, 0, DateTimeKind.Utc );
          var to = from.AddSeconds( count );
 
          var written = CreateRows( from, count );
