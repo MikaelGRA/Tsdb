@@ -87,6 +87,11 @@ namespace Vibrant.Tsdb.Ats
          return WriteInternal( items );
       }
 
+      public Task<SegmentedReadResult<TEntry>> Read( string id, DateTime from, DateTime to, int segmentSize, object continuationToken )
+      {
+         return ReadRangeSegmentedInternal( id, from, to, segmentSize, continuationToken );
+      }
+
       private async Task<int> DeleteAllInternal( IEnumerable<string> ids )
       {
          var tasks = new List<Task<int>>();
@@ -242,6 +247,16 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TEntry>( id, sort, entries );
       }
 
+      private Task<SegmentedReadResult<TEntry>> ReadRangeSegmentedInternal( string id, DateTime from, DateTime to, int segmentSize, object continuationToken )
+      {
+         to = continuationToken != null ? (DateTime)continuationToken : to;
+
+         var generalQuery = new TableQuery<TsdbTableEntity>()
+            .Where( CreateGeneralFilter( id, from, to ) );
+
+         return ReadSegmentedInternal( id, generalQuery, from, segmentSize );
+      }
+
       private async Task<List<TEntry>> ReadInternal( string id, TableQuery<TsdbTableEntity> query, bool takeAll, Sort sort )
       {
          var table = await GetTable().ConfigureAwait( false );
@@ -274,6 +289,70 @@ namespace Vibrant.Tsdb.Ats
          return results;
       }
 
+      private async Task<SegmentedReadResult<TEntry>> ReadSegmentedInternal( string id, TableQuery<TsdbTableEntity> query, DateTime from, int segmentSize )
+      {
+         var table = await GetTable().ConfigureAwait( false );
+
+         List<TEntry> results = new List<TEntry>();
+
+         bool isLastFull = true;
+         TableContinuationToken token = null;
+         DateTime? continuationToken = null;
+         int read = 0;
+         do
+         {
+            await _read.WaitAsync().ConfigureAwait( false );
+            try
+            {
+               var rows = await table.ExecuteQuerySegmentedAsync( query, token: null ).ConfigureAwait( false );
+               var entries = Convert( rows, id );
+               token = rows.ContinuationToken;
+
+               isLastFull = rows.Results.Count == 1000;
+
+               // add required items, and no more
+               if( segmentSize >= read + rows.Results.Count )
+               {
+                  results.AddRange( entries );
+               }
+               else
+               {
+                  foreach( var entry in entries.Take( segmentSize - read ) )
+                  {
+                     read++;
+                     results.Add( entry );
+                  }
+               }
+
+               if( read == segmentSize ) // short circuit
+               {
+                  token = null;
+               }
+            }
+            finally
+            {
+               _read.Release();
+            }
+         }
+         while( token != null );
+
+         // calculate continuation token
+         if( isLastFull )
+         {
+            var earliestTimestamp = results[ results.Count - 1 ].GetTimestamp();
+            if( earliestTimestamp != from )
+            {
+               continuationToken = earliestTimestamp;
+            }
+         }
+         else
+         {
+            continuationToken = null;
+         }
+
+         return new SegmentedReadResult<TEntry>( id, Sort.Descending, continuationToken );
+      }
+
       private async Task<int> DeleteInternal( string id, TableQuery<TsdbTableEntity> query )
       {
          var table = await GetTable().ConfigureAwait( false );
@@ -288,7 +367,7 @@ namespace Vibrant.Tsdb.Ats
             await _read.WaitAsync().ConfigureAwait( false );
             try
             {
-               rows = await table.ExecuteQuerySegmentedAsync( query, token : null ).ConfigureAwait( false );
+               rows = await table.ExecuteQuerySegmentedAsync( query, token: null ).ConfigureAwait( false );
                foreach( var row in rows )
                {
                   row.ETag = "*";
@@ -559,7 +638,7 @@ namespace Vibrant.Tsdb.Ats
             _disposed = true;
          }
       }
-      
+
       // This code added to correctly implement the disposable pattern.
       public void Dispose()
       {
