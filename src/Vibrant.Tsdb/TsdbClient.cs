@@ -43,16 +43,15 @@ namespace Vibrant.Tsdb
          var dynamic = _dynamicStorageSelector.GetStorage( id );
          var volume = _volumeStorageSelector.GetStorage( id );
 
-         object token = null;
+         IContinuationToken token = null;
          do
          {
             var segment = await dynamic.Read( id, 10000, token ).ConfigureAwait( false );
             await volume.Write( segment.Entries ).ConfigureAwait( false );
+            await segment.DeleteAsync().ConfigureAwait( false );
             token = segment.ContinuationToken;
          }
-         while( token != null );
-
-         await dynamic.Delete( id ).ConfigureAwait( false );
+         while( token.HasMore );
       }
 
       public async Task MoveToVolumeStorage( string id, DateTime to )
@@ -60,16 +59,15 @@ namespace Vibrant.Tsdb
          var dynamic = _dynamicStorageSelector.GetStorage( id );
          var volume = _volumeStorageSelector.GetStorage( id );
 
-         object token = null;
+         IContinuationToken token = null;
          do
          {
             var segment = await dynamic.Read( id, to, 10000, token ).ConfigureAwait( false );
             await volume.Write( segment.Entries ).ConfigureAwait( false );
+            await segment.DeleteAsync().ConfigureAwait( false );
             token = segment.ContinuationToken;
          }
-         while( token != null );
-
-         await dynamic.Delete( id, to ).ConfigureAwait( false );
+         while( token.HasMore );
       }
 
       public async Task WriteDirectlyToVolumeStorage( IEnumerable<TEntry> items )

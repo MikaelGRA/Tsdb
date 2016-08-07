@@ -93,19 +93,29 @@ namespace Vibrant.Tsdb.InfluxDB
       public async Task<SegmentedReadResult<TEntry>> Read( string id, DateTime to, int segmentSize, object continuationToken )
       {
          await CreateDatabase().ConfigureAwait( false );
-         long skip = continuationToken != null ? (long)continuationToken : 0l;
-         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateUpperBoundSegmentedSelectQuery( id, to, skip, segmentSize ) ).ConfigureAwait( false );
+         var token = (ContinuationToken)continuationToken;
+         to = token?.To ?? to;
+         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateUpperBoundSegmentedSelectQuery( id, to, segmentSize ) ).ConfigureAwait( false );
          bool hasMore = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows.Count == segmentSize;
-         return Convert( id, resultSet, hasMore ? (object)( skip + segmentSize ) : null );
+         return Convert( id, resultSet, segmentSize );
       }
 
       public async Task<SegmentedReadResult<TEntry>> Read( string id, int segmentSize, object continuationToken )
       {
          await CreateDatabase().ConfigureAwait( false );
-         long skip = continuationToken != null ? (long)continuationToken : 0l;
-         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSegmentedSelectQuery( id, skip, segmentSize ) ).ConfigureAwait( false );
+         var token = (ContinuationToken)continuationToken;
+         var to = token?.To;
+         InfluxResultSet<TEntry> resultSet;
+         if( to.HasValue )
+         {
+            resultSet = await _client.ReadAsync<TEntry>( _database, CreateUpperBoundSegmentedSelectQuery( id, to.Value, segmentSize ) ).ConfigureAwait( false );
+         }
+         else
+         {
+            resultSet = await _client.ReadAsync<TEntry>( _database, CreateSegmentedSelectQuery( id, segmentSize ) ).ConfigureAwait( false );
+         }
          bool hasMore = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows.Count == segmentSize;
-         return Convert( id, resultSet, hasMore ? (object)( skip + segmentSize ) : null );
+         return Convert( id, resultSet, segmentSize );
       }
 
       private string CreateDeleteQuery( IEnumerable<string> ids, DateTime from, DateTime to )
@@ -148,14 +158,14 @@ namespace Vibrant.Tsdb.InfluxDB
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
-      private string CreateUpperBoundSegmentedSelectQuery( string id, DateTime to, long skip, int take )
+      private string CreateUpperBoundSegmentedSelectQuery( string id, DateTime to, int take )
       {
-         return $"SELECT * FROM \"{id}\" WHERE time < '{to.ToIso8601()}' ORDER BY time DESC LIMIT {take} OFFSET {skip}";
+         return $"SELECT * FROM \"{id}\" WHERE time < '{to.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
       }
 
-      private string CreateSegmentedSelectQuery( string id, long skip, int take )
+      private string CreateSegmentedSelectQuery( string id, int take )
       {
-         return $"SELECT * FROM \"{id}\" WHERE time < '{_maxFrom.ToIso8601()}' ORDER BY time DESC LIMIT {take} OFFSET {skip}";
+         return $"SELECT * FROM \"{id}\" WHERE time < '{_maxFrom.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
       }
 
       private string CreateSelectQuery( IEnumerable<string> ids, DateTime to, Sort sort )
@@ -200,10 +210,32 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      private SegmentedReadResult<TEntry> Convert( string id, InfluxResultSet<TEntry> resultSet, object continuationToken )
+      private SegmentedReadResult<TEntry> Convert( string id, InfluxResultSet<TEntry> resultSet, int segmentSize )
       {
          var list = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows;
-         return new SegmentedReadResult<TEntry>( id, Sort.Descending, continuationToken, (List<TEntry>)list );
+         var entries = (List<TEntry>)list;
+         DateTime? to = null;
+         if( entries.Count > 0 )
+         {
+            to = ( (IEntry)entries[ entries.Count - 1 ] ).GetTimestamp();
+         }
+         var continuationToken = new ContinuationToken( entries.Count == segmentSize, to );
+
+         return new SegmentedReadResult<TEntry>( id, Sort.Descending, continuationToken, entries, CreateDeleteFunction( id, continuationToken, entries ) );
+      }
+
+      private Func<Task> CreateDeleteFunction( string id, ContinuationToken token, List<TEntry> entries )
+      {
+         if( entries.Count == 0 )
+         {
+            return () => Task.FromResult( 0 );
+         }
+         else
+         {
+            var to = ( (IEntry)entries[ 0 ] ).GetTimestamp().AddTicks( 1 );
+            var from = ( (IEntry)entries[ entries.Count - 1 ] ).GetTimestamp();
+            return () => this.Delete( id, from, to );
+         }
       }
 
       private MultiReadResult<TEntry> Convert( IEnumerable<string> requiredIds, InfluxResultSet<TEntry> resultSet, Sort sort )
@@ -254,7 +286,7 @@ namespace Vibrant.Tsdb.InfluxDB
             _dispose = true;
          }
       }
-      
+
       // This code added to correctly implement the disposable pattern.
       public void Dispose()
       {

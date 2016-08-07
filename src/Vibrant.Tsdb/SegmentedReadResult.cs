@@ -8,24 +8,20 @@ namespace Vibrant.Tsdb
    public class SegmentedReadResult<TEntry> : ReadResult<TEntry>
      where TEntry : IEntry
    {
-      public SegmentedReadResult( string id, Sort sort, object continuationToken, List<TEntry> entries )
+      private Func<Task> _delete;
+
+      public SegmentedReadResult( string id, Sort sort, IContinuationToken continuationToken, List<TEntry> entries, Func<Task> delete )
          : base( id, sort, entries )
       {
          ContinuationToken = continuationToken;
+         _delete = delete;
       }
 
-      public SegmentedReadResult( string id, Sort sort, object continuationToken )
-         : base( id, sort )
-      {
-         ContinuationToken = continuationToken;
-      }
+      public IContinuationToken ContinuationToken { get; private set; }
 
-      public object ContinuationToken { get; private set; }
-
-      public new ReadResult<TOutputEntry> As<TOutputEntry>()
-         where TOutputEntry : IEntry
+      public Task DeleteAsync()
       {
-         return new SegmentedReadResult<TOutputEntry>( Id, Sort, Entries.Cast<TOutputEntry>().ToList() );
+         return _delete();
       }
    }
 }

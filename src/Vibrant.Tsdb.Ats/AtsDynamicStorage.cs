@@ -89,12 +89,12 @@ namespace Vibrant.Tsdb.Ats
 
       public Task<SegmentedReadResult<TEntry>> Read( string id, DateTime to, int segmentSize, object continuationToken )
       {
-         return ReadRangeSegmentedInternal( id, to, segmentSize, continuationToken );
+         return ReadRangeSegmentedInternal( id, to, segmentSize, (ContinuationToken)continuationToken );
       }
 
       public Task<SegmentedReadResult<TEntry>> Read( string id, int segmentSize, object continuationToken )
       {
-         return ReadRangeSegmentedInternal( id, segmentSize, continuationToken );
+         return ReadRangeSegmentedInternal( id, segmentSize, (ContinuationToken)continuationToken );
       }
 
       private async Task<int> DeleteAllInternal( IEnumerable<string> ids )
@@ -252,9 +252,9 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TEntry>( id, sort, entries );
       }
 
-      private Task<SegmentedReadResult<TEntry>> ReadRangeSegmentedInternal( string id, DateTime to, int segmentSize, object continuationToken )
+      private Task<SegmentedReadResult<TEntry>> ReadRangeSegmentedInternal( string id, DateTime to, int segmentSize, ContinuationToken continuationToken )
       {
-         to = continuationToken != null ? (DateTime)continuationToken : to;
+         to = continuationToken?.To ?? to;
 
          var generalQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreateBeforeFilter( id, to ) );
@@ -262,9 +262,9 @@ namespace Vibrant.Tsdb.Ats
          return ReadSegmentedInternal( id, generalQuery, segmentSize );
       }
 
-      private Task<SegmentedReadResult<TEntry>> ReadRangeSegmentedInternal( string id, int segmentSize, object continuationToken )
+      private Task<SegmentedReadResult<TEntry>> ReadRangeSegmentedInternal( string id, int segmentSize, ContinuationToken continuationToken )
       {
-         DateTime? to = continuationToken != null ? (DateTime?)continuationToken : null;
+         DateTime? to = continuationToken?.To;
 
          if( to.HasValue )
          {
@@ -318,11 +318,12 @@ namespace Vibrant.Tsdb.Ats
       {
          var table = await GetTable().ConfigureAwait( false );
 
-         List<TEntry> results = new List<TEntry>();
+         List<TEntry> results = new List<TEntry>( segmentSize );
+         List<TsdbTableEntity> allRows = new List<TsdbTableEntity>( segmentSize );
 
          bool isLastFull = true;
          TableContinuationToken token = null;
-         DateTime? continuationToken = null;
+         DateTime? to = null;
          int read = 0;
          do
          {
@@ -331,7 +332,6 @@ namespace Vibrant.Tsdb.Ats
             {
                var rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
                var entries = Convert( rows, id );
-               token = rows.ContinuationToken;
 
                isLastFull = rows.Results.Count == 1000;
 
@@ -340,16 +340,24 @@ namespace Vibrant.Tsdb.Ats
                {
                   read += rows.Results.Count;
                   results.AddRange( entries );
+                  allRows.AddRange( rows );
                }
                else
                {
-                  foreach( var entry in entries.Take( segmentSize - read ) )
+                  var take = segmentSize - read;
+
+                  foreach( var entry in entries.Take( take ) )
                   {
                      read++;
                      results.Add( entry );
                   }
+                  foreach( var row in rows.Take( take ) )
+                  {
+                     allRows.Add( row );
+                  }
                }
 
+               token = rows.ContinuationToken;
                if( read == segmentSize ) // short circuit
                {
                   token = null;
@@ -365,14 +373,42 @@ namespace Vibrant.Tsdb.Ats
          // calculate continuation token
          if( isLastFull )
          {
-            continuationToken = results[ results.Count - 1 ].GetTimestamp();
+            to = results[ results.Count - 1 ].GetTimestamp();
          }
          else
          {
-            continuationToken = null;
+            to = null;
          }
 
-         return new SegmentedReadResult<TEntry>( id, Sort.Descending, continuationToken, results );
+         return new SegmentedReadResult<TEntry>( id, Sort.Descending, new ContinuationToken( isLastFull, to ), results, () => DeleteInternal( id, allRows ) );
+      }
+
+      private async Task<int> DeleteInternal( string id, List<TsdbTableEntity> entities )
+      {
+         var table = await GetTable().ConfigureAwait( false );
+
+         int count = 0;
+
+         TableContinuationToken token = null;
+         do
+         {
+            // iterate by partition and 100s
+            var tasks = new List<Task<int>>();
+            foreach( var kvp in IterateByPartition( entities ) )
+            {
+               var partitionKey = kvp.Key;
+               var items = kvp.Value;
+
+               // schedule parallel execution
+               tasks.Add( DeleteInternalLocked( items ) );
+            }
+            await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+            count += tasks.Sum( x => x.Result );
+         }
+         while( token != null );
+
+         return count;
       }
 
       private async Task<int> DeleteInternal( string id, TableQuery<TsdbTableEntity> query )

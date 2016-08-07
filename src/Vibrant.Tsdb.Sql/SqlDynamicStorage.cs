@@ -21,6 +21,8 @@ namespace Vibrant.Tsdb.Sql
 
       public SqlDynamicStorage( string tableName, string connectionString )
       {
+         SqlMapper.AddTypeMap( typeof( DateTime ), DbType.DateTime2 );
+
          _tableName = tableName;
          _connectionString = connectionString;
       }
@@ -72,12 +74,12 @@ namespace Vibrant.Tsdb.Sql
 
       public Task<SegmentedReadResult<TEntry>> Read( string id, DateTime to, int segmentSize, object continuationToken )
       {
-         return RetrieveForIdSegmented( id, to, segmentSize, continuationToken );
+         return RetrieveForIdSegmented( id, to, segmentSize, (ContinuationToken)continuationToken );
       }
 
       public Task<SegmentedReadResult<TEntry>> Read( string id, int segmentSize, object continuationToken )
       {
-         return RetrieveForIdSegmented( id, segmentSize, continuationToken );
+         return RetrieveForIdSegmented( id, segmentSize, (ContinuationToken)continuationToken );
       }
 
       private async Task CreateTableLocked()
@@ -206,10 +208,10 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<SegmentedReadResult<TEntry>> RetrieveForIdSegmented( string id, DateTime to, int segmentSize, object continuationToken )
+      private async Task<SegmentedReadResult<TEntry>> RetrieveForIdSegmented( string id, DateTime to, int segmentSize, ContinuationToken continuationToken )
       {
          await CreateTable().ConfigureAwait( false );
-         long skip = continuationToken != null ? (long)continuationToken : 0;
+         long skip = continuationToken?.Skip ?? 0;
 
          using( var connection = new SqlConnection( _connectionString ) )
          {
@@ -223,10 +225,10 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<SegmentedReadResult<TEntry>> RetrieveForIdSegmented( string id, int segmentSize, object continuationToken )
+      private async Task<SegmentedReadResult<TEntry>> RetrieveForIdSegmented( string id, int segmentSize, ContinuationToken continuationToken )
       {
          await CreateTable().ConfigureAwait( false );
-         long skip = continuationToken != null ? (long)continuationToken : 0;
+         long skip = continuationToken?.Skip ?? 0;
 
          using( var connection = new SqlConnection( _connectionString ) )
          {
@@ -309,8 +311,28 @@ namespace Vibrant.Tsdb.Sql
       private SegmentedReadResult<TEntry> CreateReadResult( string id, IEnumerable<SqlEntry> sqlEntries, int segmentSize, long skip )
       {
          var entries = SqlSerializer.Deserialize<TEntry>( sqlEntries );
-         bool hasMore = entries.Count != segmentSize;
-         return new SegmentedReadResult<TEntry>( id, Sort.Descending, hasMore ? (object)( segmentSize + skip ) : null, entries );
+         var to = entries[ 0 ].GetTimestamp();
+
+         var continuationToken = new ContinuationToken( entries.Count == segmentSize, skip + segmentSize, segmentSize );
+         return new SegmentedReadResult<TEntry>( id, Sort.Descending, continuationToken, entries, CreateDeleteFunction( id, continuationToken, entries ) );
+      }
+
+      private Func<Task> CreateDeleteFunction( string id, ContinuationToken token, List<TEntry> entries )
+      {
+         if( entries.Count == 0 )
+         {
+            return () => Task.FromResult( 0 );
+         }
+         else
+         {
+            var to = entries[ 0 ].GetTimestamp().AddTicks( 1 );
+            var from = entries[ entries.Count - 1 ].GetTimestamp();
+            return async () =>
+            {
+               await this.Delete( id, from, to ).ConfigureAwait( false );
+               token.SkippedWasDeleted();
+            };
+         }
       }
    }
 }
