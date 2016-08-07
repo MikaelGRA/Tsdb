@@ -130,6 +130,16 @@ END
          }
       }
 
+      public static string GetUpperBoundSegmentedQuery( string tableName )
+      {
+         return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] < @To ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY";
+      }
+
+      public static string GetSegmentedQuery( string tableName )
+      {
+         return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY";
+      }
+
       public static string GetBottomlessQuery( string tableName, Sort sort )
       {
          if( sort == Sort.Ascending )

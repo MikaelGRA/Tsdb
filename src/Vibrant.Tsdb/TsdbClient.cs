@@ -26,36 +26,50 @@ namespace Vibrant.Tsdb
 
       public async Task MoveToVolumeStorage( IEnumerable<string> ids )
       {
-         // read from dynamic storage
-         var readTasks = new List<Task<MultiReadResult<TEntry>>>();
-         readTasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Read( c.Lookups ) ) );
-         await Task.WhenAll( readTasks ).ConfigureAwait( false );
-
-         // write to volume storage
-         var entries = readTasks.SelectMany( x => x.Result ).SelectMany( x => x.Entries );
-         await WriteDirectlyToVolumeStorage( entries ).ConfigureAwait( false );
-
-         // delete from dynamic storage
-         var deleteTasks = new List<Task>();
-         deleteTasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Delete( c.Lookups ) ) );
-         await Task.WhenAll( deleteTasks ).ConfigureAwait( false );
+         var tasks = new List<Task>();
+         tasks.AddRange( ids.Select( id => MoveToVolumeStorage( id ) ) );
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
       public async Task MoveToVolumeStorage( IEnumerable<string> ids, DateTime to )
       {
-         // read from dynamic storage
-         var readTasks = new List<Task<MultiReadResult<TEntry>>>();
-         readTasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Read( c.Lookups, to ) ) );
-         await Task.WhenAll( readTasks ).ConfigureAwait( false );
+         var tasks = new List<Task>();
+         tasks.AddRange( ids.Select( id => MoveToVolumeStorage( id, to ) ) );
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+      }
+      
+      public async Task MoveToVolumeStorage( string id )
+      {
+         var dynamic = _dynamicStorageSelector.GetStorage( id );
+         var volume = _volumeStorageSelector.GetStorage( id );
 
-         // write to volume storage
-         var entries = readTasks.SelectMany( x => x.Result ).SelectMany( x => x.Entries );
-         await WriteDirectlyToVolumeStorage( entries ).ConfigureAwait( false );
+         object token = null;
+         do
+         {
+            var segment = await dynamic.Read( id, 10000, token ).ConfigureAwait( false );
+            await volume.Write( segment.Entries ).ConfigureAwait( false );
+            token = segment.ContinuationToken;
+         }
+         while( token != null );
 
-         // delete from dynamic storage
-         var deleteTasks = new List<Task>();
-         deleteTasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, to ) ) );
-         await Task.WhenAll( deleteTasks ).ConfigureAwait( false );
+         await dynamic.Delete( id ).ConfigureAwait( false );
+      }
+
+      public async Task MoveToVolumeStorage( string id, DateTime to )
+      {
+         var dynamic = _dynamicStorageSelector.GetStorage( id );
+         var volume = _volumeStorageSelector.GetStorage( id );
+
+         object token = null;
+         do
+         {
+            var segment = await dynamic.Read( id, to, 10000, token ).ConfigureAwait( false );
+            await volume.Write( segment.Entries ).ConfigureAwait( false );
+            token = segment.ContinuationToken;
+         }
+         while( token != null );
+
+         await dynamic.Delete( id, to ).ConfigureAwait( false );
       }
 
       public async Task WriteDirectlyToVolumeStorage( IEnumerable<TEntry> items )

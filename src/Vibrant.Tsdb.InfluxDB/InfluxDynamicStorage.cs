@@ -90,6 +90,24 @@ namespace Vibrant.Tsdb.InfluxDB
          return Convert( ids, resultSet, sort );
       }
 
+      public async Task<SegmentedReadResult<TEntry>> Read( string id, DateTime to, int segmentSize, object continuationToken )
+      {
+         await CreateDatabase().ConfigureAwait( false );
+         long skip = continuationToken != null ? (long)continuationToken : 0l;
+         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateUpperBoundSegmentedSelectQuery( id, to, skip, segmentSize ) ).ConfigureAwait( false );
+         bool hasMore = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows.Count == segmentSize;
+         return Convert( id, resultSet, hasMore ? (object)( skip + segmentSize ) : null );
+      }
+
+      public async Task<SegmentedReadResult<TEntry>> Read( string id, int segmentSize, object continuationToken )
+      {
+         await CreateDatabase().ConfigureAwait( false );
+         long skip = continuationToken != null ? (long)continuationToken : 0l;
+         var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSegmentedSelectQuery( id, skip, segmentSize ) ).ConfigureAwait( false );
+         bool hasMore = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows.Count == segmentSize;
+         return Convert( id, resultSet, hasMore ? (object)( skip + segmentSize ) : null );
+      }
+
       private string CreateDeleteQuery( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          StringBuilder sb = new StringBuilder();
@@ -115,7 +133,7 @@ namespace Vibrant.Tsdb.InfluxDB
          StringBuilder sb = new StringBuilder();
          foreach( var id in ids )
          {
-            sb.Append( $"SELECT * FROM \"{id}\";" );
+            sb.Append( $"DELETE FROM \"{id}\";" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
@@ -125,9 +143,19 @@ namespace Vibrant.Tsdb.InfluxDB
          StringBuilder sb = new StringBuilder();
          foreach( var id in ids )
          {
-            sb.Append( $"SELECT * FROM \"{id}\" WHERE '{from.ToIso8601()}' <= time AND time < '{to.ToIso8601()}' ORDER BY {GetQuery( sort )};" );
+            sb.Append( $"SELECT * FROM \"{id}\" WHERE '{from.ToIso8601()}' <= time AND time < '{to.ToIso8601()}' ORDER BY time {GetQuery( sort )};" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
+      }
+
+      private string CreateUpperBoundSegmentedSelectQuery( string id, DateTime to, long skip, int take )
+      {
+         return $"SELECT * FROM \"{id}\" WHERE time < '{to.ToIso8601()}' ORDER BY time DESC LIMIT {take} OFFSET {skip}";
+      }
+
+      private string CreateSegmentedSelectQuery( string id, long skip, int take )
+      {
+         return $"SELECT * FROM \"{id}\" WHERE time < '{_maxFrom.ToIso8601()}' ORDER BY time DESC LIMIT {take} OFFSET {skip}";
       }
 
       private string CreateSelectQuery( IEnumerable<string> ids, DateTime to, Sort sort )
@@ -135,7 +163,7 @@ namespace Vibrant.Tsdb.InfluxDB
          StringBuilder sb = new StringBuilder();
          foreach( var id in ids )
          {
-            sb.Append( $"SELECT * FROM \"{id}\" WHERE time < '{to.ToIso8601()}' ORDER BY {GetQuery( sort )};" );
+            sb.Append( $"SELECT * FROM \"{id}\" WHERE time < '{to.ToIso8601()}' ORDER BY time {GetQuery( sort )};" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
@@ -145,7 +173,7 @@ namespace Vibrant.Tsdb.InfluxDB
          StringBuilder sb = new StringBuilder();
          foreach( var id in ids )
          {
-            sb.Append( $"SELECT * FROM \"{id}\" WHERE time < '{_maxFrom.ToIso8601()}' ORDER BY {GetQuery( sort )};" );
+            sb.Append( $"SELECT * FROM \"{id}\" WHERE time < '{_maxFrom.ToIso8601()}' ORDER BY time {GetQuery( sort )};" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
@@ -170,6 +198,12 @@ namespace Vibrant.Tsdb.InfluxDB
          {
             return "DESC";
          }
+      }
+
+      private SegmentedReadResult<TEntry> Convert( string id, InfluxResultSet<TEntry> resultSet, object continuationToken )
+      {
+         var list = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows;
+         return new SegmentedReadResult<TEntry>( id, Sort.Descending, continuationToken, (List<TEntry>)list );
       }
 
       private MultiReadResult<TEntry> Convert( IEnumerable<string> requiredIds, InfluxResultSet<TEntry> resultSet, Sort sort )

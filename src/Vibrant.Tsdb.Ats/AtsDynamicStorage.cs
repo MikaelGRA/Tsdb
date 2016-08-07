@@ -87,9 +87,14 @@ namespace Vibrant.Tsdb.Ats
          return WriteInternal( items );
       }
 
-      public Task<SegmentedReadResult<TEntry>> Read( string id, DateTime from, DateTime to, int segmentSize, object continuationToken )
+      public Task<SegmentedReadResult<TEntry>> Read( string id, DateTime to, int segmentSize, object continuationToken )
       {
-         return ReadRangeSegmentedInternal( id, from, to, segmentSize, continuationToken );
+         return ReadRangeSegmentedInternal( id, to, segmentSize, continuationToken );
+      }
+
+      public Task<SegmentedReadResult<TEntry>> Read( string id, int segmentSize, object continuationToken )
+      {
+         return ReadRangeSegmentedInternal( id, segmentSize, continuationToken );
       }
 
       private async Task<int> DeleteAllInternal( IEnumerable<string> ids )
@@ -247,14 +252,34 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TEntry>( id, sort, entries );
       }
 
-      private Task<SegmentedReadResult<TEntry>> ReadRangeSegmentedInternal( string id, DateTime from, DateTime to, int segmentSize, object continuationToken )
+      private Task<SegmentedReadResult<TEntry>> ReadRangeSegmentedInternal( string id, DateTime to, int segmentSize, object continuationToken )
       {
          to = continuationToken != null ? (DateTime)continuationToken : to;
 
          var generalQuery = new TableQuery<TsdbTableEntity>()
-            .Where( CreateGeneralFilter( id, from, to ) );
+            .Where( CreateBeforeFilter( id, to ) );
 
-         return ReadSegmentedInternal( id, generalQuery, from, segmentSize );
+         return ReadSegmentedInternal( id, generalQuery, segmentSize );
+      }
+
+      private Task<SegmentedReadResult<TEntry>> ReadRangeSegmentedInternal( string id, int segmentSize, object continuationToken )
+      {
+         DateTime? to = continuationToken != null ? (DateTime?)continuationToken : null;
+
+         if( to.HasValue )
+         {
+            var generalQuery = new TableQuery<TsdbTableEntity>()
+               .Where( CreateBeforeFilter( id, to.Value ) );
+
+            return ReadSegmentedInternal( id, generalQuery, segmentSize );
+         }
+         else
+         {
+            var generalQuery = new TableQuery<TsdbTableEntity>()
+               .Where( CreatePartitionFilter( id ) );
+
+            return ReadSegmentedInternal( id, generalQuery, segmentSize );
+         }
       }
 
       private async Task<List<TEntry>> ReadInternal( string id, TableQuery<TsdbTableEntity> query, bool takeAll, Sort sort )
@@ -289,7 +314,7 @@ namespace Vibrant.Tsdb.Ats
          return results;
       }
 
-      private async Task<SegmentedReadResult<TEntry>> ReadSegmentedInternal( string id, TableQuery<TsdbTableEntity> query, DateTime from, int segmentSize )
+      private async Task<SegmentedReadResult<TEntry>> ReadSegmentedInternal( string id, TableQuery<TsdbTableEntity> query, int segmentSize )
       {
          var table = await GetTable().ConfigureAwait( false );
 
@@ -304,7 +329,7 @@ namespace Vibrant.Tsdb.Ats
             await _read.WaitAsync().ConfigureAwait( false );
             try
             {
-               var rows = await table.ExecuteQuerySegmentedAsync( query, token: null ).ConfigureAwait( false );
+               var rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
                var entries = Convert( rows, id );
                token = rows.ContinuationToken;
 
@@ -313,6 +338,7 @@ namespace Vibrant.Tsdb.Ats
                // add required items, and no more
                if( segmentSize >= read + rows.Results.Count )
                {
+                  read += rows.Results.Count;
                   results.AddRange( entries );
                }
                else
@@ -339,18 +365,14 @@ namespace Vibrant.Tsdb.Ats
          // calculate continuation token
          if( isLastFull )
          {
-            var earliestTimestamp = results[ results.Count - 1 ].GetTimestamp();
-            if( earliestTimestamp != from )
-            {
-               continuationToken = earliestTimestamp;
-            }
+            continuationToken = results[ results.Count - 1 ].GetTimestamp();
          }
          else
          {
             continuationToken = null;
          }
 
-         return new SegmentedReadResult<TEntry>( id, Sort.Descending, continuationToken );
+         return new SegmentedReadResult<TEntry>( id, Sort.Descending, continuationToken, results );
       }
 
       private async Task<int> DeleteInternal( string id, TableQuery<TsdbTableEntity> query )
@@ -367,7 +389,7 @@ namespace Vibrant.Tsdb.Ats
             await _read.WaitAsync().ConfigureAwait( false );
             try
             {
-               rows = await table.ExecuteQuerySegmentedAsync( query, token: null ).ConfigureAwait( false );
+               rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
                foreach( var row in rows )
                {
                   row.ETag = "*";

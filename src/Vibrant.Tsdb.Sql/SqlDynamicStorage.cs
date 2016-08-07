@@ -70,6 +70,16 @@ namespace Vibrant.Tsdb.Sql
          return RetrieveForIds( ids, from, to, sort );
       }
 
+      public Task<SegmentedReadResult<TEntry>> Read( string id, DateTime to, int segmentSize, object continuationToken )
+      {
+         return RetrieveForIdSegmented( id, to, segmentSize, continuationToken );
+      }
+
+      public Task<SegmentedReadResult<TEntry>> Read( string id, int segmentSize, object continuationToken )
+      {
+         return RetrieveForIdSegmented( id, segmentSize, continuationToken );
+      }
+
       private async Task CreateTableLocked()
       {
          using( var connection = new SqlConnection( _connectionString ) )
@@ -196,6 +206,40 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
+      private async Task<SegmentedReadResult<TEntry>> RetrieveForIdSegmented( string id, DateTime to, int segmentSize, object continuationToken )
+      {
+         await CreateTable().ConfigureAwait( false );
+         long skip = continuationToken != null ? (long)continuationToken : 0;
+
+         using( var connection = new SqlConnection( _connectionString ) )
+         {
+            await connection.OpenAsync().ConfigureAwait( false );
+
+            var sqlEntries = await connection.QueryAsync<SqlEntry>(
+               sql: Sql.GetUpperBoundSegmentedQuery( _tableName ),
+               param: new { Id = id, To = to, Take = segmentSize, Skip = skip } ).ConfigureAwait( false );
+
+            return CreateReadResult( id, sqlEntries, segmentSize, skip );
+         }
+      }
+
+      private async Task<SegmentedReadResult<TEntry>> RetrieveForIdSegmented( string id, int segmentSize, object continuationToken )
+      {
+         await CreateTable().ConfigureAwait( false );
+         long skip = continuationToken != null ? (long)continuationToken : 0;
+
+         using( var connection = new SqlConnection( _connectionString ) )
+         {
+            await connection.OpenAsync().ConfigureAwait( false );
+
+            var sqlEntries = await connection.QueryAsync<SqlEntry>(
+               sql: Sql.GetSegmentedQuery( _tableName ),
+               param: new { Id = id, Take = segmentSize, Skip = skip } ).ConfigureAwait( false );
+
+            return CreateReadResult( id, sqlEntries, segmentSize, skip );
+         }
+      }
+
       private async Task<int> DeleteForIds( IEnumerable<string> ids, DateTime from, DateTime to )
       {
          await CreateTable().ConfigureAwait( false );
@@ -260,6 +304,13 @@ namespace Vibrant.Tsdb.Sql
          }
 
          return new MultiReadResult<TEntry>( results );
+      }
+
+      private SegmentedReadResult<TEntry> CreateReadResult( string id, IEnumerable<SqlEntry> sqlEntries, int segmentSize, long skip )
+      {
+         var entries = SqlSerializer.Deserialize<TEntry>( sqlEntries );
+         bool hasMore = entries.Count != segmentSize;
+         return new SegmentedReadResult<TEntry>( id, Sort.Descending, hasMore ? (object)( segmentSize + skip ) : null, entries );
       }
    }
 }

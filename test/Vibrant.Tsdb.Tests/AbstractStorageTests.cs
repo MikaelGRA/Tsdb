@@ -11,8 +11,7 @@ namespace Vibrant.Tsdb.Ats.Tests
    public abstract class AbstractStorageTests<TStorage>
       where TStorage : IStorage<BasicEntry>
    {
-
-      private static readonly string[] Ids = new[]
+      protected static readonly string[] Ids = new[]
       {
          "row1",
          "row2",
@@ -23,9 +22,9 @@ namespace Vibrant.Tsdb.Ats.Tests
          "row7",
       };
 
-      private static readonly Random _rng = new Random();
+      protected static readonly Random _rng = new Random();
 
-      private static List<BasicEntry> CreateRows( DateTime startTime, int count )
+      protected static List<BasicEntry> CreateRows( DateTime startTime, int count )
       {
          var entries = new List<BasicEntry>();
 
@@ -45,7 +44,27 @@ namespace Vibrant.Tsdb.Ats.Tests
          return entries;
       }
 
-      public abstract IStorage<BasicEntry> GetStorage( string tableName );
+      protected static List<BasicEntry> CreateRows( string id, DateTime startTime, int count )
+      {
+         var entries = new List<BasicEntry>();
+
+         DateTime current = startTime;
+         for( int i = 0 ; i < count ; i++ )
+         {
+            var entry = new BasicEntry();
+            entry.Id = id;
+            entry.Timestamp = current;
+            entry.Value = _rng.NextDouble();
+
+            current = current.AddSeconds( 1 );
+
+            entries.Add( entry );
+         }
+
+         return entries;
+      }
+
+      public abstract TStorage GetStorage( string tableName );
 
       [Theory]
       [InlineData( Sort.Descending )]

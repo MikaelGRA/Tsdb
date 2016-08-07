@@ -22,7 +22,7 @@ namespace Vibrant.Tsdb.Ats.Tests
          ConnectionString = ats.GetSection( "ConnectionString" ).Value;
       }
 
-      public override IStorage<BasicEntry> GetStorage( string tableName )
+      public override AtsVolumeStorage<BasicEntry> GetStorage( string tableName )
       {
          return new AtsVolumeStorage<BasicEntry>( tableName, ConnectionString );
       }
