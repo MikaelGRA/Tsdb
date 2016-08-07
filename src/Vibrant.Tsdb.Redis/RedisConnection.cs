@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using StackExchange.Redis;
 using Vibrant.Tsdb.Ats.Serialization;
@@ -10,9 +12,9 @@ namespace Vibrant.Tsdb.Redis
    internal class RedisConnection : IDisposable
    {
       public event Action<Exception> ConnectionFailed;
-      public event Action<Exception> ConnectionRestored;
       public event Action<Exception> ErrorMessage;
 
+      private LoadedLuaScript _publishLatestScript;
       private ISubscriber _redisSubscriber;
       private ConnectionMultiplexer _connection;
 
@@ -23,8 +25,27 @@ namespace Vibrant.Tsdb.Redis
          _connection.ConnectionFailed += OnConnectionFailed;
          _connection.ConnectionRestored += OnConnectionRestored;
          _connection.ErrorMessage += OnError;
-
          _redisSubscriber = _connection.GetSubscriber();
+
+         // create all scripts
+         await CreateScriptsOnAllServers().ConfigureAwait( false );
+      }
+
+      private static string GetServerHostnameAndPort( EndPoint endpoint )
+      {
+         var dns = endpoint as DnsEndPoint;
+         if( dns != null )
+         {
+            if( dns.Port == 0 ) return dns.Host;
+            return dns.Host + ":" + dns.Port.ToString( CultureInfo.InvariantCulture );
+         }
+         var ip = endpoint as IPEndPoint;
+         if( ip != null )
+         {
+            if( ip.Port == 0 ) return ip.Address.ToString();
+            return ip.Address.ToString() + ":" + dns.Port.ToString( CultureInfo.InvariantCulture );
+         }
+         return endpoint?.ToString() ?? "";
       }
 
       public void Close( bool allowCommandsToComplete = true )
@@ -42,24 +63,24 @@ namespace Vibrant.Tsdb.Redis
          _connection.Dispose();
       }
 
-      public Task SubscribeAsync<TEntry>( string id, Action<List<TEntry>> onMessage )
+      public Task SubscribeAsync<TEntry>( string id, SubscriptionType subscribe, Action<List<TEntry>> onMessage )
          where TEntry : IRedisEntry, new()
       {
-         // TODO: Multiple at the same time...
-
-         return _redisSubscriber.SubscribeAsync( id, ( channel, data ) =>
+         var key = CreateSubscriptionKey( id, subscribe );
+         return _redisSubscriber.SubscribeAsync( key, ( channel, data ) =>
          {
             var entries = RedisSerializer.Deserialize<TEntry>( data );
             onMessage( entries );
          } );
       }
 
-      public Task UnsubscribeAsync( string id )
+      public Task UnsubscribeAsync( string id, SubscriptionType subscribe )
       {
-         return _redisSubscriber.UnsubscribeAsync( id );
+         var key = CreateSubscriptionKey( id, subscribe );
+         return _redisSubscriber.UnsubscribeAsync( key );
       }
 
-      public Task PublishAsync<TEntry>( string id, IEnumerable<TEntry> entries )
+      public Task PublishLatestAsync<TEntry>( string id, TEntry entry )
          where TEntry : IRedisEntry
       {
          if( _connection == null )
@@ -67,14 +88,59 @@ namespace Vibrant.Tsdb.Redis
             throw new InvalidOperationException( "The redis connection has not been started." );
          }
 
-         var arrays = RedisSerializer.Serialize( entries.ToList(), 64 * 1024 );
+         var data = RedisSerializer.Serialize( id, entry );
 
+
+         var key = CreateSubscriptionKey( id, SubscriptionType.LatestPerCollection );
+         var ticks = entry.GetTimestamp().Ticks;
+
+         return _connection.GetDatabase( 0 )
+            .ScriptEvaluateAsync( _publishLatestScript.Hash, new RedisKey[] { key }, new RedisValue[] { ticks, data } );
+      }
+
+      public Task PublishAllAsync<TEntry>( string id, IEnumerable<TEntry> entries )
+         where TEntry : IRedisEntry
+      {
+         if( _connection == null )
+         {
+            throw new InvalidOperationException( "The redis connection has not been started." );
+         }
+
+         var key = CreateSubscriptionKey( id, SubscriptionType.AllFromCollections );
+         var arrays = RedisSerializer.Serialize( id, entries.ToList(), 64 * 1024 );
          var tasks = new List<Task>();
          foreach( var data in arrays )
          {
-            tasks.Add( _redisSubscriber.PublishAsync( id, data ) );
+            tasks.Add( _redisSubscriber.PublishAsync( key, data ) );
          }
          return Task.WhenAll( tasks );
+      }
+
+      public async Task CreateScriptsOnAllServers()
+      {
+         var luaScript = LuaScript.Prepare( Lua.PublishLatest );
+         foreach( var endpoint in _connection.GetEndPoints() )
+         {
+            var hostname = GetServerHostnameAndPort( endpoint );
+            var server = _connection.GetServer( hostname );
+            _publishLatestScript = await luaScript.LoadAsync( server ).ConfigureAwait( false );
+         }
+      }
+
+      private string CreateSubscriptionKey( string id, SubscriptionType subscribe )
+      {
+         if( subscribe == SubscriptionType.AllFromCollections )
+         {
+            return id + "|A";
+         }
+         else if( subscribe == SubscriptionType.LatestPerCollection )
+         {
+            return id + "|L";
+         }
+         else
+         {
+            throw new ArgumentException( nameof( subscribe ) );
+         }
       }
 
       private void OnConnectionFailed( object sender, ConnectionFailedEventArgs args )
@@ -83,10 +149,15 @@ namespace Vibrant.Tsdb.Redis
          handler( args.Exception );
       }
 
-      private void OnConnectionRestored( object sender, ConnectionFailedEventArgs args )
+      private async void OnConnectionRestored( object sender, ConnectionFailedEventArgs args )
       {
-         var handler = ConnectionRestored;
-         handler( args.Exception );
+         // Workaround for StackExchange.Redis/issues/61 that sometimes Redis connection is not connected in ConnectionRestored event 
+         while( !_connection.GetDatabase( 0 ).IsConnected( "someKey" ) )
+         {
+            await Task.Delay( 200 ).ConfigureAwait( false );
+         }
+
+         await CreateScriptsOnAllServers().ConfigureAwait( false );
       }
 
       private void OnError( object sender, RedisErrorEventArgs args )

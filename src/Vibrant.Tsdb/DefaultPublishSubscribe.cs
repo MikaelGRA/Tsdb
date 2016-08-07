@@ -14,16 +14,21 @@ namespace Vibrant.Tsdb
       where TEntry : IEntry
    {
       private Task _completed = Task.FromResult( 0 );
-
-      protected IDictionary<Action<List<TEntry>>, byte> _allCallbacks;
-      protected IDictionary<string, HashSet<Action<List<TEntry>>>> _callbacks;
-      protected readonly TaskFactory _taskFactory;
-      protected bool _continueOnCapturedSynchronizationContext;
+      private IDictionary<string, HashSet<Action<List<TEntry>>>> _latestCallbacksForSingle;
+      private IDictionary<Action<List<TEntry>>, byte> _latestCallbacksForAll;
+      private IDictionary<string, HashSet<Action<List<TEntry>>>> _allCallbacksForSingle;
+      private IDictionary<Action<List<TEntry>>, byte> _allCallbacksForAll;
+      private IDictionary<string, DateTime> _latest;
+      private readonly TaskFactory _taskFactory;
+      private bool _continueOnCapturedSynchronizationContext;
 
       public DefaultPublishSubscribe( bool continueOnCapturedSynchronizationContext )
       {
-         _callbacks = new ConcurrentDictionary<string, HashSet<Action<List<TEntry>>>>();
-         _allCallbacks = new ConcurrentDictionary<Action<List<TEntry>>, byte>();
+         _latestCallbacksForSingle = new ConcurrentDictionary<string, HashSet<Action<List<TEntry>>>>();
+         _latestCallbacksForAll = new ConcurrentDictionary<Action<List<TEntry>>, byte>();
+         _allCallbacksForSingle = new ConcurrentDictionary<string, HashSet<Action<List<TEntry>>>>();
+         _allCallbacksForAll = new ConcurrentDictionary<Action<List<TEntry>>, byte>();
+         _latest = new ConcurrentDictionary<string, DateTime>();
 
          if( continueOnCapturedSynchronizationContext )
          {
@@ -49,92 +54,147 @@ namespace Vibrant.Tsdb
          return _completed;
       }
 
-      public virtual Task Publish( IEnumerable<TEntry> entries )
+      public async Task Publish( IEnumerable<TEntry> entries, PublicationType publish )
       {
-         return OnPublished( entries );
+         if( publish == PublicationType.None )
+         {
+            return;
+         }
+
+         await OnPublished( entries, publish ).ConfigureAwait( false );
       }
 
-      public async Task<Func<Task>> Subscribe( IEnumerable<string> ids, Action<List<TEntry>> callback )
+      public async Task<Func<Task>> Subscribe( IEnumerable<string> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
       {
-         var newSubscriptions = AddSubscriptions( ids, callback );
+         IDictionary<string, HashSet<Action<List<TEntry>>>> single;
+         switch( subscribe )
+         {
+            case SubscriptionType.LatestPerCollection:
+               single = _latestCallbacksForSingle;
+               break;
+            case SubscriptionType.AllFromCollections:
+               single = _allCallbacksForSingle;
+               break;
+            default:
+               throw new ArgumentException( nameof( subscribe ) );
+         }
+
+         var newSubscriptions = AddSubscriptionsToLatest( ids, callback, single );
          if( newSubscriptions.Count > 0 )
          {
             try
             {
-               await OnSubscribed( newSubscriptions ).ConfigureAwait( false );
+               await OnSubscribed( newSubscriptions, subscribe ).ConfigureAwait( false );
             }
             catch( Exception )
             {
-               RemoveSubscriptions( ids, callback );
+               RemoveSubscriptionsFromLatest( ids, callback, single );
 
                throw;
             }
          }
 
-         return () => Unsubscribe( ids, callback );
+         return () => Unsubscribe( ids, subscribe, callback );
       }
 
-      private async Task Unsubscribe( IEnumerable<string> ids, Action<List<TEntry>> callback )
+      private async Task Unsubscribe( IEnumerable<string> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
       {
-         var removedSubscriptions = RemoveSubscriptions( ids, callback );
+         IDictionary<string, HashSet<Action<List<TEntry>>>> single;
+         switch( subscribe )
+         {
+            case SubscriptionType.LatestPerCollection:
+               single = _latestCallbacksForSingle;
+               break;
+            case SubscriptionType.AllFromCollections:
+               single = _allCallbacksForSingle;
+               break;
+            default:
+               throw new ArgumentException( nameof( subscribe ) );
+         }
+
+         var removedSubscriptions = RemoveSubscriptionsFromLatest( ids, callback, single );
          if( removedSubscriptions.Count > 0 )
          {
             try
             {
-               await OnUnsubscribed( removedSubscriptions ).ConfigureAwait( false );
+               await OnUnsubscribed( removedSubscriptions, subscribe ).ConfigureAwait( false );
             }
             catch( Exception )
             {
-               AddSubscriptions( ids, callback );
+               AddSubscriptionsToLatest( ids, callback, single );
 
                throw;
             }
          }
       }
 
-      public async Task<Func<Task>> SubscribeToAll( Action<List<TEntry>> callback )
+      public async Task<Func<Task>> SubscribeToAll( SubscriptionType subscribe, Action<List<TEntry>> callback )
       {
-         bool subscribeToAll = false;
-
-         lock( _allCallbacks )
+         IDictionary<Action<List<TEntry>>, byte> all;
+         switch( subscribe )
          {
-            if( _allCallbacks.Count == 0 )
+            case SubscriptionType.LatestPerCollection:
+               all = _latestCallbacksForAll;
+               break;
+            case SubscriptionType.AllFromCollections:
+               all = _allCallbacksForAll;
+               break;
+            default:
+               throw new ArgumentException( nameof( subscribe ) );
+         }
+
+         bool subscribeToAll = false;
+         lock( all )
+         {
+            if( all.Count == 0 )
             {
                subscribeToAll = true;
             }
 
-            _allCallbacks.Add( callback, 0 );
+            all.Add( callback, 0 );
          }
 
          if( subscribeToAll )
          {
             try
             {
-               await OnSubscribedToAll().ConfigureAwait( false );
+               await OnSubscribedToAll( subscribe ).ConfigureAwait( false );
             }
             catch( Exception )
             {
-               lock( _allCallbacks )
+               lock( all )
                {
-                  _allCallbacks.Remove( callback );
+                  all.Remove( callback );
                }
 
                throw;
             }
          }
 
-         return () => UnsubscribeFromAll( callback );
+         return () => UnsubscribeFromAll( callback, subscribe );
       }
 
-      public async Task UnsubscribeFromAll( Action<List<TEntry>> callback )
+      public async Task UnsubscribeFromAll( Action<List<TEntry>> callback, SubscriptionType subscribe )
       {
-         bool unsubscribeFromAll = false;
-
-         lock( _allCallbacks )
+         IDictionary<Action<List<TEntry>>, byte> all;
+         switch( subscribe )
          {
-            _allCallbacks.Remove( callback );
+            case SubscriptionType.LatestPerCollection:
+               all = _latestCallbacksForAll;
+               break;
+            case SubscriptionType.AllFromCollections:
+               all = _allCallbacksForAll;
+               break;
+            default:
+               throw new ArgumentException( nameof( subscribe ) );
+         }
 
-            if( _allCallbacks.Count == 0 )
+         bool unsubscribeFromAll = false;
+         lock( all )
+         {
+            all.Remove( callback );
+
+            if( all.Count == 0 )
             {
                unsubscribeFromAll = true;
             }
@@ -144,13 +204,13 @@ namespace Vibrant.Tsdb
          {
             try
             {
-               await OnUnsubscribedFromAll().ConfigureAwait( false );
+               await OnUnsubscribedFromAll( subscribe ).ConfigureAwait( false );
             }
             catch( Exception )
             {
-               lock( _allCallbacks )
+               lock( all )
                {
-                  _allCallbacks.Add( callback, 0 );
+                  all.Add( callback, 0 );
                }
 
                throw;
@@ -158,18 +218,21 @@ namespace Vibrant.Tsdb
          }
       }
 
-      private List<string> AddSubscriptions( IEnumerable<string> ids, Action<List<TEntry>> callback )
+      private List<string> AddSubscriptionsToLatest(
+         IEnumerable<string> ids,
+         Action<List<TEntry>> callback,
+         IDictionary<string, HashSet<Action<List<TEntry>>>> single )
       {
          List<string> newSubscriptions = new List<string>();
-         lock( _callbacks )
+         lock( single )
          {
             foreach( var id in ids )
             {
                HashSet<Action<List<TEntry>>> subscribers;
-               if( !_callbacks.TryGetValue( id, out subscribers ) )
+               if( !single.TryGetValue( id, out subscribers ) )
                {
                   subscribers = new HashSet<Action<List<TEntry>>>();
-                  _callbacks.Add( id, subscribers );
+                  single.Add( id, subscribers );
                   newSubscriptions.Add( id );
                }
 
@@ -179,21 +242,24 @@ namespace Vibrant.Tsdb
          return newSubscriptions;
       }
 
-      private List<string> RemoveSubscriptions( IEnumerable<string> ids, Action<List<TEntry>> callback )
+      private List<string> RemoveSubscriptionsFromLatest(
+         IEnumerable<string> ids,
+         Action<List<TEntry>> callback,
+         IDictionary<string, HashSet<Action<List<TEntry>>>> single )
       {
          List<string> subscriptionsRemoved = new List<string>();
-         lock( _callbacks )
+         lock( single )
          {
             foreach( var id in ids )
             {
                HashSet<Action<List<TEntry>>> subscribers;
-               if( _callbacks.TryGetValue( id, out subscribers ) )
+               if( single.TryGetValue( id, out subscribers ) )
                {
                   subscribers.Remove( callback );
 
                   if( subscribers.Count == 0 )
                   {
-                     _callbacks.Remove( id );
+                     single.Remove( id );
                      subscriptionsRemoved.Add( id );
                   }
                }
@@ -202,61 +268,74 @@ namespace Vibrant.Tsdb
          return subscriptionsRemoved;
       }
 
-      protected virtual Task OnSubscribed( IEnumerable<string> ids )
+      protected virtual Task OnSubscribed( IEnumerable<string> ids, SubscriptionType subscribe )
       {
          return _completed;
       }
 
-      protected virtual Task OnUnsubscribed( IEnumerable<string> ids )
+      protected virtual Task OnUnsubscribed( IEnumerable<string> ids, SubscriptionType subscribe )
       {
          return _completed;
       }
 
-      protected virtual Task OnSubscribedToAll()
+      protected virtual Task OnSubscribedToAll( SubscriptionType subscribe )
       {
          return _completed;
       }
 
-      protected virtual Task OnUnsubscribedFromAll()
+      protected virtual Task OnUnsubscribedFromAll( SubscriptionType subscribe )
       {
          return _completed;
       }
 
-      protected Task OnPublished( IEnumerable<TEntry> entries )
+      protected virtual Task OnPublished( IEnumerable<TEntry> entries, PublicationType publish )
       {
+         IEnumerable<TEntry> latest = null;
+         if( publish.HasFlag( PublicationType.LatestPerCollection ) )
+         {
+            latest = FindLatestForEachId( entries );
+         }
+
          _taskFactory.StartNew( () =>
          {
-            foreach( var entriesById in entries.GroupBy( x => x.GetId() ) )
+            if( publish.HasFlag( PublicationType.LatestPerCollection ) )
             {
-               List<TEntry> entriesForSubscriber = null;
+               PublishForLatest( latest );
+            }
+            if( publish.HasFlag( PublicationType.AllFromCollections ) )
+            {
+               PublishForAll( entries );
+            }
+         } );
 
-               HashSet<Action<List<TEntry>>> subscribers;
-               if( _callbacks.TryGetValue( entriesById.Key, out subscribers ) )
+         return _completed;
+      }
+
+      private void PublishForLatest( IEnumerable<TEntry> entries )
+      {
+         PublishFor( entries, _latestCallbacksForSingle, _latestCallbacksForAll );
+      }
+
+      private void PublishForAll( IEnumerable<TEntry> entries )
+      {
+         PublishFor( entries, _allCallbacksForSingle, _allCallbacksForAll );
+      }
+
+      private void PublishFor( IEnumerable<TEntry> entries, IDictionary<string, HashSet<Action<List<TEntry>>>> single, IDictionary<Action<List<TEntry>>, byte> all )
+      {
+         foreach( var entriesById in entries.GroupBy( x => x.GetId() ) )
+         {
+            List<TEntry> entriesForSubscriber = null;
+
+            HashSet<Action<List<TEntry>>> subscribers;
+            if( single.TryGetValue( entriesById.Key, out subscribers ) )
+            {
+               entriesForSubscriber = entriesById.ToList();
+               foreach( var callback in subscribers )
                {
-                  entriesForSubscriber = entriesById.ToList();
-                  foreach( var callback in subscribers )
-                  {
-                     try
-                     {
-                        callback( entriesForSubscriber );
-                     }
-                     catch( Exception )
-                     {
-
-                     }
-                  }
-               }
-
-               // then handle all
-               foreach( var callback in _allCallbacks )
-               {
-                  if( entriesForSubscriber == null )
-                  {
-                     entriesForSubscriber = entriesById.ToList();
-                  }
                   try
                   {
-                     callback.Key( entriesForSubscriber );
+                     callback( entriesForSubscriber );
                   }
                   catch( Exception )
                   {
@@ -264,9 +343,146 @@ namespace Vibrant.Tsdb
                   }
                }
             }
-         } );
 
-         return _completed;
+            // then handle all
+            foreach( var callback in all )
+            {
+               if( entriesForSubscriber == null )
+               {
+                  entriesForSubscriber = entriesById.ToList();
+               }
+               try
+               {
+                  callback.Key( entriesForSubscriber );
+               }
+               catch( Exception )
+               {
+
+               }
+            }
+         }
+      }
+
+      protected void PublishToSingleForLatestEntriesWithSameId( List<TEntry> entries )
+      {
+         if( _continueOnCapturedSynchronizationContext )
+         {
+            _taskFactory.StartNew( () => PublishToSingleForEntriesWithSameId( entries, _latestCallbacksForSingle, _latestCallbacksForAll ) );
+         }
+         else
+         {
+            PublishToSingleForEntriesWithSameId( entries, _latestCallbacksForSingle, _latestCallbacksForAll );
+         }
+      }
+
+      protected void PublishToSingleForAllEntriesWithSameId( List<TEntry> entries )
+      {
+         if( _continueOnCapturedSynchronizationContext )
+         {
+            _taskFactory.StartNew( () => PublishToSingleForEntriesWithSameId( entries, _allCallbacksForSingle, _allCallbacksForAll ) );
+         }
+         else
+         {
+            PublishToSingleForEntriesWithSameId( entries, _allCallbacksForSingle, _allCallbacksForAll );
+         }
+      }
+
+      protected void PublishToAllForLatestEntriesWithSameId( List<TEntry> entries )
+      {
+         if( _continueOnCapturedSynchronizationContext )
+         {
+            _taskFactory.StartNew( () => PublishToAllForEntriesWithSameId( entries, _latestCallbacksForSingle, _latestCallbacksForAll ) );
+         }
+         else
+         {
+            PublishToAllForEntriesWithSameId( entries, _latestCallbacksForSingle, _latestCallbacksForAll );
+         }
+      }
+
+      protected void PublishToAllForAllEntriesWithSameId( List<TEntry> entries )
+      {
+         if( _continueOnCapturedSynchronizationContext )
+         {
+            _taskFactory.StartNew( () => PublishToAllForEntriesWithSameId( entries, _allCallbacksForSingle, _allCallbacksForAll ) );
+         }
+         else
+         {
+            PublishToAllForEntriesWithSameId( entries, _allCallbacksForSingle, _allCallbacksForAll );
+         }
+      }
+
+      private void PublishToSingleForEntriesWithSameId( List<TEntry> entries, IDictionary<string, HashSet<Action<List<TEntry>>>> single, IDictionary<Action<List<TEntry>>, byte> all )
+      {
+         var id = entries[ 0 ].GetId();
+
+         HashSet<Action<List<TEntry>>> subscribers;
+         if( single.TryGetValue( id, out subscribers ) )
+         {
+            foreach( var callback in subscribers )
+            {
+               try
+               {
+                  callback( entries );
+               }
+               catch( Exception )
+               {
+
+               }
+            }
+         }
+      }
+
+      private void PublishToAllForEntriesWithSameId( List<TEntry> entries, IDictionary<string, HashSet<Action<List<TEntry>>>> single, IDictionary<Action<List<TEntry>>, byte> all )
+      {
+         foreach( var callback in all )
+         {
+            try
+            {
+               callback.Key( entries );
+            }
+            catch( Exception )
+            {
+
+            }
+         }
+      }
+
+      protected IEnumerable<TEntry> FindLatestForEachId( IEnumerable<TEntry> entries )
+      {
+         var foundEntries = new Dictionary<string, TEntry>();
+         foreach( var entry in entries )
+         {
+            var id = entry.GetId();
+
+            TEntry existingEntry;
+            if( !foundEntries.TryGetValue( id, out existingEntry ) )
+            {
+               DateTime currentLatest;
+               if( _latest.TryGetValue( id, out currentLatest ) )
+               {
+                  var timestamp = entry.GetTimestamp();
+                  if( timestamp > currentLatest )
+                  {
+                     foundEntries.Add( id, entry );
+                     _latest[ id ] = timestamp;
+                  }
+               }
+               else
+               {
+                  foundEntries.Add( id, entry );
+                  _latest[ id ] = entry.GetTimestamp();
+               }
+            }
+            else
+            {
+               if( entry.GetTimestamp() > existingEntry.GetTimestamp() )
+               {
+                  foundEntries[ id ] = entry;
+               }
+            }
+         }
+
+         return foundEntries.Values;
       }
    }
 }

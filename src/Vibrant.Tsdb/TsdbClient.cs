@@ -10,16 +10,18 @@ namespace Vibrant.Tsdb
    {
       private IDynamicStorageSelector<TEntry> _dynamicStorageSelector;
       private IVolumeStorageSelector<TEntry> _volumeStorageSelector;
-      private IPublishSubscribe<TEntry> _publishSubscribe;
+      private IPublishSubscribe<TEntry> _remotePublishSubscribe;
+      private DefaultPublishSubscribe<TEntry> _localPublishSubscribe;
 
       public TsdbClient(
          IDynamicStorageSelector<TEntry> dynamicStorageSelector,
          IVolumeStorageSelector<TEntry> volumeStorageSelector,
-         IPublishSubscribe<TEntry> publishSubscribe )
+         IPublishSubscribe<TEntry> remotePublishSubscribe )
       {
          _dynamicStorageSelector = dynamicStorageSelector;
          _volumeStorageSelector = volumeStorageSelector;
-         _publishSubscribe = publishSubscribe;
+         _remotePublishSubscribe = remotePublishSubscribe;
+         _localPublishSubscribe = new DefaultPublishSubscribe<TEntry>( false );
       }
 
       public async Task MoveToVolumeStorage( IEnumerable<string> ids )
@@ -65,26 +67,33 @@ namespace Vibrant.Tsdb
 
       public Task Write( IEnumerable<TEntry> items )
       {
-         return Write( items, Publish.None );
+         return Write( items, PublicationType.None, Publish.Nowhere );
       }
 
-      public async Task Write( IEnumerable<TEntry> items, Publish publish )
+      public Task Write( IEnumerable<TEntry> items, PublicationType publicationnType )
       {
+         return Write( items, publicationnType, publicationnType != PublicationType.None ? Publish.LocallyAndRemotely : Publish.Nowhere );
+      }
+
+      public async Task Write( IEnumerable<TEntry> items, PublicationType publicationType, Publish publish )
+      {
+         // ensure we only iterate the original collection once, if it is not a list or array
+         if( !( items is IList<TEntry> || items is Array ) )
+         {
+            items = items.ToList();
+         }
+
          var tasks = new List<Task>();
          tasks.AddRange( LookupDynamicStorages( items ).Select( c => c.Storage.Write( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         switch( publish )
+         if( publish.HasFlag( Publish.Remotely ) )
          {
-            case Publish.Latest:
-               await _publishSubscribe.Publish( FindLatestForEachId( items ) ).ConfigureAwait( false );
-               break;
-            case Publish.All:
-               await _publishSubscribe.Publish( items ).ConfigureAwait( false );
-               break;
-            case Publish.None:
-            default:
-               throw new ArgumentException( "publish" );
+            await _remotePublishSubscribe.Publish( items, publicationType ).ConfigureAwait( false );
+         }
+         if( publish.HasFlag( Publish.Locally ) )
+         {
+            await _localPublishSubscribe.Publish( items, publicationType ).ConfigureAwait( false );
          }
       }
 
@@ -156,40 +165,27 @@ namespace Vibrant.Tsdb
          return tasks.Select( x => x.Result ).Combine();
       }
 
-      public Task<Func<Task>> Subscribe( IEnumerable<string> ids, Action<List<TEntry>> callback )
+      public Task<Func<Task>> Subscribe( IEnumerable<string> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
       {
-         return _publishSubscribe.Subscribe( ids, callback );
+         return _remotePublishSubscribe.Subscribe( ids, subscribe, callback );
       }
 
-      public Task<Func<Task>> SubscribeToAll( Action<List<TEntry>> callback )
+      public Task<Func<Task>> SubscribeToAll( SubscriptionType subscribe, Action<List<TEntry>> callback )
       {
-         return _publishSubscribe.SubscribeToAll( callback );
+         return _remotePublishSubscribe.SubscribeToAll( subscribe, callback );
+      }
+
+      public Task<Func<Task>> SubscribeLocally( IEnumerable<string> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
+      {
+         return _localPublishSubscribe.Subscribe( ids, subscribe, callback );
+      }
+
+      public Task<Func<Task>> SubscribeToAllLocally( SubscriptionType subscribe, Action<List<TEntry>> callback )
+      {
+         return _localPublishSubscribe.SubscribeToAll( subscribe, callback );
       }
 
       #region Lookup
-
-      private IEnumerable<TEntry> FindLatestForEachId( IEnumerable<TEntry> entries )
-      {
-         var foundEntries = new Dictionary<string, TEntry>();
-         foreach( var entry in entries )
-         {
-            var id = entry.GetId();
-
-            TEntry existingEntry;
-            if( !foundEntries.TryGetValue( id, out existingEntry ) )
-            {
-               foundEntries.Add( id, entry );
-            }
-            else
-            {
-               if( entry.GetTimestamp() > existingEntry.GetTimestamp() )
-               {
-                  foundEntries[ id ] = entry;
-               }
-            }
-         }
-         return foundEntries.Values;
-      }
 
       private IEnumerable<VolumeStorageLookupResult<TEntry, TEntry>> LookupVolumeStorages( IEnumerable<TEntry> entries )
       {

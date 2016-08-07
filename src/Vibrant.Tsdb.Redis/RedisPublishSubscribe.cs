@@ -61,105 +61,75 @@ namespace Vibrant.Tsdb.Redis
          return _waitWhileDisconnected.Task;
       }
 
-      public override async Task Publish( IEnumerable<TEntry> entries )
+      protected override async Task OnPublished( IEnumerable<TEntry> entries, PublicationType publish )
       {
          var tasks = new List<Task>();
-         foreach( var entriesById in entries.GroupBy( x => x.GetId() ) )
+         if( publish.HasFlag( PublicationType.LatestPerCollection ) )
          {
-            var id = entriesById.Key;
-            tasks.Add( _connection.PublishAsync( id, entriesById ) );
+            var latest = FindLatestForEachId( entries );
+            foreach( var entry in entries )
+            {
+               var id = entry.GetId();
+               tasks.Add( _connection.PublishLatestAsync( id, entry ) );
+            }
+         }
+         if( publish.HasFlag( PublicationType.AllFromCollections ) )
+         {
+            foreach( var entriesById in entries.GroupBy( x => x.GetId() ) )
+            {
+               var id = entriesById.Key;
+               tasks.Add( _connection.PublishAllAsync( id, entriesById ) );
+            }
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      protected override Task OnSubscribed( IEnumerable<string> ids )
+      protected override Task OnSubscribed( IEnumerable<string> ids, SubscriptionType subscribe )
       {
          List<Task> tasks = new List<Task>();
          foreach( var id in ids )
          {
-            tasks.Add( _connection.SubscribeAsync<TEntry>( id, OnEntriesReceivedForId ) );
+            switch( subscribe )
+            {
+               case SubscriptionType.LatestPerCollection:
+                  tasks.Add( _connection.SubscribeAsync<TEntry>( id, subscribe, PublishToSingleForLatestEntriesWithSameId ) );
+                  break;
+               case SubscriptionType.AllFromCollections:
+                  tasks.Add( _connection.SubscribeAsync<TEntry>( id, subscribe, PublishToSingleForAllEntriesWithSameId ) );
+                  break;
+               default:
+                  throw new ArgumentException( nameof( subscribe ) );
+            }
          }
          return Task.WhenAll( tasks );
       }
 
-      protected override Task OnUnsubscribed( IEnumerable<string> ids )
+      protected override Task OnUnsubscribed( IEnumerable<string> ids, SubscriptionType subscribe )
       {
          List<Task> tasks = new List<Task>();
          foreach( var id in ids )
          {
-            tasks.Add( _connection.UnsubscribeAsync( id ) );
+            tasks.Add( _connection.UnsubscribeAsync( id, subscribe ) );
          }
          return Task.WhenAll( tasks );
       }
 
-      protected override Task OnSubscribedToAll()
+      protected override Task OnSubscribedToAll( SubscriptionType subscribe )
       {
-         return _connection.SubscribeAsync<TEntry>( "*", OnEntriesReceivedForAll );
-      }
-
-      protected override Task OnUnsubscribedFromAll()
-      {
-         return _connection.UnsubscribeAsync( "*" );
-      }
-
-      private void OnEntriesReceivedForId( List<TEntry> entries )
-      {
-         if( _continueOnCapturedSynchronizationContext )
+         switch( subscribe )
          {
-            _taskFactory.StartNew( () => PublishToIndividual( entries ) );
-         }
-         else
-         {
-            PublishToIndividual( entries );
+            case SubscriptionType.LatestPerCollection:
+               return _connection.SubscribeAsync<TEntry>( "*", subscribe, PublishToAllForLatestEntriesWithSameId );
+            case SubscriptionType.AllFromCollections:
+               return _connection.SubscribeAsync<TEntry>( "*", subscribe, PublishToAllForAllEntriesWithSameId );
+            default:
+               throw new ArgumentException( nameof( subscribe ) );
          }
       }
 
-      private void OnEntriesReceivedForAll( List<TEntry> entries )
+      protected override Task OnUnsubscribedFromAll( SubscriptionType subscribe )
       {
-         if( _continueOnCapturedSynchronizationContext )
-         {
-            _taskFactory.StartNew( () => PublishToAll( entries ) );
-         }
-         else
-         {
-            PublishToAll( entries );
-         }
-      }
-
-      private void PublishToAll( List<TEntry> entries )
-      {
-         var id = entries[ 0 ].GetId();
-         foreach( var callback in _allCallbacks )
-         {
-            try
-            {
-               callback.Key( entries );
-            }
-            catch( Exception )
-            {
-
-            }
-         }
-      }
-
-      private void PublishToIndividual( List<TEntry> entries )
-      {
-         var id = entries[ 0 ].GetId();
-         HashSet<Action<List<TEntry>>> subscribers;
-         if( _callbacks.TryGetValue( id, out subscribers ) )
-         {
-            foreach( var callback in subscribers )
-            {
-               try
-               {
-                  callback( entries );
-               }
-               catch( Exception )
-               {
-
-               }
-            }
-         }
+         return _connection.UnsubscribeAsync( "*", subscribe );
       }
 
       internal async Task ConnectWithRetry()
@@ -204,14 +174,12 @@ namespace Vibrant.Tsdb.Redis
          {
             _connection.ErrorMessage -= OnConnectionError;
             _connection.ConnectionFailed -= OnConnectionFailed;
-            _connection.ConnectionRestored -= OnConnectionRestored;
          }
 
          await _connection.ConnectAsync( _connectionString ).ConfigureAwait( false );
-
+         
          _connection.ErrorMessage += OnConnectionError;
          _connection.ConnectionFailed += OnConnectionFailed;
-         _connection.ConnectionRestored += OnConnectionRestored;
       }
 
       internal static class State

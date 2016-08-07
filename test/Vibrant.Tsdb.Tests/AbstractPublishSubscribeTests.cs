@@ -20,7 +20,7 @@ namespace Vibrant.Tsdb.Ats.Tests
          await ps.WaitWhileDisconnected();
 
          int received1 = 0;
-         var unsubscribe1 = await ps.Subscribe( new[] { "row1" }, entries =>
+         var unsubscribe1 = await ps.Subscribe( new[] { "row1" }, SubscriptionType.AllFromCollections, entries =>
          {
             foreach( var entry in entries )
             {
@@ -30,7 +30,7 @@ namespace Vibrant.Tsdb.Ats.Tests
          } );
 
          int received2 = 0;
-         var unsubscribe2 = await ps.Subscribe( new[] { "row2" }, entries =>
+         var unsubscribe2 = await ps.Subscribe( new[] { "row2" }, SubscriptionType.AllFromCollections, entries =>
          {
             foreach( var entry in entries )
             {
@@ -40,7 +40,7 @@ namespace Vibrant.Tsdb.Ats.Tests
          } );
 
          int received3 = 0;
-         var unsubscribe3 = await ps.SubscribeToAll( entries =>
+         var unsubscribe3 = await ps.SubscribeToAll( SubscriptionType.AllFromCollections, entries =>
          {
             foreach( var entry in entries )
             {
@@ -48,43 +48,68 @@ namespace Vibrant.Tsdb.Ats.Tests
             }
          } );
 
+         int received4 = 0;
+         var unsubscribe4 = await ps.Subscribe( new[] { "row6" }, SubscriptionType.LatestPerCollection, entries =>
+         {
+            foreach( var entry in entries )
+            {
+               received4++;
+            }
+         } );
+
+         var now = DateTime.UtcNow;
+
          var toPublish = new[] {
-               new BasicEntry { Id = "row1", Timestamp = DateTime.UtcNow, Value = 23.53 },
-               new BasicEntry { Id = "row1", Timestamp = DateTime.UtcNow, Value = 50.23 },
-               new BasicEntry { Id = "row2", Timestamp = DateTime.UtcNow, Value = 23 },
-               new BasicEntry { Id = "row6", Timestamp = DateTime.UtcNow, Value = 2364 },
+               new BasicEntry { Id = "row1", Timestamp = now, Value = 23.53 },
+               new BasicEntry { Id = "row1", Timestamp = now + TimeSpan.FromSeconds( 1 ), Value = 50.23 },
+               new BasicEntry { Id = "row2", Timestamp = now + TimeSpan.FromSeconds( 2 ), Value = 23 },
+               new BasicEntry { Id = "row6", Timestamp = now + TimeSpan.FromSeconds( 3 ), Value = 2364 },
             };
 
-         await ps.Publish( toPublish );
+         await ps.Publish( toPublish, PublicationType.Both );
          await Task.Delay( 2000 );
 
          Assert.Equal( 2, received1 );
          Assert.Equal( 1, received2 );
          Assert.Equal( 4, received3 );
+         Assert.Equal( 1, received4 );
 
          await unsubscribe3();
-         await ps.Publish( toPublish );
+         await ps.Publish( toPublish, PublicationType.Both );
          await Task.Delay( 2000 );
 
          Assert.Equal( 4, received1 );
          Assert.Equal( 2, received2 );
          Assert.Equal( 4, received3 );
+         Assert.Equal( 1, received4 );
 
          await unsubscribe2();
-         await ps.Publish( toPublish );
+         await ps.Publish( toPublish, PublicationType.Both );
          await Task.Delay( 2000 );
 
          Assert.Equal( 6, received1 );
          Assert.Equal( 2, received2 );
          Assert.Equal( 4, received3 );
+         Assert.Equal( 1, received4 );
 
          await unsubscribe1();
-         await ps.Publish( toPublish );
+         await ps.Publish( toPublish, PublicationType.Both );
          await Task.Delay( 2000 );
 
          Assert.Equal( 6, received1 );
          Assert.Equal( 2, received2 );
          Assert.Equal( 4, received3 );
+         Assert.Equal( 1, received4 );
+
+         await ps.Publish( new[] { new BasicEntry { Id = "row6", Timestamp = now + TimeSpan.FromSeconds( 5 ), Value = 1337 } }, PublicationType.LatestPerCollection );
+         await Task.Delay( 2000 );
+
+         Assert.Equal( 6, received1 );
+         Assert.Equal( 2, received2 );
+         Assert.Equal( 4, received3 );
+         Assert.Equal( 2, received4 );
+
+         await unsubscribe4();
       }
    }
 }

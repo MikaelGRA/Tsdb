@@ -61,7 +61,7 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          // redis.GetSection( "ConnectionString" ).Value
 
-         var batcher = new TsdbWriteBatcher<BasicEntry>( client, Publish.None, TimeSpan.FromSeconds( 5 ), 10000 );
+         var batcher = new TsdbWriteBatcher<BasicEntry>( client, PublicationType.None, TimeSpan.FromSeconds( 5 ), 10000 );
 
          var engine = new TsdbEngine<BasicEntry>( this, client );
 

@@ -14,12 +14,12 @@ namespace Vibrant.Tsdb
       private BatchWrite<TEntry> _currentBatch;
       private Queue<BatchWrite<TEntry>> _batches;
       private TimeSpan _writeInterval;
-      private Publish _publish;
+      private PublicationType _publish;
       private bool _disposed = false;
       private CancellationTokenSource _cts;
       private int _maxBatchSize;
 
-      public TsdbWriteBatcher( TsdbClient<TEntry> client, Publish publish, TimeSpan writeInterval, int maxBatchSize )
+      public TsdbWriteBatcher( TsdbClient<TEntry> client, PublicationType publish, TimeSpan writeInterval, int maxBatchSize )
       {
          _client = client;
          _writeInterval = writeInterval;

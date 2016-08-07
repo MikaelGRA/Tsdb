@@ -1,5 +1,5 @@
 ﻿{
-   "version": "1.0.0-*",
+   "version": "2.0.0-*",
    "title": "SQL storage for TSDB client",
    "description": "An easy-to-use timeseries database client that allows storing of masses of simple of data structures identified by a string id and a timestamp.",
    "authors": [ "MikaelGRA" ],
@@ -13,7 +13,7 @@
    "copyright": "Copyright (c) 2015-2016 MikaelGRA",
 
    "dependencies": {
-      "Vibrant.Tsdb": "1.0.0-*",
+      "Vibrant.Tsdb": "2.0.0-*",
       "Dapper": "1.50.2"
    },
 
