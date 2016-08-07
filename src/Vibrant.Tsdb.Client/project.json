@@ -13,10 +13,10 @@
    "copyright": "Copyright (c) 2015-2016 MikaelGRA",
 
    "dependencies": {
-      "Vibrant.Tsdb": "2.0.0-*",
-      "Vibrant.Tsdb.Ats": "2.0.0-*",
-      "Vibrant.Tsdb.Redis": "2.0.0-*",
-      "Vibrant.Tsdb.Sql": "2.0.0-*"
+      "Vibrant.Tsdb": "2.1.0-*",
+      "Vibrant.Tsdb.Ats": "2.1.0-*",
+      "Vibrant.Tsdb.Redis": "2.1.0-*",
+      "Vibrant.Tsdb.Sql": "2.1.0-*"
    },
 
    "frameworks": {

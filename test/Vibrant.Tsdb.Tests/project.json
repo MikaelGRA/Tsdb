@@ -2,15 +2,15 @@
    "version": "1.0.0-*",
    "testRunner": "xunit",
    "dependencies": {
-      "Vibrant.Tsdb.Ats": "1.0.0-*",
       "xunit": "2.2.0-beta2-build3300",
       "dotnet-test-xunit": "2.2.0-preview2-build1029",
       "Microsoft.Extensions.Configuration": "1.0.0",
       "Microsoft.Extensions.Configuration.Json": "1.0.0",
-      "Vibrant.Tsdb.Sql": "1.0.0-*",
-      "Vibrant.Tsdb.Redis": "1.0.0-*",
-      "Vibrant.Tsdb": "1.0.0-*",
-      "Vibrant.Tsdb.InfluxDB": "1.0.0-*"
+      "Vibrant.Tsdb.Ats": "2.1.0-*",
+      "Vibrant.Tsdb.Sql": "2.1.0-*",
+      "Vibrant.Tsdb.Redis": "2.1.0-*",
+      "Vibrant.Tsdb": "2.1.0-*",
+      "Vibrant.Tsdb.InfluxDB": "2.1.0-*"
    },
    "buildOptions": {
       "copyToOutput": {
