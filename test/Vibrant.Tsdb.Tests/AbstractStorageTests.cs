@@ -67,11 +67,11 @@ namespace Vibrant.Tsdb.Ats.Tests
       public abstract TStorage GetStorage( string tableName );
 
       [Theory]
-      [InlineData( Sort.Descending )]
-      [InlineData( Sort.Ascending )]
-      public async Task Should_Write_And_Read_Basic_Rows( Sort sort )
+      [InlineData( "Table1", Sort.Descending )]
+      [InlineData( "Table2", Sort.Ascending )]
+      public async Task Should_Write_And_Read_Basic_Rows( string tableName, Sort sort )
       {
-         var store = GetStorage( "Table1" );
+         var store = GetStorage( tableName );
 
          int count = 50000;
 
@@ -111,7 +111,7 @@ namespace Vibrant.Tsdb.Ats.Tests
                var original = sourceList[ i ];
                var readen = readResult.Entries[ i ];
 
-               Assert.Equal( original.Value, readen.Value );
+               Assert.Equal( original.Value, readen.Value, 5 );
                Assert.Equal( original.Timestamp, readen.Timestamp );
 
                if( ( i == 0 && sort == Sort.Descending ) || ( i == sourceList.Count - 1 && sort == Sort.Ascending ) )
@@ -119,7 +119,7 @@ namespace Vibrant.Tsdb.Ats.Tests
                   var latestEntry = latest.First( x => x.Id == readResult.Id );
                   var entry = latestEntry.Entries[ 0 ];
 
-                  Assert.Equal( original.Value, entry.Value );
+                  Assert.Equal( original.Value, entry.Value, 5 );
                   Assert.Equal( original.Timestamp, entry.Timestamp );
                }
             }
@@ -127,9 +127,9 @@ namespace Vibrant.Tsdb.Ats.Tests
       }
 
       [Theory]
-      [InlineData( Sort.Descending )]
-      [InlineData( Sort.Ascending )]
-      public async Task Should_Write_And_Delete_Basic_Rows( Sort sort )
+      [InlineData( "Table3", Sort.Descending )]
+      [InlineData( "Table4", Sort.Ascending )]
+      public async Task Should_Write_And_Delete_Basic_Rows( string tableName, Sort sort )
       {
          var store = GetStorage( "Table2" );
 
@@ -150,11 +150,11 @@ namespace Vibrant.Tsdb.Ats.Tests
       }
 
       [Theory]
-      [InlineData( Sort.Descending )]
-      [InlineData( Sort.Ascending )]
-      public async Task Should_Write_Twice_Then_Delete_All_Basic_Rows( Sort sort )
+      [InlineData( "Table5", Sort.Descending )]
+      [InlineData( "Table6", Sort.Ascending )]
+      public async Task Should_Write_Twice_Then_Delete_All_Basic_Rows( string tableName, Sort sort )
       {
-         var store = GetStorage( "Table3" );
+         var store = GetStorage( tableName );
 
          int count = 1000;
 

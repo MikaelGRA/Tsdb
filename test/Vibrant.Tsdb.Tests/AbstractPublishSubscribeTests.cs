@@ -67,7 +67,7 @@ namespace Vibrant.Tsdb.Ats.Tests
             };
 
          await ps.Publish( toPublish, PublicationType.Both );
-         await Task.Delay( 2000 );
+         await Task.Delay( 3000 );
 
          Assert.Equal( 2, received1 );
          Assert.Equal( 1, received2 );
@@ -76,7 +76,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          await unsubscribe3();
          await ps.Publish( toPublish, PublicationType.Both );
-         await Task.Delay( 2000 );
+         await Task.Delay( 3000 );
 
          Assert.Equal( 4, received1 );
          Assert.Equal( 2, received2 );
@@ -85,7 +85,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          await unsubscribe2();
          await ps.Publish( toPublish, PublicationType.Both );
-         await Task.Delay( 2000 );
+         await Task.Delay( 3000 );
 
          Assert.Equal( 6, received1 );
          Assert.Equal( 2, received2 );
@@ -94,7 +94,7 @@ namespace Vibrant.Tsdb.Ats.Tests
 
          await unsubscribe1();
          await ps.Publish( toPublish, PublicationType.Both );
-         await Task.Delay( 2000 );
+         await Task.Delay( 3000 );
 
          Assert.Equal( 6, received1 );
          Assert.Equal( 2, received2 );
@@ -102,7 +102,7 @@ namespace Vibrant.Tsdb.Ats.Tests
          Assert.Equal( 1, received4 );
 
          await ps.Publish( new[] { new BasicEntry { Id = "row6", Timestamp = now + TimeSpan.FromSeconds( 5 ), Value = 1337 } }, PublicationType.LatestPerCollection );
-         await Task.Delay( 2000 );
+         await Task.Delay( 3000 );
 
          Assert.Equal( 6, received1 );
          Assert.Equal( 2, received2 );
