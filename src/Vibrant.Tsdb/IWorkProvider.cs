@@ -14,5 +14,9 @@ namespace Vibrant.Tsdb
       Task<IEnumerable<TsdbVolumeMoval>> GetAllMovalsAsync( DateTime now );
 
       Task<TsdbVolumeMoval> GetMovalAsync( TsdbVolumeMoval completedMoval );
+
+      TimeSpan GetTemporaryMovalInterval();
+
+      int GetTemporaryMovalBatchSize();
    }
 }

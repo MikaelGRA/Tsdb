@@ -97,8 +97,6 @@ namespace Vibrant.Tsdb
             read = batch.Entries.Count;
          }
          while( read != 0 );
-
-
       }
 
       public async Task WriteDirectlyToVolumeStorage( IEnumerable<TEntry> items )
@@ -155,7 +153,7 @@ namespace Vibrant.Tsdb
             await storage.Write( entries ).ConfigureAwait( false );
             return entries;
          }
-         catch( Exception )
+         catch( Exception e1 )
          {
             if( useTemporaryStorageOnFailure )
             {
@@ -163,13 +161,13 @@ namespace Vibrant.Tsdb
                {
                   _temporaryStorage.Write( entries );
                }
-               catch( Exception )
+               catch( Exception e2 )
                {
-                  TemporaryWriteFailure?.Invoke( this, new TsdbWriteFailureEventArgs<TEntry>( entries ) );
+                  TemporaryWriteFailure?.Invoke( this, new TsdbWriteFailureEventArgs<TEntry>( entries, e2 ) );
                }
             }
 
-            WriteFailure?.Invoke( this, new TsdbWriteFailureEventArgs<TEntry>( entries ) );
+            WriteFailure?.Invoke( this, new TsdbWriteFailureEventArgs<TEntry>( entries, e1 ) );
             return _entries;
          }
       }

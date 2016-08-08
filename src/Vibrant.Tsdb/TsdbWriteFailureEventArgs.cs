@@ -9,10 +9,12 @@ namespace Vibrant.Tsdb
       where TEntry : IEntry
    {
       private IEnumerable<TEntry> _entries;
+      private Exception _exception;
 
-      public TsdbWriteFailureEventArgs( IEnumerable<TEntry> entries )
+      public TsdbWriteFailureEventArgs( IEnumerable<TEntry> entries, Exception exception )
       {
          _entries = entries;
+         _exception = exception;
       }
       
       public IEnumerable<TEntry> Entries
@@ -20,6 +22,14 @@ namespace Vibrant.Tsdb
          get
          {
             return _entries;
+         }
+      }
+
+      public Exception Exception
+      {
+         get
+         {
+            return _exception;
          }
       }
    }

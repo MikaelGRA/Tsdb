@@ -24,9 +24,9 @@ namespace Vibrant.Tsdb
          {
             await _engine.Client.MoveToVolumeStorage( new[] { _moval.Id }, _moval.To ).ConfigureAwait( false );
          }
-         catch( Exception )
+         catch( Exception e )
          {
-            // TODO: How to handle???
+            _engine.RaiseMoveTemporaryDataFailed( e );
          }
 
          var newMoval = await _engine.Work.GetMovalAsync( _moval ).ConfigureAwait( false );

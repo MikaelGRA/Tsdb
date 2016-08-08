@@ -62,8 +62,6 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          // redis.GetSection( "ConnectionString" ).Value
 
-         // TODO: Add task for batcher that schedules moval from dynamic store
-
          var batcher = new TsdbWriteBatcher<BasicEntry>( client, PublicationType.None, TimeSpan.FromSeconds( 5 ), 10000 );
 
          var engine = new TsdbEngine<BasicEntry>( this, client );
@@ -111,6 +109,16 @@ namespace Vibrant.Tsdb.ConsoleApp
          var movalTime = completedMoval.Timestamp + TimeSpan.FromMinutes( 1 );
          var moveUntil = movalTime - TimeSpan.FromMinutes( 2 );
          return Task.FromResult( new TsdbVolumeMoval( completedMoval.Id, movalTime, moveUntil ) );
+      }
+
+      public TimeSpan GetTemporaryMovalInterval()
+      {
+         return TimeSpan.FromMinutes( 1 );
+      }
+
+      public int GetTemporaryMovalBatchSize()
+      {
+         return 5000;
       }
    }
 }

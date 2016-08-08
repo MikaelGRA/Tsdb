@@ -8,10 +8,14 @@ namespace Vibrant.Tsdb
    public class TsdbEngine<TEntry> : IDisposable
       where TEntry : IEntry
    {
+      public event EventHandler<ExceptionEventArgs> MoveTemporaryDataFailed;
+      public event EventHandler<ExceptionEventArgs> MoveToVolumeStorageFailed;
+
       private EventScheduler _scheduler;
       private TsdbClient<TEntry> _client;
       private IWorkProvider _workProvider;
       private Dictionary<string, TsdbScheduledMoval<TEntry>> _scheduledWork;
+      private Func<bool> _unsubscribe;
       private bool _disposed = false;
 
       public TsdbEngine( IWorkProvider workProvider, TsdbClient<TEntry> client )
@@ -60,8 +64,29 @@ namespace Vibrant.Tsdb
             }
          }
 
+         var scheduleTime = DateTime.UtcNow + _workProvider.GetTemporaryMovalInterval();
+         _scheduler.AddCommand( scheduleTime, MoveTemporaryData );
+
          _workProvider.MovalChangedOrAdded += WorkProvider_MovalChangedOrAdded;
          _workProvider.MovalRemoved += WorkProvider_MovalRemoved;
+      }
+
+      private async void MoveTemporaryData( DateTime timestamp )
+      {
+         if( !_disposed )
+         {
+            try
+            {
+               await _client.MoveFromTemporaryStorage( _workProvider.GetTemporaryMovalBatchSize() ).ConfigureAwait( false );
+            }
+            catch( Exception e )
+            {
+               RaiseMoveTemporaryDataFailed( e );
+            }
+
+            var scheduleTime = DateTime.UtcNow + _workProvider.GetTemporaryMovalInterval();
+            _unsubscribe = _scheduler.AddCommand( scheduleTime, MoveTemporaryData );
+         }
       }
 
       private void WorkProvider_MovalRemoved( string id )
@@ -96,6 +121,16 @@ namespace Vibrant.Tsdb
          }
       }
 
+      internal void RaiseMoveTemporaryDataFailed( Exception exception )
+      {
+         MoveTemporaryDataFailed?.Invoke( this, new ExceptionEventArgs( exception ) );
+      }
+
+      internal void RaiseMoveToVolumeStorageFailed( Exception exception )
+      {
+         MoveToVolumeStorageFailed?.Invoke( this, new ExceptionEventArgs( exception ) );
+      }
+
       protected virtual void Dispose( bool disposing )
       {
          if( !_disposed )
@@ -105,6 +140,7 @@ namespace Vibrant.Tsdb
                _scheduler.Dispose();
             }
 
+            _unsubscribe?.Invoke();
             _workProvider.MovalChangedOrAdded -= WorkProvider_MovalChangedOrAdded;
             _workProvider.MovalRemoved -= WorkProvider_MovalRemoved;
 
