@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Files
 {
-   public static class QSFile
+   internal static class QSFile
    {
       [ThreadStatic]
       private static byte[] fileBuf = new byte[ 128 * 1024 ];
