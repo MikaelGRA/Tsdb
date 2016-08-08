@@ -8,24 +8,25 @@ namespace Vibrant.Tsdb.Ats.Helpers
    internal class EntrySplitResult<TEntry>
       where TEntry : IAtsEntry
    {
+      private HashSet<TEntry> _uniqueEntries;
       private List<TEntry> _entries;
 
       public EntrySplitResult( string id )
       {
          Id = id;
-         
-         _entries = new List<TEntry>();
+         _uniqueEntries = new HashSet<TEntry>( new EntryEqualityComparer<TEntry>() );
       }
 
       public string Id { get; set; }
 
       public void Insert( TEntry entry )
       {
-         _entries.Add( entry );
+         _uniqueEntries.Add( entry );
       }
 
       public void Sort( Sort sort )
       {
+         _entries = new List<TEntry>( _uniqueEntries );
          _entries.Sort( EntryComparer.GetComparer<TEntry>( sort ) );
       }
 
@@ -49,7 +50,7 @@ namespace Vibrant.Tsdb.Ats.Helpers
       {
          get
          {
-            return _entries[ Entries.Count - 1 ].GetTimestamp();
+            return _entries[ _entries.Count - 1 ].GetTimestamp();
          }
       }
    }

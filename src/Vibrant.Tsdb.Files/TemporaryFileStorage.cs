@@ -13,7 +13,7 @@ namespace Vibrant.Tsdb.Files
    {
       private static readonly string FileTemplate = "{0}.dat";
 
-      private object _sync;
+      private object _sync = new object();
       private DirectoryInfo _directory;
       private FileInfo _currentFile;
       private int _maxFileSize;
@@ -40,8 +40,8 @@ namespace Vibrant.Tsdb.Files
             foreach( var fi in _directory.EnumerateFiles( "*.dat" ) )
             {
                using( var fs = fi.Open( FileMode.Open, FileAccess.Read ) )
+               using( var reader = new BinaryReader( fs, Encoding.ASCII, true ) )
                {
-                  var reader = new BinaryReader( fs, Encoding.ASCII, true );
 
                   while( reader.PeekChar() != -1 && read < count )
                   {
@@ -82,7 +82,7 @@ namespace Vibrant.Tsdb.Files
             // Open the current or a new file
             FileInfo fileInfo = GetOrCreateCurrentFile();
             FileStream fileStream = fileInfo.Open( FileMode.OpenOrCreate, FileAccess.ReadWrite );
-            long startFileSize = fileInfo.Length;
+            long startFileSize = fileStream.Length;
 
             // Seek to the end of the file
             fileStream.Seek( 0, SeekOrigin.End );
@@ -114,7 +114,7 @@ namespace Vibrant.Tsdb.Files
                   fileInfo = CreateCurrentFile();
                   fileStream = fileInfo.Open( FileMode.OpenOrCreate, FileAccess.ReadWrite );
                   writer = new BinaryWriter( fileStream, Encoding.ASCII, true );
-                  startFileSize = fileInfo.Length;
+                  startFileSize = fileStream.Length;
                   beforeLength = startFileSize;
                   afterLength = beforeLength;
                }
@@ -145,12 +145,8 @@ namespace Vibrant.Tsdb.Files
             }
 
             writer.Flush();
-
-            if( !disposed )
-            {
-               writer.Dispose();
-               fileStream.Dispose();
-            }
+            writer.Dispose();
+            fileStream.Dispose();
          }
       }
 
@@ -180,6 +176,11 @@ namespace Vibrant.Tsdb.Files
 
       private void CalculateDirectorySize()
       {
+         if( !_directory.Exists )
+         {
+            _directory.Create();
+         }
+
          _currentSize = 0;
          foreach( var fi in _directory.EnumerateFiles( "*.dat" ) )
          {
@@ -219,7 +220,7 @@ namespace Vibrant.Tsdb.Files
 
       private string CreateFileName( DateTime timestamp )
       {
-         return string.Format( FileTemplate, timestamp.ToString( "yyyyMMddHHmmssffffzzz" ) );
+         return string.Format( FileTemplate, timestamp.ToString( "yyyyMMddHHmmssffff" ) );
       }
    }
 }

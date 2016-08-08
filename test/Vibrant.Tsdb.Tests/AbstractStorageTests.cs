@@ -131,7 +131,7 @@ namespace Vibrant.Tsdb.Ats.Tests
       [InlineData( "Table4", Sort.Ascending )]
       public async Task Should_Write_And_Delete_Basic_Rows( string tableName, Sort sort )
       {
-         var store = GetStorage( "Table2" );
+         var store = GetStorage( tableName );
 
          int count = 50000;
 
@@ -168,13 +168,35 @@ namespace Vibrant.Tsdb.Ats.Tests
 
 
          var rows = await store.Read( Ids );
-         
+
          await store.Delete( Ids );
 
          var read = await store.Read( Ids, sort );
 
          Assert.Equal( count * 2, rows.Sum( x => x.Entries.Count ) );
          Assert.Equal( 0, read.Sum( x => x.Entries.Count ) );
+      }
+
+      [Fact]
+      public async Task Should_Write_Duplicate_Rows()
+      {
+         var store = GetStorage( "Table9" );
+
+         var from = new DateTime( 2016, 12, 31, 0, 0, 0, DateTimeKind.Utc );
+
+         var written = new BasicEntry[]
+         {
+            new BasicEntry { Id = "row1", Timestamp = from, Value = 13.37 },
+            new BasicEntry { Id = "row1", Timestamp = from, Value = 37.13 },
+         };
+
+         await store.Write( written );
+
+         var read = await store.Read( Ids );
+
+         await store.Delete( Ids );
+
+         Assert.Equal( 1, read.Sum( x => x.Entries.Count ) );
       }
    }
 }

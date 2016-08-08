@@ -35,10 +35,13 @@ namespace Vibrant.Tsdb.Files
          }
          else
          {
-            QSFile.DeleteFilePart( 
-               _fileInfo.Open( FileMode.Open, FileAccess.ReadWrite ), 
-               0,
-               _deleteLength );
+            using( var fi = _fileInfo.Open( FileMode.Open, FileAccess.ReadWrite ) )
+            {
+               QSFile.DeleteFilePart(
+                  fi,
+                  0,
+                  _deleteLength );
+            }
          }
       }
    }

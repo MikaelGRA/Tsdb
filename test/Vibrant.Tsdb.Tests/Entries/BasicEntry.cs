@@ -5,15 +5,16 @@ using System.Linq;
 using System.Threading.Tasks;
 using Vibrant.InfluxDB.Client;
 using Vibrant.InfluxDB.Client.Rows;
+using Vibrant.Tsdb.Files;
 using Vibrant.Tsdb.InfluxDB;
 using Vibrant.Tsdb.Redis;
 using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.Ats.Tests.Entries
 {
-   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, IInfluxEntry
+   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, IInfluxEntry, IFileEntry
    {
-      private KeyValuePair<string, string>[] _empty = new KeyValuePair<string, string>[ 0 ];
+      private static readonly KeyValuePair<string, string>[] _empty = new KeyValuePair<string, string>[ 0 ];
 
       public BasicEntry()
       {

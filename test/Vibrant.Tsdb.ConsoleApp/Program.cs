@@ -63,7 +63,6 @@ namespace Vibrant.Tsdb.ConsoleApp
          // redis.GetSection( "ConnectionString" ).Value
 
          // TODO: Add task for batcher that schedules moval from dynamic store
-         // TODO: Add create directory call
 
          var batcher = new TsdbWriteBatcher<BasicEntry>( client, PublicationType.None, TimeSpan.FromSeconds( 5 ), 10000 );
 

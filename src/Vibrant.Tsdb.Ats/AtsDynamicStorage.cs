@@ -21,6 +21,7 @@ namespace Vibrant.Tsdb.Ats
       private CloudTableClient _client;
       private Task<CloudTable> _table;
       private IPartitionProvider _partitioningProvider;
+      private EntryEqualityComparer<TEntry> _comparer;
 
       public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IPartitionProvider partitioningProvider )
       {
@@ -30,6 +31,7 @@ namespace Vibrant.Tsdb.Ats
          _account = CloudStorageAccount.Parse( connectionString );
          _client = _account.CreateCloudTableClient();
          _partitioningProvider = partitioningProvider;
+         _comparer = new EntryEqualityComparer<TEntry>();
       }
 
       public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism )
@@ -557,18 +559,18 @@ namespace Vibrant.Tsdb.Ats
          return AtsSerializer.DeserializeEntry<TEntry>( reader, id );
       }
 
-      private IEnumerable<KeyValuePair<string, List<TEntry>>> IterateByPartition( IEnumerable<TEntry> entries )
+      private IEnumerable<KeyValuePair<string, HashSet<TEntry>>> IterateByPartition( IEnumerable<TEntry> entries )
       {
-         Dictionary<string, List<TEntry>> lookup = new Dictionary<string, List<TEntry>>();
+         Dictionary<string, HashSet<TEntry>> lookup = new Dictionary<string, HashSet<TEntry>>();
 
          foreach( var entry in entries )
          {
             var pk = AtsKeyCalculator.CalculatePartitionKey( entry.GetId(), entry.GetTimestamp(), _partitioningProvider );
 
-            List<TEntry> items;
+            HashSet<TEntry> items;
             if( !lookup.TryGetValue( pk, out items ) )
             {
-               items = new List<TEntry>();
+               items = new HashSet<TEntry>( _comparer );
                lookup.Add( pk, items );
             }
 
@@ -576,7 +578,7 @@ namespace Vibrant.Tsdb.Ats
             if( items.Count == 100 )
             {
                lookup.Remove( pk );
-               yield return new KeyValuePair<string, List<TEntry>>( pk, items );
+               yield return new KeyValuePair<string, HashSet<TEntry>>( pk, items );
             }
          }
 

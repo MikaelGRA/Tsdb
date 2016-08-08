@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.SqlServer.Server;
+using Vibrant.Tsdb.Helpers;
 using Vibrant.Tsdb.Sql.Serialization;
 
 namespace Vibrant.Tsdb.Sql
@@ -18,6 +19,7 @@ namespace Vibrant.Tsdb.Sql
       private string _tableName;
       private string _connectionString;
       private Task _createTable;
+      private EntryEqualityComparer<TEntry> _comparer;
 
       public SqlDynamicStorage( string tableName, string connectionString )
       {
@@ -25,6 +27,7 @@ namespace Vibrant.Tsdb.Sql
 
          _tableName = tableName;
          _connectionString = connectionString;
+         _comparer = new EntryEqualityComparer<TEntry>();
       }
 
       public IDynamicStorage<TEntry> GetStorage( string id )
@@ -34,7 +37,8 @@ namespace Vibrant.Tsdb.Sql
 
       public Task Write( IEnumerable<TEntry> items )
       {
-         return StoreForAll( items );
+         var uniqueEntries = Unique.Ensure( items, _comparer );
+         return StoreForAll( uniqueEntries );
       }
 
       public Task Delete( IEnumerable<string> ids, DateTime from, DateTime to )

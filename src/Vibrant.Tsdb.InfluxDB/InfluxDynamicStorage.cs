@@ -6,6 +6,7 @@ using Vibrant.InfluxDB.Client;
 using Vibrant.InfluxDB.Client.Rows;
 using System.Reflection;
 using System.Text;
+using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb.InfluxDB
 {
@@ -17,6 +18,7 @@ namespace Vibrant.Tsdb.InfluxDB
       private InfluxClient _client;
       private string _database;
       private Task _createDatabase;
+      private EntryEqualityComparer<TEntry> _comparer;
 
       public InfluxDynamicStorage( Uri endpoint, string database, string username, string password )
       {
@@ -25,6 +27,8 @@ namespace Vibrant.Tsdb.InfluxDB
 
          _client.DefaultQueryOptions.Precision = TimestampPrecision.Nanosecond;
          _client.DefaultWriteOptions.Precision = TimestampPrecision.Nanosecond;
+
+         _comparer = new EntryEqualityComparer<TEntry>();
       }
 
       public InfluxDynamicStorage( Uri endpoint, string database )
@@ -41,7 +45,8 @@ namespace Vibrant.Tsdb.InfluxDB
       public async Task Write( IEnumerable<TEntry> items )
       {
          await CreateDatabase().ConfigureAwait( false );
-         await _client.WriteAsync( _database, items ).ConfigureAwait( false );
+         var uniqueEntries = Unique.Ensure( items, _comparer );
+         await _client.WriteAsync( _database, uniqueEntries ).ConfigureAwait( false );
       }
 
       public async Task Delete( IEnumerable<string> ids, DateTime from, DateTime to )
