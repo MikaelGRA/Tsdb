@@ -62,11 +62,19 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          // redis.GetSection( "ConnectionString" ).Value
 
+         client.TemporaryWriteFailure += Client_TemporaryWriteFailure;
+         client.WriteFailure += Client_WriteFailure;
+
          var batcher = new TsdbWriteBatcher<BasicEntry>( client, PublicationType.None, TimeSpan.FromSeconds( 5 ), 10000 );
 
          var engine = new TsdbEngine<BasicEntry>( this, client );
-
+         engine.MoveTemporaryDataFailed += Engine_MoveTemporaryDataFailed;
+         engine.MoveToVolumeStorageFailed += Engine_MoveToVolumeStorageFailed;
          engine.StartAsync().Wait();
+
+         // TODO: Test if this works as expected
+         //  -> Moval to temp storage and moval away from it again...
+         //  -> Dont keep this moving infitely to test
 
          while( true )
          {
@@ -92,6 +100,26 @@ namespace Vibrant.Tsdb.ConsoleApp
 
             Thread.Sleep( 1000 );
          }
+      }
+
+      private void Client_WriteFailure( object sender, TsdbWriteFailureEventArgs<BasicEntry> e )
+      {
+         Console.WriteLine( "Client_WriteFailure: " + e.Exception );
+      }
+
+      private void Client_TemporaryWriteFailure( object sender, TsdbWriteFailureEventArgs<BasicEntry> e )
+      {
+         Console.WriteLine( "Client_TemporaryWriteFailure: " + e.Exception );
+      }
+
+      private void Engine_MoveToVolumeStorageFailed( object sender, ExceptionEventArgs e )
+      {
+         Console.WriteLine( "Engine_MoveToVolumeStorageFailed: " + e.Exception );
+      }
+
+      private void Engine_MoveTemporaryDataFailed( object sender, ExceptionEventArgs e )
+      {
+         Console.WriteLine( "Engine_MoveTemporaryDataFailed: " + e.Exception );
       }
 
       public Task<IEnumerable<TsdbVolumeMoval>> GetAllMovalsAsync( DateTime now )
