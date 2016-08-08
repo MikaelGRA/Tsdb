@@ -95,9 +95,17 @@ namespace Vibrant.Tsdb
             items = items.ToList();
          }
 
+         // TODO: Handle read failures
+
+         // Schedule re-write later
+
+         // Throw exception on fault (partial write?)
+
          var tasks = new List<Task>();
          tasks.AddRange( LookupDynamicStorages( items ).Select( c => c.Storage.Write( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+         // Only publish things that were written
 
          if( publish.HasFlag( Publish.Remotely ) )
          {
