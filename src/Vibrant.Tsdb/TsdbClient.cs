@@ -8,19 +8,26 @@ namespace Vibrant.Tsdb
    public class TsdbClient<TEntry> : IStorage<TEntry>, ISubscribe<TEntry>
       where TEntry : IEntry
    {
+      public event EventHandler<TsdbWriteFailureEventArgs<TEntry>> WriteFailure;
+      public event EventHandler<TsdbWriteFailureEventArgs<TEntry>> TemporaryWriteFailure;
+
+      private TEntry[] _entries = new TEntry[ 0 ];
       private IDynamicStorageSelector<TEntry> _dynamicStorageSelector;
       private IVolumeStorageSelector<TEntry> _volumeStorageSelector;
       private IPublishSubscribe<TEntry> _remotePublishSubscribe;
+      private ITemporaryStorage<TEntry> _temporaryStorage;
       private DefaultPublishSubscribe<TEntry> _localPublishSubscribe;
 
       public TsdbClient(
          IDynamicStorageSelector<TEntry> dynamicStorageSelector,
          IVolumeStorageSelector<TEntry> volumeStorageSelector,
-         IPublishSubscribe<TEntry> remotePublishSubscribe )
+         IPublishSubscribe<TEntry> remotePublishSubscribe,
+         ITemporaryStorage<TEntry> temporaryStorage )
       {
          _dynamicStorageSelector = dynamicStorageSelector;
          _volumeStorageSelector = volumeStorageSelector;
          _remotePublishSubscribe = remotePublishSubscribe;
+         _temporaryStorage = temporaryStorage;
          _localPublishSubscribe = new DefaultPublishSubscribe<TEntry>( false );
       }
 
@@ -70,6 +77,30 @@ namespace Vibrant.Tsdb
          while( token.HasMore );
       }
 
+      public async Task MoveFromTemporaryStorage( int batchSize )
+      {
+         int read = 0;
+         do
+         {
+            // read
+            var batch = _temporaryStorage.Read( batchSize );
+
+            // write to volumetric
+            var tasks = new List<Task>();
+            tasks.AddRange( LookupDynamicStorages( batch.Entries ).Select( c => c.Storage.Write( c.Lookups ) ) );
+            await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+            // delete
+            batch.Delete();
+
+            // set read count
+            read = batch.Entries.Count;
+         }
+         while( read != 0 );
+
+
+      }
+
       public async Task WriteDirectlyToVolumeStorage( IEnumerable<TEntry> items )
       {
          var tasks = new List<Task>();
@@ -79,15 +110,20 @@ namespace Vibrant.Tsdb
 
       public Task Write( IEnumerable<TEntry> items )
       {
-         return Write( items, PublicationType.None, Publish.Nowhere );
+         return Write( items, PublicationType.None, Publish.Nowhere, false );
       }
 
-      public Task Write( IEnumerable<TEntry> items, PublicationType publicationnType )
+      public Task Write( IEnumerable<TEntry> items, bool useTemporaryStorageOnFailure )
       {
-         return Write( items, publicationnType, publicationnType != PublicationType.None ? Publish.LocallyAndRemotely : Publish.Nowhere );
+         return Write( items, PublicationType.None, Publish.Nowhere, useTemporaryStorageOnFailure );
       }
 
-      public async Task Write( IEnumerable<TEntry> items, PublicationType publicationType, Publish publish )
+      public Task Write( IEnumerable<TEntry> items, PublicationType publicationType )
+      {
+         return Write( items, publicationType, publicationType != PublicationType.None ? Publish.LocallyAndRemotely : Publish.Nowhere, false );
+      }
+
+      public async Task Write( IEnumerable<TEntry> items, PublicationType publicationType, Publish publish, bool useTemporaryStorageOnFailure )
       {
          // ensure we only iterate the original collection once, if it is not a list or array
          if( !( items is IList<TEntry> || items is Array ) )
@@ -95,25 +131,46 @@ namespace Vibrant.Tsdb
             items = items.ToList();
          }
 
-         // TODO: Handle read failures
-
-         // Schedule re-write later
-
-         // Throw exception on fault (partial write?)
-
-         var tasks = new List<Task>();
-         tasks.AddRange( LookupDynamicStorages( items ).Select( c => c.Storage.Write( c.Lookups ) ) );
+         var tasks = new List<Task<IEnumerable<TEntry>>>();
+         tasks.AddRange( LookupDynamicStorages( items ).Select( c => WriteToDynamicStorage( c.Storage, c.Lookups, useTemporaryStorageOnFailure ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
          // Only publish things that were written
-
+         var writtenItems = tasks.SelectMany( x => x.Result );
+         
          if( publish.HasFlag( Publish.Remotely ) )
          {
-            await _remotePublishSubscribe.Publish( items, publicationType ).ConfigureAwait( false );
+            await _remotePublishSubscribe.Publish( writtenItems, publicationType ).ConfigureAwait( false );
          }
          if( publish.HasFlag( Publish.Locally ) )
          {
-            await _localPublishSubscribe.Publish( items, publicationType ).ConfigureAwait( false );
+            await _localPublishSubscribe.Publish( writtenItems, publicationType ).ConfigureAwait( false );
+         }
+      }
+
+      private async Task<IEnumerable<TEntry>> WriteToDynamicStorage( IDynamicStorage<TEntry> storage, IEnumerable<TEntry> entries, bool useTemporaryStorageOnFailure )
+      {
+         try
+         {
+            await storage.Write( entries ).ConfigureAwait( false );
+            return entries;
+         }
+         catch( Exception )
+         {
+            if( useTemporaryStorageOnFailure )
+            {
+               try
+               {
+                  _temporaryStorage.Write( entries );
+               }
+               catch( Exception )
+               {
+                  TemporaryWriteFailure?.Invoke( this, new TsdbWriteFailureEventArgs<TEntry>( entries ) );
+               }
+            }
+
+            WriteFailure?.Invoke( this, new TsdbWriteFailureEventArgs<TEntry>( entries ) );
+            return _entries;
          }
       }
 

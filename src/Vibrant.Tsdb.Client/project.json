@@ -15,6 +15,7 @@
    "dependencies": {
       "Vibrant.Tsdb": "2.1.0-*",
       "Vibrant.Tsdb.Ats": "2.1.0-*",
+      "Vibrant.Tsdb.Files": "2.1.0-*",
       "Vibrant.Tsdb.Redis": "2.1.0-*",
       "Vibrant.Tsdb.Sql": "2.1.0-*"
    },

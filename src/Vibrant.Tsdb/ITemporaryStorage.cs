@@ -10,10 +10,8 @@ namespace Vibrant.Tsdb
    {
       void Write( IEnumerable<TEntry> entries );
 
-      List<TEntry> Read( int count );
+      TemporaryReadResult<TEntry> Read( int count );
 
-      // has more data???
-
-      // continuous read???
+      void Delete();
    }
 }

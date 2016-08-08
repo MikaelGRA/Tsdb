@@ -57,7 +57,8 @@ namespace Vibrant.Tsdb.ConsoleApp
             sql.GetSection( "Table" ).Value,
             sql.GetSection( "ConnectionString" ).Value,
             ats.GetSection( "Table" ).Value,
-            ats.GetSection( "ConnectionString" ).Value );
+            ats.GetSection( "ConnectionString" ).Value,
+            @"C:\temp\lol\heh" );
 
          // redis.GetSection( "ConnectionString" ).Value
 
