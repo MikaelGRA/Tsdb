@@ -5,16 +5,16 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class TsdbVolumeMoval
+   public class TsdbVolumeMoval<TKey>
    {
-      public TsdbVolumeMoval( string id, DateTime timestamp, DateTime to )
+      public TsdbVolumeMoval( TKey id, DateTime timestamp, DateTime to )
       {
          Id = id;
          Timestamp = timestamp;
          To = to;
       }
 
-      public string Id { get; private set; }
+      public TKey Id { get; private set; }
 
       public DateTime Timestamp { get; private set; }
 

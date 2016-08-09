@@ -21,30 +21,30 @@ namespace Vibrant.Tsdb.Sql.Serialization
          return writer;
       }
 
-      public static void SerializeEntry<TEntry>( BinaryWriter writer, TEntry entry )
-         where TEntry : ISqlEntry
+      public static void SerializeEntry<TKey, TEntry>( BinaryWriter writer, TEntry entry )
+         where TEntry : ISqlEntry<TKey>
       {
          entry.Write( writer );
       }
 
-      public static TEntry DeserializeEntry<TEntry>( BinaryReader reader, string id )
-         where TEntry : ISqlEntry, new()
+      public static TEntry DeserializeEntry<TKey, TEntry>( BinaryReader reader, TKey id )
+         where TEntry : ISqlEntry<TKey>, new()
       {
          var entry = new TEntry();
-         entry.SetId( id );
+         entry.SetKey( id );
          entry.Read( reader );
          return entry;
       }
 
-      public static void Serialize<TEntry>( IEnumerable<TEntry> entries, Action<TEntry, byte[]> serialized )
-         where TEntry : ISqlEntry
+      public static void Serialize<TKey, TEntry>( IEnumerable<TEntry> entries, Action<TEntry, byte[]> serialized )
+         where TEntry : ISqlEntry<TKey>
       {
          var stream = new MemoryStream();
          var writer = CreateWriter( stream );
 
          foreach( var entry in entries )
          {
-            SerializeEntry( writer, entry );
+            SerializeEntry<TKey, TEntry>( writer, entry );
             writer.Flush();
 
             var serializedEntry = stream.ToArray();
@@ -59,8 +59,8 @@ namespace Vibrant.Tsdb.Sql.Serialization
          writer.Dispose();
       }
 
-      public static List<TEntry> Deserialize<TEntry>( IEnumerable<SqlEntry> sqlEntries )
-         where TEntry : ISqlEntry, new()
+      public static List<TEntry> Deserialize<TKey, TEntry>( IEnumerable<SqlEntry> sqlEntries, IKeyConverter<TKey> keyConverter )
+         where TEntry : ISqlEntry<TKey>, new()
       {
          List<TEntry> entries = new List<TEntry>();
 
@@ -68,7 +68,7 @@ namespace Vibrant.Tsdb.Sql.Serialization
          {
             var stream = new MemoryStream( sqlEntry.Data );
             var reader = CreateReader( stream );
-            var entry = DeserializeEntry<TEntry>( reader, sqlEntry.Id );
+            var entry = DeserializeEntry<TKey, TEntry>( reader, keyConverter.Convert( sqlEntry.Id ) );
             entry.SetTimestamp( sqlEntry.Timestamp );
             entries.Add( entry );
          }

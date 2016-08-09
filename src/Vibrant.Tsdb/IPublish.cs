@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IPublish<TEntry>
-      where TEntry : IEntry
+   public interface IPublish<TKey,TEntry>
+      where TEntry : IEntry<TKey>
    {
       Task Publish( IEnumerable<TEntry> entries, PublicationType publish );
    }

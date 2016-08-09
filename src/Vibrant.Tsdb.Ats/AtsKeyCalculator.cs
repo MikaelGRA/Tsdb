@@ -8,23 +8,22 @@ namespace Vibrant.Tsdb.Ats
 {
    internal static class AtsKeyCalculator
    {
-      private const string MinPartitionKeyRange = "9999";
-      private const string MaxPartitionKeyRange = "0000";
       private const string Seperator = "|";
 
-      public static string CalculatePartitionKey<TEntry>( TEntry entry, IPartitionProvider provider )
-         where TEntry : IAtsEntry
+      public static string CalculatePartitionKey<TKey, TEntry>( TEntry entry, IKeyConverter<TKey> keyConverter, IPartitionProvider<TKey> provider )
+         where TEntry : IAtsEntry<TKey>
       {
-         return CalculatePartitionKey( entry.GetId(), entry.GetTimestamp(), provider );
+         var key = entry.GetKey();
+         return CalculatePartitionKey( keyConverter.Convert( key ), key, entry.GetTimestamp(), provider );
       }
 
-      public static string CalculatePartitionKey( string id, DateTime timestamp, IPartitionProvider provider )
+      public static string CalculatePartitionKey<TKey>( string id, TKey key, DateTime timestamp, IPartitionProvider<TKey> provider )
       {
          StringBuilder builder = new StringBuilder();
 
          builder.Append( id );
 
-         var partitionRange = provider.GetPartitioning( id, timestamp );
+         var partitionRange = provider.GetPartitioning( key, timestamp );
          if( !string.IsNullOrEmpty( partitionRange ) )
          {
             builder.Append( Seperator )
@@ -34,13 +33,13 @@ namespace Vibrant.Tsdb.Ats
          return builder.ToString();
       }
 
-      public static string CalculateMaxPartitionKey( string id, IPartitionProvider provider )
+      public static string CalculateMaxPartitionKey<TKey>( string id, TKey key, IPartitionProvider<TKey> provider )
       {
          StringBuilder builder = new StringBuilder();
 
          builder.Append( id );
 
-         var partitionRange = provider.GetMaxPartitioning( id );
+         var partitionRange = provider.GetMaxPartitioning( key );
          if( !string.IsNullOrEmpty( partitionRange ) )
          {
             builder.Append( Seperator )
@@ -50,13 +49,13 @@ namespace Vibrant.Tsdb.Ats
          return builder.ToString();
       }
 
-      public static string CalculateMinPartitionKey( string id, IPartitionProvider provider )
+      public static string CalculateMinPartitionKey<TKey>( string id, TKey key, IPartitionProvider<TKey> provider )
       {
          StringBuilder builder = new StringBuilder();
 
          builder.Append( id );
 
-         var partitionRange = provider.GetMinPartitioning( id );
+         var partitionRange = provider.GetMinPartitioning( key );
          if( !string.IsNullOrEmpty( partitionRange ) )
          {
             builder.Append( Seperator )

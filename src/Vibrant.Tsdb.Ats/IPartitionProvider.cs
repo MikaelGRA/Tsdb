@@ -5,12 +5,12 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public interface IPartitionProvider
+   public interface IPartitionProvider<TKey>
    {
-      string GetPartitioning( string id, DateTime timestamp );
+      string GetPartitioning( TKey id, DateTime timestamp );
 
-      string GetMaxPartitioning( string id );
+      string GetMaxPartitioning( TKey id );
 
-      string GetMinPartitioning( string id );
+      string GetMinPartitioning( TKey id );
    }
 }

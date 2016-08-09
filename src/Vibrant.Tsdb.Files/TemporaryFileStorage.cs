@@ -4,12 +4,13 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Vibrant.Tsdb;
 using Vibrant.Tsdb.Exceptions;
 
 namespace Vibrant.Tsdb.Files
 {
-   public class TemporaryFileStorage<TEntry> : ITemporaryStorage<TEntry>
-      where TEntry : IFileEntry, new()
+   public class TemporaryFileStorage<TKey, TEntry> : ITemporaryStorage<TKey, TEntry>
+      where TEntry : IFileEntry<TKey>, new()
    {
       private static readonly string FileTemplate = "{0}.dat";
 
@@ -19,18 +20,24 @@ namespace Vibrant.Tsdb.Files
       private int _maxFileSize;
       private long _maxStorageSize;
       private long _currentSize;
+      private IKeyConverter<TKey> _keyConverter;
 
-      // https://msdn.microsoft.com/en-us/library/system.io.filestream.lock(v=vs.110).aspx
-      public TemporaryFileStorage( string directory, int maxFileSize, long maxStorageSize )
+      public TemporaryFileStorage( string directory, int maxFileSize, long maxStorageSize, IKeyConverter<TKey> keyConverter )
       {
          _directory = new DirectoryInfo( directory );
          _maxFileSize = maxFileSize;
          _maxStorageSize = maxStorageSize;
+         _keyConverter = keyConverter;
 
          CalculateDirectorySize();
       }
 
-      public TemporaryReadResult<TEntry> Read( int count )
+      public TemporaryFileStorage( string directory, int maxFileSize, long maxStorageSize )
+         : this(directory, maxFileSize, maxStorageSize, DefaultKeyConverter<TKey>.Current )
+      {
+      }
+
+      public TemporaryReadResult<TKey, TEntry> Read( int count )
       {
          lock( _sync )
          {
@@ -48,7 +55,7 @@ namespace Vibrant.Tsdb.Files
                      var entry = new TEntry();
                      var id = reader.ReadString();
                      var timestamp = new DateTime( reader.ReadInt64(), DateTimeKind.Utc );
-                     entry.SetId( id );
+                     entry.SetKey( _keyConverter.Convert( id ) );
                      entry.SetTimestamp( timestamp );
                      entry.Read( reader );
                      entries.Add( entry );
@@ -66,7 +73,7 @@ namespace Vibrant.Tsdb.Files
                }
             }
 
-            return new TemporaryReadResult<TEntry>( entries, () => Delete( modifications ) );
+            return new TemporaryReadResult<TKey, TEntry>( entries, () => Delete( modifications ) );
          }
       }
 
@@ -137,7 +144,7 @@ namespace Vibrant.Tsdb.Files
                   throw new TsdbException( "Could not write all the entries to the temporary file storage because it exceeds the maximum storage size." );
                }
 
-               writer.Write( entry.GetId() );
+               writer.Write( _keyConverter.Convert( entry.GetKey() ) );
                writer.Write( entry.GetTimestamp().Ticks );
                entry.Write( writer );
 

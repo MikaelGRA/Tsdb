@@ -8,7 +8,7 @@ using Vibrant.Tsdb.Files;
 
 namespace Vibrant.Tsdb.Ats.Tests
 {
-   public class TemporaryFileStorageTests : AbstractTemporaryStorageTests<TemporaryFileStorage<BasicEntry>>
+   public class TemporaryFileStorageTests : AbstractTemporaryStorageTests<TemporaryFileStorage<string, BasicEntry>>
    {
       private static readonly string ConnectionString;
 
@@ -16,9 +16,9 @@ namespace Vibrant.Tsdb.Ats.Tests
       {
       }
 
-      public override TemporaryFileStorage<BasicEntry> GetStorage()
+      public override TemporaryFileStorage<string, BasicEntry> GetStorage()
       {
-         return new TemporaryFileStorage<BasicEntry>( @"c:\temp\lol\test", 64 * 1024, 1024 * 1024 * 1024 );
+         return new TemporaryFileStorage<string, BasicEntry>( @"c:\temp\lol\test", 64 * 1024, 1024 * 1024 * 1024 );
       }
    }
 }

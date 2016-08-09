@@ -8,7 +8,7 @@ using Xunit;
 namespace Vibrant.Tsdb.Ats.Tests
 {
    public abstract class AbstractPublishSubscribeTests<TPublishSubscribe>
-     where TPublishSubscribe : IPublishSubscribe<BasicEntry>
+     where TPublishSubscribe : IPublishSubscribe<string, BasicEntry>
    {
       public abstract TPublishSubscribe CreatePublishSubscribe();
 
@@ -24,7 +24,7 @@ namespace Vibrant.Tsdb.Ats.Tests
          {
             foreach( var entry in entries )
             {
-               Assert.Equal( "row1", entry.GetId() );
+               Assert.Equal( "row1", entry.GetKey() );
                received1++;
             }
          } );
@@ -34,7 +34,7 @@ namespace Vibrant.Tsdb.Ats.Tests
          {
             foreach( var entry in entries )
             {
-               Assert.Equal( "row2", entry.GetId() );
+               Assert.Equal( "row2", entry.GetKey() );
                received2++;
             }
          } );

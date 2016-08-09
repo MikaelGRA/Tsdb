@@ -6,20 +6,22 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Redis
 {
-   public class RedisPublishSubscribe<TEntry> : DefaultPublishSubscribe<TEntry>, IDisposable
-      where TEntry : IRedisEntry, new()
+   public class RedisPublishSubscribe<TKey, TEntry> : DefaultPublishSubscribe<TKey, TEntry>, IDisposable
+      where TEntry : IRedisEntry<TKey>, new()
    {
       private TaskCompletionSource<bool> _waitWhileDisconnected;
       private RedisConnection _connection;
       private string _connectionString;
       private int _state;
+      private IKeyConverter<TKey> _keyConverter;
 
-      public RedisPublishSubscribe( string connectionString, bool continueOnCapturedSynchronizationContext )
+      public RedisPublishSubscribe( string connectionString, bool continueOnCapturedSynchronizationContext, IKeyConverter<TKey> keyConverter )
          : base( continueOnCapturedSynchronizationContext )
       {
          _connectionString = connectionString;
          _connection = new RedisConnection();
          _waitWhileDisconnected = new TaskCompletionSource<bool>();
+         _keyConverter = keyConverter;
 
          ReconnectDelay = TimeSpan.FromSeconds( 2 );
 
@@ -27,6 +29,11 @@ namespace Vibrant.Tsdb.Redis
          {
             var ignore = ConnectWithRetry();
          } );
+      }
+
+      public RedisPublishSubscribe( string connectionString, bool continueOnCapturedSynchronizationContext )
+         : this( connectionString, continueOnCapturedSynchronizationContext, DefaultKeyConverter<TKey>.Current )
+      {
       }
 
       public TimeSpan ReconnectDelay { get; set; }
@@ -69,22 +76,22 @@ namespace Vibrant.Tsdb.Redis
             var latest = FindLatestForEachId( entries );
             foreach( var entry in entries )
             {
-               var id = entry.GetId();
-               tasks.Add( _connection.PublishLatestAsync( id, entry ) );
+               var id = entry.GetKey();
+               tasks.Add( _connection.PublishLatestAsync<TKey, TEntry>( _keyConverter.Convert( id ), entry ) );
             }
          }
          if( publish.HasFlag( PublicationType.AllFromCollections ) )
          {
-            foreach( var entriesById in entries.GroupBy( x => x.GetId() ) )
+            foreach( var entriesById in entries.GroupBy( x => x.GetKey() ) )
             {
                var id = entriesById.Key;
-               tasks.Add( _connection.PublishAllAsync( id, entriesById ) );
+               tasks.Add( _connection.PublishAllAsync<TKey, TEntry>( _keyConverter.Convert( id ), entriesById ) );
             }
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      protected override Task OnSubscribed( IEnumerable<string> ids, SubscriptionType subscribe )
+      protected override Task OnSubscribed( IEnumerable<TKey> ids, SubscriptionType subscribe )
       {
          List<Task> tasks = new List<Task>();
          foreach( var id in ids )
@@ -92,10 +99,10 @@ namespace Vibrant.Tsdb.Redis
             switch( subscribe )
             {
                case SubscriptionType.LatestPerCollection:
-                  tasks.Add( _connection.SubscribeAsync<TEntry>( id, subscribe, PublishToSingleForLatestEntriesWithSameId ) );
+                  tasks.Add( _connection.SubscribeAsync<TKey, TEntry>( _keyConverter.Convert( id ), _keyConverter, subscribe, PublishToSingleForLatestEntriesWithSameId ) );
                   break;
                case SubscriptionType.AllFromCollections:
-                  tasks.Add( _connection.SubscribeAsync<TEntry>( id, subscribe, PublishToSingleForAllEntriesWithSameId ) );
+                  tasks.Add( _connection.SubscribeAsync<TKey, TEntry>( _keyConverter.Convert( id ), _keyConverter, subscribe, PublishToSingleForAllEntriesWithSameId ) );
                   break;
                default:
                   throw new ArgumentException( nameof( subscribe ) );
@@ -104,12 +111,12 @@ namespace Vibrant.Tsdb.Redis
          return Task.WhenAll( tasks );
       }
 
-      protected override Task OnUnsubscribed( IEnumerable<string> ids, SubscriptionType subscribe )
+      protected override Task OnUnsubscribed( IEnumerable<TKey> ids, SubscriptionType subscribe )
       {
          List<Task> tasks = new List<Task>();
          foreach( var id in ids )
          {
-            tasks.Add( _connection.UnsubscribeAsync( id, subscribe ) );
+            tasks.Add( _connection.UnsubscribeAsync( _keyConverter.Convert( id ), subscribe ) );
          }
          return Task.WhenAll( tasks );
       }
@@ -119,9 +126,9 @@ namespace Vibrant.Tsdb.Redis
          switch( subscribe )
          {
             case SubscriptionType.LatestPerCollection:
-               return _connection.SubscribeAsync<TEntry>( "*", subscribe, PublishToAllForLatestEntriesWithSameId );
+               return _connection.SubscribeAsync<TKey, TEntry>( "*", _keyConverter, subscribe, PublishToAllForLatestEntriesWithSameId );
             case SubscriptionType.AllFromCollections:
-               return _connection.SubscribeAsync<TEntry>( "*", subscribe, PublishToAllForAllEntriesWithSameId );
+               return _connection.SubscribeAsync<TKey, TEntry>( "*", _keyConverter, subscribe, PublishToAllForAllEntriesWithSameId );
             default:
                throw new ArgumentException( nameof( subscribe ) );
          }
@@ -177,7 +184,7 @@ namespace Vibrant.Tsdb.Redis
          }
 
          await _connection.ConnectAsync( _connectionString ).ConfigureAwait( false );
-         
+
          _connection.ErrorMessage += OnConnectionError;
          _connection.ConnectionFailed += OnConnectionFailed;
       }

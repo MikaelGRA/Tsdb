@@ -10,25 +10,25 @@ namespace Vibrant.Tsdb
    /// <summary>
    /// Simple publish subscribe implementation that only works locally.
    /// </summary>
-   public class DefaultPublishSubscribe<TEntry> : IPublishSubscribe<TEntry>
-      where TEntry : IEntry
+   public class DefaultPublishSubscribe<TKey, TEntry> : IPublishSubscribe<TKey, TEntry>
+      where TEntry : IEntry<TKey>
    {
       private Task _completed = Task.FromResult( 0 );
-      private IDictionary<string, HashSet<Action<List<TEntry>>>> _latestCallbacksForSingle;
+      private IDictionary<TKey, HashSet<Action<List<TEntry>>>> _latestCallbacksForSingle;
       private IDictionary<Action<List<TEntry>>, byte> _latestCallbacksForAll;
-      private IDictionary<string, HashSet<Action<List<TEntry>>>> _allCallbacksForSingle;
+      private IDictionary<TKey, HashSet<Action<List<TEntry>>>> _allCallbacksForSingle;
       private IDictionary<Action<List<TEntry>>, byte> _allCallbacksForAll;
-      private IDictionary<string, DateTime> _latest;
+      private IDictionary<TKey, DateTime> _latest;
       private readonly TaskFactory _taskFactory;
       private bool _continueOnCapturedSynchronizationContext;
 
       public DefaultPublishSubscribe( bool continueOnCapturedSynchronizationContext )
       {
-         _latestCallbacksForSingle = new ConcurrentDictionary<string, HashSet<Action<List<TEntry>>>>();
+         _latestCallbacksForSingle = new ConcurrentDictionary<TKey, HashSet<Action<List<TEntry>>>>();
          _latestCallbacksForAll = new ConcurrentDictionary<Action<List<TEntry>>, byte>();
-         _allCallbacksForSingle = new ConcurrentDictionary<string, HashSet<Action<List<TEntry>>>>();
+         _allCallbacksForSingle = new ConcurrentDictionary<TKey, HashSet<Action<List<TEntry>>>>();
          _allCallbacksForAll = new ConcurrentDictionary<Action<List<TEntry>>, byte>();
-         _latest = new ConcurrentDictionary<string, DateTime>();
+         _latest = new ConcurrentDictionary<TKey, DateTime>();
 
          if( continueOnCapturedSynchronizationContext )
          {
@@ -64,9 +64,9 @@ namespace Vibrant.Tsdb
          await OnPublished( entries, publish ).ConfigureAwait( false );
       }
 
-      public async Task<Func<Task>> Subscribe( IEnumerable<string> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
+      public async Task<Func<Task>> Subscribe( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
       {
-         IDictionary<string, HashSet<Action<List<TEntry>>>> single;
+         IDictionary<TKey, HashSet<Action<List<TEntry>>>> single;
          switch( subscribe )
          {
             case SubscriptionType.LatestPerCollection:
@@ -97,9 +97,9 @@ namespace Vibrant.Tsdb
          return () => Unsubscribe( ids, subscribe, callback );
       }
 
-      private async Task Unsubscribe( IEnumerable<string> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
+      private async Task Unsubscribe( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
       {
-         IDictionary<string, HashSet<Action<List<TEntry>>>> single;
+         IDictionary<TKey, HashSet<Action<List<TEntry>>>> single;
          switch( subscribe )
          {
             case SubscriptionType.LatestPerCollection:
@@ -218,12 +218,12 @@ namespace Vibrant.Tsdb
          }
       }
 
-      private List<string> AddSubscriptionsToLatest(
-         IEnumerable<string> ids,
+      private List<TKey> AddSubscriptionsToLatest(
+         IEnumerable<TKey> ids,
          Action<List<TEntry>> callback,
-         IDictionary<string, HashSet<Action<List<TEntry>>>> single )
+         IDictionary<TKey, HashSet<Action<List<TEntry>>>> single )
       {
-         List<string> newSubscriptions = new List<string>();
+         List<TKey> newSubscriptions = new List<TKey>();
          lock( single )
          {
             foreach( var id in ids )
@@ -242,12 +242,12 @@ namespace Vibrant.Tsdb
          return newSubscriptions;
       }
 
-      private List<string> RemoveSubscriptionsFromLatest(
-         IEnumerable<string> ids,
+      private List<TKey> RemoveSubscriptionsFromLatest(
+         IEnumerable<TKey> ids,
          Action<List<TEntry>> callback,
-         IDictionary<string, HashSet<Action<List<TEntry>>>> single )
+         IDictionary<TKey, HashSet<Action<List<TEntry>>>> single )
       {
-         List<string> subscriptionsRemoved = new List<string>();
+         List<TKey> subscriptionsRemoved = new List<TKey>();
          lock( single )
          {
             foreach( var id in ids )
@@ -268,12 +268,12 @@ namespace Vibrant.Tsdb
          return subscriptionsRemoved;
       }
 
-      protected virtual Task OnSubscribed( IEnumerable<string> ids, SubscriptionType subscribe )
+      protected virtual Task OnSubscribed( IEnumerable<TKey> ids, SubscriptionType subscribe )
       {
          return _completed;
       }
 
-      protected virtual Task OnUnsubscribed( IEnumerable<string> ids, SubscriptionType subscribe )
+      protected virtual Task OnUnsubscribed( IEnumerable<TKey> ids, SubscriptionType subscribe )
       {
          return _completed;
       }
@@ -321,9 +321,9 @@ namespace Vibrant.Tsdb
          PublishFor( entries, _allCallbacksForSingle, _allCallbacksForAll );
       }
 
-      private void PublishFor( IEnumerable<TEntry> entries, IDictionary<string, HashSet<Action<List<TEntry>>>> single, IDictionary<Action<List<TEntry>>, byte> all )
+      private void PublishFor( IEnumerable<TEntry> entries, IDictionary<TKey, HashSet<Action<List<TEntry>>>> single, IDictionary<Action<List<TEntry>>, byte> all )
       {
-         foreach( var entriesById in entries.GroupBy( x => x.GetId() ) )
+         foreach( var entriesById in entries.GroupBy( x => x.GetKey() ) )
          {
             List<TEntry> entriesForSubscriber = null;
 
@@ -411,9 +411,9 @@ namespace Vibrant.Tsdb
          }
       }
 
-      private void PublishToSingleForEntriesWithSameId( List<TEntry> entries, IDictionary<string, HashSet<Action<List<TEntry>>>> single, IDictionary<Action<List<TEntry>>, byte> all )
+      private void PublishToSingleForEntriesWithSameId( List<TEntry> entries, IDictionary<TKey, HashSet<Action<List<TEntry>>>> single, IDictionary<Action<List<TEntry>>, byte> all )
       {
-         var id = entries[ 0 ].GetId();
+         var id = entries[ 0 ].GetKey();
 
          HashSet<Action<List<TEntry>>> subscribers;
          if( single.TryGetValue( id, out subscribers ) )
@@ -432,7 +432,7 @@ namespace Vibrant.Tsdb
          }
       }
 
-      private void PublishToAllForEntriesWithSameId( List<TEntry> entries, IDictionary<string, HashSet<Action<List<TEntry>>>> single, IDictionary<Action<List<TEntry>>, byte> all )
+      private void PublishToAllForEntriesWithSameId( List<TEntry> entries, IDictionary<TKey, HashSet<Action<List<TEntry>>>> single, IDictionary<Action<List<TEntry>>, byte> all )
       {
          foreach( var callback in all )
          {
@@ -449,10 +449,10 @@ namespace Vibrant.Tsdb
 
       protected IEnumerable<TEntry> FindLatestForEachId( IEnumerable<TEntry> entries )
       {
-         var foundEntries = new Dictionary<string, TEntry>();
+         var foundEntries = new Dictionary<TKey, TEntry>();
          foreach( var entry in entries )
          {
-            var id = entry.GetId();
+            var id = entry.GetKey();
 
             TEntry existingEntry;
             if( !foundEntries.TryGetValue( id, out existingEntry ) )

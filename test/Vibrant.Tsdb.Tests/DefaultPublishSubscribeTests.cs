@@ -6,11 +6,11 @@ using Vibrant.Tsdb.Ats.Tests.Entries;
 
 namespace Vibrant.Tsdb.Ats.Tests
 {
-   public class DefaultPublishSubscribeTests : AbstractPublishSubscribeTests<DefaultPublishSubscribe<BasicEntry>>
+   public class DefaultPublishSubscribeTests : AbstractPublishSubscribeTests<DefaultPublishSubscribe<string, BasicEntry>>
    {
-      public override DefaultPublishSubscribe<BasicEntry> CreatePublishSubscribe()
+      public override DefaultPublishSubscribe<string, BasicEntry> CreatePublishSubscribe()
       {
-         return new DefaultPublishSubscribe<BasicEntry>( false );
+         return new DefaultPublishSubscribe<string, BasicEntry>( false );
       }
    }
 }

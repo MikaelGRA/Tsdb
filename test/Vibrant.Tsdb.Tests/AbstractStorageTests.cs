@@ -9,7 +9,7 @@ using Xunit;
 namespace Vibrant.Tsdb.Ats.Tests
 {
    public abstract class AbstractStorageTests<TStorage>
-      where TStorage : IStorage<BasicEntry>
+      where TStorage : IStorage<string, BasicEntry>
    {
       protected static readonly string[] Ids = new[]
       {
@@ -87,10 +87,10 @@ namespace Vibrant.Tsdb.Ats.Tests
          foreach( var item in written )
          {
             List<BasicEntry> items;
-            if( !entries.TryGetValue( item.GetId(), out items ) )
+            if( !entries.TryGetValue( item.GetKey(), out items ) )
             {
                items = new List<BasicEntry>();
-               entries[ item.GetId() ] = items;
+               entries[ item.GetKey() ] = items;
             }
             items.Add( item );
          }

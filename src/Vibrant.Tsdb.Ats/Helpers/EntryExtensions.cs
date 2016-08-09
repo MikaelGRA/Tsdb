@@ -7,18 +7,18 @@ namespace Vibrant.Tsdb.Ats.Helpers
 {
    internal static class EntryExtensions
    {
-      public static IEnumerable<EntrySplitResult<TEntry>> SplitEntriesById<TEntry>( this IEnumerable<TEntry> entries, Sort sort )
-         where TEntry : IAtsEntry
+      public static IEnumerable<EntrySplitResult<TKey, TEntry>> SplitEntriesById<TKey, TEntry>( this IEnumerable<TEntry> entries, Sort sort )
+         where TEntry : IAtsEntry<TKey>
       {
-         var splitEntries = new Dictionary<string, EntrySplitResult<TEntry>>();
+         var splitEntries = new Dictionary<TKey, EntrySplitResult<TKey, TEntry>>();
          foreach( var entry in entries )
          {
-            EntrySplitResult<TEntry> splitEntry;
-            var id = entry.GetId();
+            EntrySplitResult<TKey, TEntry> splitEntry;
+            var id = entry.GetKey();
 
             if( !splitEntries.TryGetValue( id, out splitEntry ) )
             {
-               splitEntry = new EntrySplitResult<TEntry>( id );
+               splitEntry = new EntrySplitResult<TKey, TEntry>( id );
                splitEntries.Add( id, splitEntry );
             }
             splitEntry.Insert( entry );

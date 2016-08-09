@@ -10,7 +10,7 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.ConsoleApp.Entries
 {
-   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, IFileEntry
+   public class BasicEntry : IEntry<string>, IAtsEntry<string>, ISqlEntry<string>, IRedisEntry<string>, IFileEntry<string>
    {
       private KeyValuePair<string, string>[] _empty = new KeyValuePair<string, string>[ 0 ];
 
@@ -20,12 +20,12 @@ namespace Vibrant.Tsdb.ConsoleApp.Entries
 
       public double Value { get; set; }
 
-      public string GetId()
+      public string GetKey()
       {
          return Id;
       }
 
-      public void SetId( string id )
+      public void SetKey( string id )
       {
          Id = id;
       }

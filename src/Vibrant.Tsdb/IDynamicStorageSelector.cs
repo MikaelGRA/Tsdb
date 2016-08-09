@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IDynamicStorageSelector<TEntry> where TEntry : IEntry
+   public interface IDynamicStorageSelector<TKey, TEntry> where TEntry : IEntry<TKey>
    {
-      IDynamicStorage<TEntry> GetStorage( string id );
+      IDynamicStorage<TKey, TEntry> GetStorage( TKey id );
    }
 }

@@ -5,12 +5,12 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class SegmentedReadResult<TEntry> : ReadResult<TEntry>
-     where TEntry : IEntry
+   public class SegmentedReadResult<TKey, TEntry> : ReadResult<TKey, TEntry>
+     where TEntry : IEntry<TKey>
    {
       private Func<Task> _delete;
 
-      public SegmentedReadResult( string id, Sort sort, IContinuationToken continuationToken, List<TEntry> entries, Func<Task> delete )
+      public SegmentedReadResult( TKey id, Sort sort, IContinuationToken continuationToken, List<TEntry> entries, Func<Task> delete )
          : base( id, sort, entries )
       {
          ContinuationToken = continuationToken;

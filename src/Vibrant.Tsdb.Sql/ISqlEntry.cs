@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Sql
 {
-   public interface ISqlEntry : IEntry
+   public interface ISqlEntry<TKey> : IEntry<TKey>
    {
       void Write( BinaryWriter writer );
 

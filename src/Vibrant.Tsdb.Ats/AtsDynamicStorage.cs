@@ -10,8 +10,8 @@ using Vibrant.Tsdb.Ats.Serialization;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public class AtsDynamicStorage<TEntry> : IDynamicStorage<TEntry>, IDynamicStorageSelector<TEntry>, IDisposable
-     where TEntry : IAtsEntry, new()
+   public class AtsDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
+     where TEntry : IAtsEntry<TKey>, new()
    {
       private object _sync = new object();
       private SemaphoreSlim _read;
@@ -20,10 +20,11 @@ namespace Vibrant.Tsdb.Ats
       private CloudStorageAccount _account;
       private CloudTableClient _client;
       private Task<CloudTable> _table;
-      private IPartitionProvider _partitioningProvider;
-      private EntryEqualityComparer<TEntry> _comparer;
+      private IPartitionProvider<TKey> _partitioningProvider;
+      private EntryEqualityComparer<TKey, TEntry> _comparer;
+      private IKeyConverter<TKey> _keyConverter;
 
-      public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IPartitionProvider partitioningProvider )
+      public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IPartitionProvider<TKey> partitioningProvider, IKeyConverter<TKey> keyConverter )
       {
          _read = new SemaphoreSlim( readParallelism );
          _write = new SemaphoreSlim( writeParallelism );
@@ -31,58 +32,63 @@ namespace Vibrant.Tsdb.Ats
          _account = CloudStorageAccount.Parse( connectionString );
          _client = _account.CreateCloudTableClient();
          _partitioningProvider = partitioningProvider;
-         _comparer = new EntryEqualityComparer<TEntry>();
+         _comparer = new EntryEqualityComparer<TKey, TEntry>();
+         _keyConverter = keyConverter;
 
-         // improve data insertion
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
 
+      public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IPartitionProvider<TKey> partitioningProvider )
+         : this( tableName, connectionString, readParallelism, writeParallelism, partitioningProvider, DefaultKeyConverter<TKey>.Current )
+      {
+      }
+
       public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism )
-         : this( tableName, connectionString, readParallelism, writeParallelism, new YearlyPartitioningProvider() )
+         : this( tableName, connectionString, readParallelism, writeParallelism, new YearlyPartitioningProvider<TKey>() )
       {
       }
 
       public AtsDynamicStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, 25, 25, new YearlyPartitioningProvider() )
+         : this( tableName, connectionString, 25, 25, new YearlyPartitioningProvider<TKey>() )
       {
       }
 
-      public IDynamicStorage<TEntry> GetStorage( string id )
+      public IDynamicStorage<TKey, TEntry> GetStorage( TKey id )
       {
          return this;
       }
 
-      public Task Delete( IEnumerable<string> ids )
+      public Task Delete( IEnumerable<TKey> ids )
       {
          return DeleteAllInternal( ids );
       }
 
-      public Task Delete( IEnumerable<string> ids, DateTime to )
+      public Task Delete( IEnumerable<TKey> ids, DateTime to )
       {
          return DeleteUntilInternal( ids, to );
       }
 
-      public Task Delete( IEnumerable<string> ids, DateTime from, DateTime to )
+      public Task Delete( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          return DeleteRangeInternal( ids, from, to );
       }
 
-      public Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
       {
          return ReadAllInternal( ids, sort );
       }
 
-      public Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime to, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
       {
          return ReadUntilInternal( ids, to, sort );
       }
 
-      public Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          return ReadRangeInternal( ids, from, to, sort );
       }
 
-      public Task<MultiReadResult<TEntry>> ReadLatest( IEnumerable<string> ids )
+      public Task<MultiReadResult<TKey, TEntry>> ReadLatest( IEnumerable<TKey> ids )
       {
          return ReadLatestInternal( ids );
       }
@@ -92,17 +98,17 @@ namespace Vibrant.Tsdb.Ats
          return WriteInternal( items );
       }
 
-      public Task<SegmentedReadResult<TEntry>> Read( string id, DateTime to, int segmentSize, object continuationToken )
+      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime to, int segmentSize, object continuationToken )
       {
          return ReadRangeSegmentedInternal( id, to, segmentSize, (ContinuationToken)continuationToken );
       }
 
-      public Task<SegmentedReadResult<TEntry>> Read( string id, int segmentSize, object continuationToken )
+      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, int segmentSize, object continuationToken )
       {
          return ReadRangeSegmentedInternal( id, segmentSize, (ContinuationToken)continuationToken );
       }
 
-      private async Task<int> DeleteAllInternal( IEnumerable<string> ids )
+      private async Task<int> DeleteAllInternal( IEnumerable<TKey> ids )
       {
          var tasks = new List<Task<int>>();
          foreach( var id in ids )
@@ -114,7 +120,7 @@ namespace Vibrant.Tsdb.Ats
          return tasks.Sum( x => x.Result );
       }
 
-      private async Task<int> DeleteAllInternal( string id )
+      private async Task<int> DeleteAllInternal( TKey id )
       {
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreatePartitionFilter( id ) );
@@ -124,7 +130,7 @@ namespace Vibrant.Tsdb.Ats
          return count;
       }
 
-      private async Task<int> DeleteUntilInternal( IEnumerable<string> ids, DateTime to )
+      private async Task<int> DeleteUntilInternal( IEnumerable<TKey> ids, DateTime to )
       {
          var tasks = new List<Task<int>>();
          foreach( var id in ids )
@@ -136,7 +142,7 @@ namespace Vibrant.Tsdb.Ats
          return tasks.Sum( x => x.Result );
       }
 
-      private async Task<int> DeleteUntilInternal( string id, DateTime to )
+      private async Task<int> DeleteUntilInternal( TKey id, DateTime to )
       {
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreateBeforeFilter( id, to ) );
@@ -146,7 +152,7 @@ namespace Vibrant.Tsdb.Ats
          return count;
       }
 
-      private async Task<int> DeleteRangeInternal( IEnumerable<string> ids, DateTime from, DateTime to )
+      private async Task<int> DeleteRangeInternal( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          var tasks = new List<Task<int>>();
          foreach( var id in ids )
@@ -158,7 +164,7 @@ namespace Vibrant.Tsdb.Ats
          return tasks.Sum( x => x.Result );
       }
 
-      private async Task<int> DeleteRangeInternal( string id, DateTime from, DateTime to )
+      private async Task<int> DeleteRangeInternal( TKey id, DateTime from, DateTime to )
       {
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreateGeneralFilter( id, from, to ) );
@@ -168,19 +174,19 @@ namespace Vibrant.Tsdb.Ats
          return count;
       }
 
-      private async Task<MultiReadResult<TEntry>> ReadLatestInternal( IEnumerable<string> ids )
+      private async Task<MultiReadResult<TKey, TEntry>> ReadLatestInternal( IEnumerable<TKey> ids )
       {
-         var tasks = new List<Task<ReadResult<TEntry>>>();
+         var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
          foreach( var id in ids )
          {
             tasks.Add( ReadLatestInternal( id, Sort.Descending ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         return new MultiReadResult<TEntry>( tasks.Select( x => x.Result ) );
+         return new MultiReadResult<TKey, TEntry>( tasks.Select( x => x.Result ) );
       }
 
-      private async Task<ReadResult<TEntry>> ReadLatestInternal( string id, Sort sort )
+      private async Task<ReadResult<TKey, TEntry>> ReadLatestInternal( TKey id, Sort sort )
       {
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreatePartitionFilter( id ) )
@@ -188,76 +194,76 @@ namespace Vibrant.Tsdb.Ats
 
          var entries = await ReadInternal( id, fullQuery, false, sort ).ConfigureAwait( false );
 
-         return new ReadResult<TEntry>( id, sort, entries );
+         return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
 
-      private async Task<MultiReadResult<TEntry>> ReadAllInternal( IEnumerable<string> ids, Sort sort )
+      private async Task<MultiReadResult<TKey, TEntry>> ReadAllInternal( IEnumerable<TKey> ids, Sort sort )
       {
-         var tasks = new List<Task<ReadResult<TEntry>>>();
+         var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
          foreach( var id in ids )
          {
             tasks.Add( ReadAllInternal( id, sort ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         return new MultiReadResult<TEntry>( tasks.Select( x => x.Result ) );
+         return new MultiReadResult<TKey, TEntry>( tasks.Select( x => x.Result ) );
       }
 
-      private async Task<ReadResult<TEntry>> ReadAllInternal( string id, Sort sort )
+      private async Task<ReadResult<TKey, TEntry>> ReadAllInternal( TKey id, Sort sort )
       {
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreatePartitionFilter( id ) );
 
          var entries = await ReadInternal( id, fullQuery, true, sort ).ConfigureAwait( false );
 
-         return new ReadResult<TEntry>( id, sort, entries );
+         return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
 
-      private async Task<MultiReadResult<TEntry>> ReadUntilInternal( IEnumerable<string> ids, DateTime to, Sort sort )
+      private async Task<MultiReadResult<TKey, TEntry>> ReadUntilInternal( IEnumerable<TKey> ids, DateTime to, Sort sort )
       {
-         var tasks = new List<Task<ReadResult<TEntry>>>();
+         var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
          foreach( var id in ids )
          {
             tasks.Add( ReadUntilInternal( id, to, sort ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         return new MultiReadResult<TEntry>( tasks.Select( x => x.Result ) );
+         return new MultiReadResult<TKey, TEntry>( tasks.Select( x => x.Result ) );
       }
 
-      private async Task<ReadResult<TEntry>> ReadUntilInternal( string id, DateTime to, Sort sort )
+      private async Task<ReadResult<TKey, TEntry>> ReadUntilInternal( TKey id, DateTime to, Sort sort )
       {
          var query = new TableQuery<TsdbTableEntity>()
             .Where( CreateBeforeFilter( id, to ) );
 
          var entries = await ReadInternal( id, query, true, sort ).ConfigureAwait( false );
 
-         return new ReadResult<TEntry>( id, sort, entries );
+         return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
 
-      private async Task<MultiReadResult<TEntry>> ReadRangeInternal( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort )
+      private async Task<MultiReadResult<TKey, TEntry>> ReadRangeInternal( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort )
       {
-         var tasks = new List<Task<ReadResult<TEntry>>>();
+         var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
          foreach( var id in ids )
          {
             tasks.Add( ReadRangeInternal( id, from, to, sort ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         return new MultiReadResult<TEntry>( tasks.Select( x => x.Result ) );
+         return new MultiReadResult<TKey, TEntry>( tasks.Select( x => x.Result ) );
       }
 
-      private async Task<ReadResult<TEntry>> ReadRangeInternal( string id, DateTime from, DateTime to, Sort sort )
+      private async Task<ReadResult<TKey, TEntry>> ReadRangeInternal( TKey id, DateTime from, DateTime to, Sort sort )
       {
          var generalQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreateGeneralFilter( id, from, to ) );
 
          var entries = await ReadInternal( id, generalQuery, true, sort ).ConfigureAwait( false );
 
-         return new ReadResult<TEntry>( id, sort, entries );
+         return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
 
-      private Task<SegmentedReadResult<TEntry>> ReadRangeSegmentedInternal( string id, DateTime to, int segmentSize, ContinuationToken continuationToken )
+      private Task<SegmentedReadResult<TKey, TEntry>> ReadRangeSegmentedInternal( TKey id, DateTime to, int segmentSize, ContinuationToken continuationToken )
       {
          to = continuationToken?.To ?? to;
 
@@ -267,7 +273,7 @@ namespace Vibrant.Tsdb.Ats
          return ReadSegmentedInternal( id, generalQuery, segmentSize );
       }
 
-      private Task<SegmentedReadResult<TEntry>> ReadRangeSegmentedInternal( string id, int segmentSize, ContinuationToken continuationToken )
+      private Task<SegmentedReadResult<TKey, TEntry>> ReadRangeSegmentedInternal( TKey id, int segmentSize, ContinuationToken continuationToken )
       {
          DateTime? to = continuationToken?.To;
 
@@ -287,7 +293,7 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private async Task<List<TEntry>> ReadInternal( string id, TableQuery<TsdbTableEntity> query, bool takeAll, Sort sort )
+      private async Task<List<TEntry>> ReadInternal( TKey id, TableQuery<TsdbTableEntity> query, bool takeAll, Sort sort )
       {
          var table = await GetTable().ConfigureAwait( false );
 
@@ -319,7 +325,7 @@ namespace Vibrant.Tsdb.Ats
          return results;
       }
 
-      private async Task<SegmentedReadResult<TEntry>> ReadSegmentedInternal( string id, TableQuery<TsdbTableEntity> query, int segmentSize )
+      private async Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedInternal( TKey id, TableQuery<TsdbTableEntity> query, int segmentSize )
       {
          var table = await GetTable().ConfigureAwait( false );
 
@@ -385,10 +391,10 @@ namespace Vibrant.Tsdb.Ats
             to = null;
          }
 
-         return new SegmentedReadResult<TEntry>( id, Sort.Descending, new ContinuationToken( isLastFull, to ), results, () => DeleteInternal( id, allRows ) );
+         return new SegmentedReadResult<TKey, TEntry>( id, Sort.Descending, new ContinuationToken( isLastFull, to ), results, () => DeleteInternal( id, allRows ) );
       }
 
-      private async Task<int> DeleteInternal( string id, List<TsdbTableEntity> entities )
+      private async Task<int> DeleteInternal( TKey id, List<TsdbTableEntity> entities )
       {
          var table = await GetTable().ConfigureAwait( false );
 
@@ -416,7 +422,7 @@ namespace Vibrant.Tsdb.Ats
          return count;
       }
 
-      private async Task<int> DeleteInternal( string id, TableQuery<TsdbTableEntity> query )
+      private async Task<int> DeleteInternal( TKey id, TableQuery<TsdbTableEntity> query )
       {
          var table = await GetTable().ConfigureAwait( false );
 
@@ -521,7 +527,7 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private IEnumerable<TsdbTableEntity> Convert( IEnumerable<TEntry> entries, string partitionKey = null )
+      private IEnumerable<TsdbTableEntity> Convert( IEnumerable<TEntry> entries, string partitionKey )
       {
          var stream = new MemoryStream();
          using( var writer = AtsSerializer.CreateWriter( stream ) )
@@ -535,17 +541,17 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private TsdbTableEntity Convert( BinaryWriter writer, MemoryStream stream, TEntry entry, string partitionKey = null )
+      private TsdbTableEntity Convert( BinaryWriter writer, MemoryStream stream, TEntry entry, string partitionKey )
       {
          var entity = new TsdbTableEntity();
          entity.RowKey = AtsKeyCalculator.CalculateRowKey( entry.GetTimestamp() );
-         entity.PartitionKey = partitionKey ?? AtsKeyCalculator.CalculatePartitionKey( entry, _partitioningProvider );
-         AtsSerializer.SerializeEntry( writer, entry );
+         entity.PartitionKey = partitionKey;
+         AtsSerializer.SerializeEntry<TKey, TEntry>( writer, entry );
          entity.P0 = stream.ToArray();
          return entity;
       }
 
-      private IEnumerable<TEntry> Convert( IEnumerable<TsdbTableEntity> entities, string id )
+      private IEnumerable<TEntry> Convert( IEnumerable<TsdbTableEntity> entities, TKey id )
       {
          foreach( var entity in entities )
          {
@@ -557,9 +563,9 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private TEntry Convert( BinaryReader reader, TsdbTableEntity entity, string id )
+      private TEntry Convert( BinaryReader reader, TsdbTableEntity entity, TKey id )
       {
-         return AtsSerializer.DeserializeEntry<TEntry>( reader, id );
+         return AtsSerializer.DeserializeEntry<TKey, TEntry>( reader, id );
       }
 
       private IEnumerable<KeyValuePair<string, HashSet<TEntry>>> IterateByPartition( IEnumerable<TEntry> entries )
@@ -568,7 +574,9 @@ namespace Vibrant.Tsdb.Ats
 
          foreach( var entry in entries )
          {
-            var pk = AtsKeyCalculator.CalculatePartitionKey( entry.GetId(), entry.GetTimestamp(), _partitioningProvider );
+            var key = entry.GetKey();
+            var id = _keyConverter.Convert( key );
+            var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, entry.GetTimestamp(), _partitioningProvider );
 
             HashSet<TEntry> items;
             if( !lookup.TryGetValue( pk, out items ) )
@@ -639,12 +647,13 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private string CreateGeneralFilter( string id, DateTime from, DateTime to )
+      private string CreateGeneralFilter( TKey key, DateTime from, DateTime to )
       {
+         var id = _keyConverter.Convert( key );
          var fromRowKey = AtsKeyCalculator.CalculateRowKey( from );
          var toRowKey = AtsKeyCalculator.CalculateRowKey( to );
-         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, from, _partitioningProvider );
-         var toPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, to.AddTicks( -1 ), _partitioningProvider ); // -1 tick because it is an approximation value and we use gte operation
+         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, from, _partitioningProvider );
+         var toPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, to.AddTicks( -1 ), _partitioningProvider ); // -1 tick because it is an approximation value and we use gte operation
 
          return TableQuery.CombineFilters(
                TableQuery.CombineFilters(
@@ -658,11 +667,12 @@ namespace Vibrant.Tsdb.Ats
                   TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.GreaterThan, toRowKey ) ) );
       }
 
-      private string CreateBeforeFilter( string id, DateTime from )
+      private string CreateBeforeFilter( TKey key, DateTime from )
       {
+         var id = _keyConverter.Convert( key );
          var fromRowKey = AtsKeyCalculator.CalculateRowKey( from );
-         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, from, _partitioningProvider ); // 7125
-         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, _partitioningProvider ); // 9999
+         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, from, _partitioningProvider ); // 7125
+         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, key, _partitioningProvider ); // 9999
 
          return TableQuery.CombineFilters(
             TableQuery.CombineFilters(
@@ -673,10 +683,11 @@ namespace Vibrant.Tsdb.Ats
             TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.GreaterThan, fromRowKey ) );
       }
 
-      private string CreatePartitionFilter( string id )
+      private string CreatePartitionFilter( TKey key )
       {
-         var fromPartitionKey = AtsKeyCalculator.CalculateMaxPartitionKey( id, _partitioningProvider ); // 0000
-         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, _partitioningProvider ); // 9999
+         var id = _keyConverter.Convert( key );
+         var fromPartitionKey = AtsKeyCalculator.CalculateMaxPartitionKey( id, key, _partitioningProvider ); // 0000
+         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, key, _partitioningProvider ); // 9999
 
          return TableQuery.CombineFilters(
             TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.GreaterThanOrEqual, fromPartitionKey ),

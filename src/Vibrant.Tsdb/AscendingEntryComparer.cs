@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class AscendingEntryComparer<TEntry> : IComparer<TEntry>
-      where TEntry : IEntry
+   public class AscendingEntryComparer<TKey, TEntry> : IComparer<TEntry>
+      where TEntry : IEntry<TKey>
    {
       public int Compare( TEntry x, TEntry y )
       {

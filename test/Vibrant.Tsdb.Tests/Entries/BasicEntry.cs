@@ -12,7 +12,7 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.Ats.Tests.Entries
 {
-   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, IInfluxEntry, IFileEntry
+   public class BasicEntry : IEntry<string>, IAtsEntry<string>, ISqlEntry<string>, IRedisEntry<string>, IInfluxEntry<string>, IFileEntry<string>
    {
       private static readonly KeyValuePair<string, string>[] _empty = new KeyValuePair<string, string>[ 0 ];
 
@@ -46,12 +46,12 @@ namespace Vibrant.Tsdb.Ats.Tests.Entries
 
       #region Interfaces
 
-      public string GetId()
+      public string GetKey()
       {
          return Id;
       }
 
-      public void SetId( string id )
+      public void SetKey( string id )
       {
          Id = id;
       }

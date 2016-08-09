@@ -13,10 +13,10 @@ namespace Vibrant.Tsdb.Ats
       
       public byte[] P0 { get; set; }
 
-      public TEntry[] GetEntries<TEntry>( string id, Sort sort )
-         where TEntry : IAtsEntry, new()
+      public TEntry[] GetEntries<TKey, TEntry>( TKey id, Sort sort )
+         where TEntry : IAtsEntry<TKey>, new()
       {
-         return AtsSerializer.Deserialize<TEntry>( id, P0, sort );
+         return AtsSerializer.Deserialize<TKey, TEntry>( id, P0, sort );
       }
 
       /// <summary>

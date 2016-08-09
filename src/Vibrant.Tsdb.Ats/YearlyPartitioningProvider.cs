@@ -5,22 +5,22 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public class YearlyPartitioningProvider : IPartitionProvider
+   public class YearlyPartitioningProvider<TKey> : IPartitionProvider<TKey>
    {
       private static readonly string MinPartitionKeyRange = "9999";
       private static readonly string MaxPartitionKeyRange = "0000";
 
-      public string GetMaxPartitioning( string id )
+      public string GetMaxPartitioning( TKey id )
       {
          return MaxPartitionKeyRange;
       }
 
-      public string GetMinPartitioning( string id )
+      public string GetMinPartitioning( TKey id )
       {
          return MinPartitionKeyRange;
       }
 
-      public string GetPartitioning( string id, DateTime timestamp )
+      public string GetPartitioning( TKey id, DateTime timestamp )
       {
          return CalculatePartitionKeyRange( timestamp );
       }

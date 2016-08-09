@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IEntry
+   public interface IEntry<TKey>
    {
-      string GetId();
+      TKey GetKey();
 
-      void SetId( string id );
+      void SetKey( TKey key );
 
       DateTime GetTimestamp();
 

@@ -10,7 +10,7 @@ using Xunit;
 namespace Vibrant.Tsdb.Ats.Tests
 {
    public abstract class AbstractTemporaryStorageTests<TStorage>
-      where TStorage : ITemporaryStorage<BasicEntry>
+      where TStorage : ITemporaryStorage<string, BasicEntry>
    {
       protected static readonly string[] Ids = new[]
       {

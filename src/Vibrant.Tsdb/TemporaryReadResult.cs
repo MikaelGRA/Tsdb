@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class TemporaryReadResult<TEntry>
-      where TEntry : IEntry
+   public class TemporaryReadResult<TKey, TEntry>
+      where TEntry : IEntry<TKey>
    {
       private Action _delete;
 

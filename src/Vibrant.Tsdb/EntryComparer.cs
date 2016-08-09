@@ -7,15 +7,15 @@ namespace Vibrant.Tsdb
 {
    public static class EntryComparer
    {
-      public static IComparer<TEntry> GetComparer<TEntry>( Sort sort )
-         where TEntry : IEntry
+      public static IComparer<TEntry> GetComparer<TKey, TEntry>( Sort sort )
+         where TEntry : IEntry<TKey>
       {
          switch( sort )
          {
             case Sort.Descending:
-               return new DescendingEntryComparer<TEntry>();
+               return new DescendingEntryComparer<TKey, TEntry>();
             case Sort.Ascending:
-               return new AscendingEntryComparer<TEntry>();
+               return new AscendingEntryComparer<TKey, TEntry>();
             default:
                throw new ArgumentException( "sort" );
          }

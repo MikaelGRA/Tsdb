@@ -24,25 +24,25 @@ namespace Vibrant.Tsdb.Ats.Serialization
          return writer;
       }
 
-      public static void SerializeEntry<TEntry>( BinaryWriter writer, TEntry entry )
-         where TEntry : IRedisEntry
+      public static void SerializeEntry<TKey, TEntry>( BinaryWriter writer, TEntry entry )
+         where TEntry : IRedisEntry<TKey>
       {
          writer.Write( entry.GetTimestamp().Ticks );
          entry.Write( writer );
       }
 
-      public static TEntry DeserializeEntry<TEntry>( string id, BinaryReader reader )
-         where TEntry : IRedisEntry, new()
+      public static TEntry DeserializeEntry<TKey, TEntry>( TKey id, BinaryReader reader )
+         where TEntry : IRedisEntry<TKey>, new()
       {
          var entry = new TEntry();
-         entry.SetId( id );
+         entry.SetKey( id );
          entry.SetTimestamp( new DateTime( reader.ReadInt64(), DateTimeKind.Utc ) );
          entry.Read( reader );
          return entry;
       }
 
-      public static List<byte[]> Serialize<TEntry>( string id, List<TEntry> entries, int maxByteArraySize )
-         where TEntry : IRedisEntry
+      public static List<byte[]> Serialize<Tkey, TEntry>( string id, List<TEntry> entries, int maxByteArraySize )
+         where TEntry : IRedisEntry<Tkey>
       {
          var results = new List<byte[]>();
          var stream = new MemoryStream();
@@ -73,7 +73,7 @@ namespace Vibrant.Tsdb.Ats.Serialization
                serializedEntries = new List<byte[]>( serializedEntries.Count );
             }
 
-            SerializeEntry( writer, entry );
+            SerializeEntry<Tkey, TEntry>( writer, entry );
             writer.Flush(); // is this needed for a memory stream????
 
             var serializedEntry = stream.ToArray();
@@ -99,14 +99,14 @@ namespace Vibrant.Tsdb.Ats.Serialization
          return results;
       }
 
-      public static byte[] Serialize<TEntry>( string id, TEntry entry )
-         where TEntry : IRedisEntry
+      public static byte[] Serialize<TKey, TEntry>( string id, TEntry entry )
+         where TEntry : IRedisEntry<TKey>
       {
          var stream = new MemoryStream();
          using( var writer = CreateWriter( stream ) )
          {
             writer.Write( id );
-            SerializeEntry( writer, entry );
+            SerializeEntry<TKey, TEntry>( writer, entry );
             writer.Flush();
             return stream.ToArray();
          }
@@ -126,18 +126,19 @@ namespace Vibrant.Tsdb.Ats.Serialization
          return data;
       }
 
-      public static List<TEntry> Deserialize<TEntry>( byte[] bytes )
-         where TEntry : IRedisEntry, new()
+      public static List<TEntry> Deserialize<TKey, TEntry>( byte[] bytes, IKeyConverter<TKey> keyConverter )
+         where TEntry : IRedisEntry<TKey>, new()
       {
          var stream = new MemoryStream( bytes );
          var reader = CreateReader( stream );
          List<TEntry> entries = new List<TEntry>();
 
          var id = reader.ReadString();
+         var key = keyConverter.Convert( id );
 
          while( stream.Length != stream.Position )
          {
-            var entry = DeserializeEntry<TEntry>( id, reader );
+            var entry = DeserializeEntry<TKey, TEntry>( key, reader );
             entries.Add( entry );
          }
 

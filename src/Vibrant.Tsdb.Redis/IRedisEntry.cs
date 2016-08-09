@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Redis
 {
-   public interface IRedisEntry : IEntry
+   public interface IRedisEntry<TKey> : IEntry<TKey>
    {
       void Write( BinaryWriter writer );
 

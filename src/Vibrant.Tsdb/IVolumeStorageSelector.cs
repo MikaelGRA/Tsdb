@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IVolumeStorageSelector<TEntry> where TEntry : IEntry
+   public interface IVolumeStorageSelector<TKey, TEntry> where TEntry : IEntry<TKey>
    {
-      IVolumeStorage<TEntry> GetStorage( string id );
+      IVolumeStorage<TKey, TEntry> GetStorage( TKey id );
    }
 }

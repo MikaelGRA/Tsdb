@@ -5,12 +5,12 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface ITemporaryStorage<TEntry>
-      where TEntry : IEntry
+   public interface ITemporaryStorage<TKey, TEntry>
+      where TEntry : IEntry<TKey>
    {
       void Write( IEnumerable<TEntry> entries );
 
-      TemporaryReadResult<TEntry> Read( int count );
+      TemporaryReadResult<TKey, TEntry> Read( int count );
 
       void Delete();
    }

@@ -8,7 +8,7 @@ using Xunit;
 namespace Vibrant.Tsdb.Ats.Tests
 {
    public abstract class AbstractDynamicStorageTests<TStorage> : AbstractStorageTests<TStorage>
-     where TStorage : IDynamicStorage<BasicEntry>
+     where TStorage : IDynamicStorage<string, BasicEntry>
    {
       [Fact]
       public async Task Should_Read_Segmented()

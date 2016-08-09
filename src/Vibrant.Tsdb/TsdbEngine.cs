@@ -5,28 +5,28 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class TsdbEngine<TEntry> : IDisposable
-      where TEntry : IEntry
+   public class TsdbEngine<TKey, TEntry> : IDisposable
+      where TEntry : IEntry<TKey>
    {
       public event EventHandler<ExceptionEventArgs> MoveTemporaryDataFailed;
       public event EventHandler<ExceptionEventArgs> MoveToVolumeStorageFailed;
 
       private EventScheduler _scheduler;
-      private TsdbClient<TEntry> _client;
-      private IWorkProvider _workProvider;
-      private Dictionary<string, TsdbScheduledMoval<TEntry>> _scheduledWork;
+      private TsdbClient<TKey, TEntry> _client;
+      private IWorkProvider<TKey> _workProvider;
+      private Dictionary<TKey, TsdbScheduledMoval<TKey, TEntry>> _scheduledWork;
       private Func<bool> _unsubscribe;
       private bool _disposed = false;
 
-      public TsdbEngine( IWorkProvider workProvider, TsdbClient<TEntry> client )
+      public TsdbEngine( IWorkProvider<TKey> workProvider, TsdbClient<TKey, TEntry> client )
       {
          _client = client;
          _workProvider = workProvider;
          _scheduler = new EventScheduler();
-         _scheduledWork = new Dictionary<string, TsdbScheduledMoval<TEntry>>();
+         _scheduledWork = new Dictionary<TKey, TsdbScheduledMoval<TKey, TEntry>>();
       }
 
-      internal TsdbClient<TEntry> Client
+      internal TsdbClient<TKey, TEntry> Client
       {
          get
          {
@@ -42,7 +42,7 @@ namespace Vibrant.Tsdb
          }
       }
 
-      internal IWorkProvider Work
+      internal IWorkProvider<TKey> Work
       {
          get
          {
@@ -58,7 +58,7 @@ namespace Vibrant.Tsdb
          {
             foreach( var moval in movals )
             {
-               var work = new TsdbScheduledMoval<TEntry>( this, moval );
+               var work = new TsdbScheduledMoval<TKey, TEntry>( this, moval );
                _scheduledWork.Add( moval.Id, work );
                work.Schedule();
             }
@@ -89,11 +89,11 @@ namespace Vibrant.Tsdb
          }
       }
 
-      private void WorkProvider_MovalRemoved( string id )
+      private void WorkProvider_MovalRemoved( TKey id )
       {
          lock( _scheduledWork )
          {
-            TsdbScheduledMoval<TEntry> work;
+            TsdbScheduledMoval<TKey, TEntry> work;
             if( _scheduledWork.TryGetValue( id, out work ) )
             {
                _scheduledWork.Remove( id );
@@ -103,18 +103,18 @@ namespace Vibrant.Tsdb
          }
       }
 
-      private void WorkProvider_MovalChangedOrAdded( TsdbVolumeMoval moval )
+      private void WorkProvider_MovalChangedOrAdded( TsdbVolumeMoval<TKey> moval )
       {
          lock( _scheduledWork )
          {
-            TsdbScheduledMoval<TEntry> work;
+            TsdbScheduledMoval<TKey, TEntry> work;
             if( _scheduledWork.TryGetValue( moval.Id, out work ) )
             {
                work.Reschedule( moval );
             }
             else
             {
-               work = new TsdbScheduledMoval<TEntry>( this, moval );
+               work = new TsdbScheduledMoval<TKey, TEntry>( this, moval );
                _scheduledWork.Add( moval.Id, work );
                work.Schedule();
             }

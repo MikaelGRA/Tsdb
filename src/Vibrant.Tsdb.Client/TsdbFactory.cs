@@ -14,40 +14,52 @@ namespace Vibrant.Tsdb.Client
    /// </summary>
    public static class TsdbFactory
    {
-      public static TsdbClient<TEntry> CreateClient<TEntry>( string sqlTableName, string sqlConnectionString, string atsTableNamme, string atsConnectionString, string temporaryFileDirectory )
-         where TEntry : IEntry, IAtsEntry, ISqlEntry, IFileEntry, new()
+      public static TsdbClient<TKey, TEntry> CreateSqlAtsRedisClient<TKey, TEntry>( string sqlTableName, string sqlConnectionString, string atsTableNamme, string atsConnectionString, string redisConnectionString, string temporaryFileDirectory )
+         where TEntry : IEntry<TKey>, IAtsEntry<TKey>, ISqlEntry<TKey>, IRedisEntry<TKey>, IFileEntry<TKey>, new()
       {
-         var sql = new SqlDynamicStorage<TEntry>( sqlTableName, sqlConnectionString );
-         var ats = new AtsVolumeStorage<TEntry>( atsTableNamme, atsConnectionString );
-         var sub = new DefaultPublishSubscribe<TEntry>( false );
-         var files = new TemporaryFileStorage<TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024 );
-         return new TsdbClient<TEntry>( sql, ats, sub, files );
+         var sql = new SqlDynamicStorage<TKey, TEntry>( sqlTableName, sqlConnectionString );
+         var ats = new AtsVolumeStorage<TKey, TEntry>( atsTableNamme, atsConnectionString );
+         var sub = new RedisPublishSubscribe<TKey, TEntry>( redisConnectionString, false );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024 );
+         return new TsdbClient<TKey, TEntry>( sql, ats, sub, files );
       }
 
-      public static TsdbClient<TEntry> CreateClient<TEntry>( string sqlTableName, string sqlConnectionString, string atsTableNamme, string atsConnectionString, string temporaryFileDirectory, string redisConnectionString )
-         where TEntry : IEntry, IAtsEntry, ISqlEntry, IFileEntry, IRedisEntry, new()
+      public static TsdbClient<TKey, TEntry> CreateSqlAtsRedisClient<TKey, TEntry>( string sqlTableName, string sqlConnectionString, string atsTableNamme, string atsConnectionString, string redisConnectionString, string temporaryFileDirectory, IPartitionProvider<TKey> partitionProvider, IKeyConverter<TKey> keyConverter )
+         where TEntry : IEntry<TKey>, IAtsEntry<TKey>, ISqlEntry<TKey>, IRedisEntry<TKey>, IFileEntry<TKey>, new()
       {
-         var sql = new SqlDynamicStorage<TEntry>( sqlTableName, sqlConnectionString );
-         var ats = new AtsVolumeStorage<TEntry>( atsTableNamme, atsConnectionString );
-         var sub = new RedisPublishSubscribe<TEntry>( redisConnectionString, false );
-         var files = new TemporaryFileStorage<TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024 );
-         return new TsdbClient<TEntry>( sql, ats, sub, files );
+         var sql = new SqlDynamicStorage<TKey, TEntry>( sqlTableName, sqlConnectionString, keyConverter );
+         var ats = new AtsVolumeStorage<TKey, TEntry>( atsTableNamme, atsConnectionString, 25, 25, partitionProvider, keyConverter );
+         var sub = new RedisPublishSubscribe<TKey, TEntry>( redisConnectionString, false, keyConverter );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024, keyConverter );
+         return new TsdbClient<TKey, TEntry>( sql, ats, sub, files );
       }
 
-      public static TsdbClient<TEntry> CreateAtsClient<TEntry>( string volumetricAtsTableName, string dynamicAtsTableName, string atsConnectionString, string temporaryFileDirectory )
-         where TEntry : IEntry, IAtsEntry, ISqlEntry, IFileEntry, IRedisEntry, new()
+      public static TsdbClient<TKey, TEntry> CreateAtsRedisClient<TKey, TEntry>( string dynamicAtsTableName, string volumeAtsTableName, string atsConnectionString, string redisConnectionString, string temporaryFileDirectory )
+         where TEntry : IEntry<TKey>, IAtsEntry<TKey>, IRedisEntry<TKey>, IFileEntry<TKey>, new()
       {
-         var sql = new AtsDynamicStorage<TEntry>( dynamicAtsTableName, atsConnectionString );
-         var ats = new AtsVolumeStorage<TEntry>( volumetricAtsTableName, atsConnectionString );
-         var sub = new DefaultPublishSubscribe<TEntry>( false );
-         var files = new TemporaryFileStorage<TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024 );
-         return new TsdbClient<TEntry>( sql, ats, sub, files );
+         var sql = new AtsDynamicStorage<TKey, TEntry>( dynamicAtsTableName, atsConnectionString );
+         var ats = new AtsVolumeStorage<TKey, TEntry>( volumeAtsTableName, atsConnectionString );
+         var sub = new RedisPublishSubscribe<TKey, TEntry>( redisConnectionString, false );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024 );
+         return new TsdbClient<TKey, TEntry>( sql, ats, sub, files );
       }
 
-      public static TsdbEngine<TEntry> CreateEngine<TEntry>( IWorkProvider workProvider, TsdbClient<TEntry> client )
-         where TEntry : IEntry
+      public static TsdbClient<TKey, TEntry> CreateAtsClient<TKey, TEntry>( string dynamicAtsTableName, string volumeAtsTableName, string atsConnectionString, string temporaryFileDirectory )
+         where TEntry : IEntry<TKey>, IAtsEntry<TKey>, IFileEntry<TKey>, new()
       {
-         return new TsdbEngine<TEntry>( workProvider, client );
+         var sql = new AtsDynamicStorage<TKey, TEntry>( dynamicAtsTableName, atsConnectionString );
+         var ats = new AtsVolumeStorage<TKey, TEntry>( volumeAtsTableName, atsConnectionString );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024 );
+         return new TsdbClient<TKey, TEntry>( sql, ats, files );
+      }
+
+      public static TsdbClient<TKey, TEntry> CreateAtsClient<TKey, TEntry>( string dynamicAtsTableName, string volumeAtsTableName, string atsConnectionString, string temporaryFileDirectory, IPartitionProvider<TKey> dynamicPartitionProvider, IPartitionProvider<TKey> volumePartitionProvider, IKeyConverter<TKey> keyConverter )
+         where TEntry : IEntry<TKey>, IAtsEntry<TKey>, IFileEntry<TKey>, new()
+      {
+         var sql = new AtsDynamicStorage<TKey, TEntry>( dynamicAtsTableName, atsConnectionString, 25, 25, dynamicPartitionProvider, keyConverter );
+         var ats = new AtsVolumeStorage<TKey, TEntry>( volumeAtsTableName, atsConnectionString, 25, 25, volumePartitionProvider, keyConverter );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024, keyConverter );
+         return new TsdbClient<TKey, TEntry>( sql, ats, files );
       }
    }
 }

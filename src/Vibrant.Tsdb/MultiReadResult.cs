@@ -6,37 +6,37 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class MultiReadResult<TEntry> : IEnumerable<ReadResult<TEntry>>
-      where TEntry : IEntry
+   public class MultiReadResult<TKey, TEntry> : IEnumerable<ReadResult<TKey, TEntry>>
+      where TEntry : IEntry<TKey>
    {
-      private IDictionary<string, ReadResult<TEntry>> _results;
+      private IDictionary<TKey, ReadResult<TKey, TEntry>> _results;
 
-      public MultiReadResult( IDictionary<string, ReadResult<TEntry>> results )
+      public MultiReadResult( IDictionary<TKey, ReadResult<TKey, TEntry>> results )
       {
          _results = results;
       }
 
-      public MultiReadResult( IEnumerable<ReadResult<TEntry>> results )
+      public MultiReadResult( IEnumerable<ReadResult<TKey, TEntry>> results )
       {
          _results = results.ToDictionary( x => x.Id );
       }
 
       public MultiReadResult()
       {
-         _results = new Dictionary<string, ReadResult<TEntry>>();
+         _results = new Dictionary<TKey, ReadResult<TKey, TEntry>>();
       }
 
-      public ReadResult<TEntry> FindResult( string id )
+      public ReadResult<TKey, TEntry> FindResult( TKey id )
       {
          return _results[ id ];
       }
 
-      public bool TryFindResult( string id, out ReadResult<TEntry> readResult )
+      public bool TryFindResult( TKey id, out ReadResult<TKey, TEntry> readResult )
       {
          return _results.TryGetValue( id, out readResult );
       }
 
-      public void AddOrMerge( MultiReadResult<TEntry> result )
+      public void AddOrMerge( MultiReadResult<TKey, TEntry> result )
       {
          foreach( var item in result )
          {
@@ -44,9 +44,9 @@ namespace Vibrant.Tsdb
          }
       }
 
-      public void AddOrMerge( ReadResult<TEntry> result )
+      public void AddOrMerge( ReadResult<TKey, TEntry> result )
       {
-         ReadResult<TEntry> existing;
+         ReadResult<TKey, TEntry> existing;
          if( _results.TryGetValue( result.Id, out existing ) )
          {
             existing.MergeWith( result );
@@ -57,7 +57,7 @@ namespace Vibrant.Tsdb
          }
       }
 
-      public IEnumerator<ReadResult<TEntry>> GetEnumerator()
+      public IEnumerator<ReadResult<TKey, TEntry>> GetEnumerator()
       {
          return _results.Values.GetEnumerator();
       }
@@ -66,13 +66,13 @@ namespace Vibrant.Tsdb
       {
          return _results.Values.GetEnumerator();
       }
-      public MultiReadResult<TOutputEntry> As<TOutputEntry>()
-         where TOutputEntry : IEntry
+      public MultiReadResult<TKey, TOutputEntry> As<TOutputEntry>()
+         where TOutputEntry : IEntry<TKey>
       {
-         return new MultiReadResult<TOutputEntry>( _results.ToDictionary( x => x.Key, x => x.Value.As<TOutputEntry>() ) );
+         return new MultiReadResult<TKey, TOutputEntry>( _results.ToDictionary( x => x.Key, x => x.Value.As<TOutputEntry>() ) );
       }
 
-      public MultiReadResult<TEntry> MergeWith( MultiReadResult<TEntry> other )
+      public MultiReadResult<TKey, TEntry> MergeWith( MultiReadResult<TKey, TEntry> other )
       {
          foreach( var thisResult in this )
          {
@@ -82,7 +82,7 @@ namespace Vibrant.Tsdb
          return this;
       }
 
-      public MultiReadResult<TEntry> MergeInto( MultiReadResult<TEntry> other )
+      public MultiReadResult<TKey, TEntry> MergeInto( MultiReadResult<TKey, TEntry> other )
       {
          foreach( var otherResult in other )
          {

@@ -5,19 +5,19 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats.Helpers
 {
-   internal class EntrySplitResult<TEntry>
-      where TEntry : IAtsEntry
+   internal class EntrySplitResult<TKey, TEntry>
+      where TEntry : IAtsEntry<TKey>
    {
       private HashSet<TEntry> _uniqueEntries;
       private List<TEntry> _entries;
 
-      public EntrySplitResult( string id )
+      public EntrySplitResult( TKey id )
       {
          Id = id;
-         _uniqueEntries = new HashSet<TEntry>( new EntryEqualityComparer<TEntry>() );
+         _uniqueEntries = new HashSet<TEntry>( new EntryEqualityComparer<TKey, TEntry>() );
       }
 
-      public string Id { get; set; }
+      public TKey Id { get; set; }
 
       public void Insert( TEntry entry )
       {
@@ -27,7 +27,7 @@ namespace Vibrant.Tsdb.Ats.Helpers
       public void Sort( Sort sort )
       {
          _entries = new List<TEntry>( _uniqueEntries );
-         _entries.Sort( EntryComparer.GetComparer<TEntry>( sort ) );
+         _entries.Sort( EntryComparer.GetComparer<TKey, TEntry>( sort ) );
       }
 
       public IReadOnlyList<TEntry> Entries

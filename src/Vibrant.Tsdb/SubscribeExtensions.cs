@@ -7,8 +7,8 @@ namespace Vibrant.Tsdb
 {
    public static class SubscribeExtensions
    {
-      public static Task<Func<Task>> Subscribe<TSubscribeEntry>( this ISubscribe<TSubscribeEntry> subscribe, string id, SubscriptionType subscribeType, Action<List<TSubscribeEntry>> callback )
-         where TSubscribeEntry : IEntry
+      public static Task<Func<Task>> Subscribe<TKey, TEntry>( this ISubscribe<TKey, TEntry> subscribe, TKey id, SubscriptionType subscribeType, Action<List<TEntry>> callback )
+         where TEntry : IEntry<TKey>
       {
          return subscribe.Subscribe( new[] { id }, subscribeType, callback );
       }

@@ -5,14 +5,14 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IDynamicStorage<TEntry> : IStorage<TEntry> where TEntry : IEntry
+   public interface IDynamicStorage<TKey, TEntry> : IStorage<TKey, TEntry> where TEntry : IEntry<TKey>
    {
-      Task<SegmentedReadResult<TEntry>> Read( string id, DateTime to, int segmentSize, object continuationToken );
+      Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime to, int segmentSize, object continuationToken );
 
-      Task<SegmentedReadResult<TEntry>> Read( string id, int segmentSize, object continuationToken );
+      Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, int segmentSize, object continuationToken );
 
-      Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime to, Sort sort = Sort.Descending );
+      Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending );
 
-      Task Delete( IEnumerable<string> ids, DateTime to );
+      Task Delete( IEnumerable<TKey> ids, DateTime to );
    }
 }

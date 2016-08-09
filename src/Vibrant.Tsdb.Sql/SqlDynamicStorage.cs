@@ -12,76 +12,83 @@ using Vibrant.Tsdb.Sql.Serialization;
 
 namespace Vibrant.Tsdb.Sql
 {
-   public class SqlDynamicStorage<TEntry> : IDynamicStorage<TEntry>, IDynamicStorageSelector<TEntry>
-      where TEntry : ISqlEntry, new()
+   public class SqlDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>
+      where TEntry : ISqlEntry<TKey>, new()
    {
       private object _sync = new object();
       private string _tableName;
       private string _connectionString;
       private Task _createTable;
-      private EntryEqualityComparer<TEntry> _comparer;
+      private EntryEqualityComparer<TKey, TEntry> _comparer;
+      private IKeyConverter<TKey> _keyConverter;
 
-      public SqlDynamicStorage( string tableName, string connectionString )
+      public SqlDynamicStorage( string tableName, string connectionString, IKeyConverter<TKey> keyConverter )
       {
          SqlMapper.AddTypeMap( typeof( DateTime ), DbType.DateTime2 );
 
          _tableName = tableName;
          _connectionString = connectionString;
-         _comparer = new EntryEqualityComparer<TEntry>();
+         _comparer = new EntryEqualityComparer<TKey, TEntry>();
+         _keyConverter = keyConverter;
       }
 
-      public IDynamicStorage<TEntry> GetStorage( string id )
+      public SqlDynamicStorage( string tableName, string connectionString )
+         : this( tableName, connectionString, DefaultKeyConverter<TKey>.Current )
+      {
+      }
+
+      public IDynamicStorage<TKey, TEntry> GetStorage( TKey id )
       {
          return this;
       }
 
       public Task Write( IEnumerable<TEntry> items )
       {
-         var uniqueEntries = Unique.Ensure( items, _comparer );
+         var uniqueEntries = Unique.Ensure<TKey, TEntry>( items, _comparer );
          return StoreForAll( uniqueEntries );
       }
 
-      public Task Delete( IEnumerable<string> ids, DateTime from, DateTime to )
+      public Task Delete( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          return DeleteForIds( ids, from, to );
       }
 
-      public Task Delete( IEnumerable<string> ids, DateTime to )
+      public Task Delete( IEnumerable<TKey> ids, DateTime to )
       {
          return DeleteForIds( ids, to );
       }
 
-      public Task Delete( IEnumerable<string> ids )
+      public Task Delete( IEnumerable<TKey> ids )
       {
          return DeleteForIds( ids );
       }
 
-      public Task<MultiReadResult<TEntry>> ReadLatest( IEnumerable<string> ids )
+      public Task<MultiReadResult<TKey, TEntry>> ReadLatest( IEnumerable<TKey> ids )
       {
          return RetrieveLatestForIds( ids );
       }
 
-      public Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
       {
          return RetrieveForIds( ids, sort );
       }
 
-      public Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime to, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
       {
          return RetrieveForIds( ids, to, sort );
       }
 
-      public Task<MultiReadResult<TEntry>> Read( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          return RetrieveForIds( ids, from, to, sort );
       }
 
-      public Task<SegmentedReadResult<TEntry>> Read( string id, DateTime to, int segmentSize, object continuationToken )
+      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime to, int segmentSize, object continuationToken )
       {
          return RetrieveForIdSegmented( id, to, segmentSize, (ContinuationToken)continuationToken );
       }
 
-      public Task<SegmentedReadResult<TEntry>> Read( string id, int segmentSize, object continuationToken )
+      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, int segmentSize, object continuationToken )
       {
          return RetrieveForIdSegmented( id, segmentSize, (ContinuationToken)continuationToken );
       }
@@ -119,10 +126,10 @@ namespace Vibrant.Tsdb.Sql
             await connection.OpenAsync().ConfigureAwait( false );
 
             List<SqlDataRecord> records = new List<SqlDataRecord>();
-            SqlSerializer.Serialize( entries, ( entry, data ) =>
+            SqlSerializer.Serialize<TKey, TEntry>( entries, ( entry, data ) =>
             {
                SqlDataRecord record = new SqlDataRecord( Sql.InsertParameterMetadata );
-               record.SetString( 0, entry.GetId() );
+               record.SetString( 0, _keyConverter.Convert( entry.GetKey() ) );
                record.SetDateTime( 1, entry.GetTimestamp() );
                record.SetSqlBinary( 2, new SqlBinary( data ) );
                records.Add( record );
@@ -147,7 +154,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<MultiReadResult<TEntry>> RetrieveForIds( IEnumerable<string> ids, DateTime to, Sort sort )
+      private async Task<MultiReadResult<TKey, TEntry>> RetrieveForIds( IEnumerable<TKey> ids, DateTime to, Sort sort )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -165,7 +172,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<MultiReadResult<TEntry>> RetrieveForIds( IEnumerable<string> ids, DateTime from, DateTime to, Sort sort )
+      private async Task<MultiReadResult<TKey, TEntry>> RetrieveForIds( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -185,7 +192,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<MultiReadResult<TEntry>> RetrieveForIds( IEnumerable<string> ids, Sort sort )
+      private async Task<MultiReadResult<TKey, TEntry>> RetrieveForIds( IEnumerable<TKey> ids, Sort sort )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -205,7 +212,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<MultiReadResult<TEntry>> RetrieveLatestForIds( IEnumerable<string> ids )
+      private async Task<MultiReadResult<TKey, TEntry>> RetrieveLatestForIds( IEnumerable<TKey> ids )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -213,26 +220,27 @@ namespace Vibrant.Tsdb.Sql
          {
             await connection.OpenAsync().ConfigureAwait( false );
 
-            List<Task<IEnumerable<SqlEntry>>> tasks = new List<Task<IEnumerable<SqlEntry>>>();
 
-            foreach( var id in ids )
+            using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
             {
-               using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+               List<Task<IEnumerable<SqlEntry>>> tasks = new List<Task<IEnumerable<SqlEntry>>>();
+
+               foreach( var id in ids )
                {
                   tasks.Add( connection.QueryAsync<SqlEntry>(
                      sql: Sql.GetLatestQuery( _tableName ),
                      param: new { Id = id },
                      transaction: tx ) );
                }
+
+               await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+               return CreateReadResult( tasks.SelectMany( x => x.Result ), ids, Sort.Descending );
             }
-
-            await Task.WhenAll( tasks ).ConfigureAwait( false );
-
-            return CreateReadResult( tasks.SelectMany( x => x.Result ), ids, Sort.Descending );
          }
       }
 
-      private async Task<SegmentedReadResult<TEntry>> RetrieveForIdSegmented( string id, DateTime to, int segmentSize, ContinuationToken continuationToken )
+      private async Task<SegmentedReadResult<TKey, TEntry>> RetrieveForIdSegmented( TKey id, DateTime to, int segmentSize, ContinuationToken continuationToken )
       {
          await CreateTable().ConfigureAwait( false );
          long skip = continuationToken?.Skip ?? 0;
@@ -253,7 +261,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<SegmentedReadResult<TEntry>> RetrieveForIdSegmented( string id, int segmentSize, ContinuationToken continuationToken )
+      private async Task<SegmentedReadResult<TKey, TEntry>> RetrieveForIdSegmented( TKey id, int segmentSize, ContinuationToken continuationToken )
       {
          await CreateTable().ConfigureAwait( false );
          long skip = continuationToken?.Skip ?? 0;
@@ -274,7 +282,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<int> DeleteForIds( IEnumerable<string> ids, DateTime from, DateTime to )
+      private async Task<int> DeleteForIds( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -284,15 +292,19 @@ namespace Vibrant.Tsdb.Sql
 
             using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
             {
-               return await connection.ExecuteAsync(
+               var count = await connection.ExecuteAsync(
                   sql: Sql.GetRangedDeleteCommand( _tableName ),
                   param: new { Ids = ids, From = from, To = to },
                   transaction: tx ).ConfigureAwait( false );
+
+               tx.Commit();
+
+               return count;
             }
          }
       }
 
-      private async Task<int> DeleteForIds( IEnumerable<string> ids, DateTime to )
+      private async Task<int> DeleteForIds( IEnumerable<TKey> ids, DateTime to )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -302,15 +314,19 @@ namespace Vibrant.Tsdb.Sql
 
             using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
             {
-               return await connection.ExecuteAsync(
+               var count = await connection.ExecuteAsync(
                   sql: Sql.GetBottomlessDeleteCommand( _tableName ),
                   param: new { Ids = ids, To = to },
                   transaction: tx ).ConfigureAwait( false );
+
+               tx.Commit();
+
+               return count;
             }
          }
       }
 
-      private async Task<int> DeleteForIds( IEnumerable<string> ids )
+      private async Task<int> DeleteForIds( IEnumerable<TKey> ids )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -320,28 +336,32 @@ namespace Vibrant.Tsdb.Sql
 
             using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
             {
-               return await connection.ExecuteAsync(
+               var count = await connection.ExecuteAsync(
                   sql: Sql.GetDeleteCommand( _tableName ),
                   param: new { Ids = ids },
                   transaction: tx ).ConfigureAwait( false );
+
+               tx.Commit();
+
+               return count;
             }
          }
       }
 
-      private MultiReadResult<TEntry> CreateReadResult( IEnumerable<SqlEntry> sqlEntries, IEnumerable<string> requiredIds, Sort sort )
+      private MultiReadResult<TKey, TEntry> CreateReadResult( IEnumerable<SqlEntry> sqlEntries, IEnumerable<TKey> requiredIds, Sort sort )
       {
-         IDictionary<string, ReadResult<TEntry>> results = new Dictionary<string, ReadResult<TEntry>>();
+         IDictionary<TKey, ReadResult<TKey, TEntry>> results = new Dictionary<TKey, ReadResult<TKey, TEntry>>();
          foreach( var id in requiredIds )
          {
-            results[ id ] = new ReadResult<TEntry>( id, sort );
+            results[ id ] = new ReadResult<TKey, TEntry>( id, sort );
          }
 
-         ReadResult<TEntry> currentResult = null;
+         ReadResult<TKey, TEntry> currentResult = null;
 
-         foreach( var entry in SqlSerializer.Deserialize<TEntry>( sqlEntries ) )
+         foreach( var entry in SqlSerializer.Deserialize<TKey, TEntry>( sqlEntries, _keyConverter ) )
          {
-            var id = entry.GetId();
-            if( currentResult == null || currentResult.Id != id )
+            var id = entry.GetKey();
+            if( currentResult == null || !currentResult.Id.Equals( id ) )
             {
                currentResult = results[ id ];
             }
@@ -349,17 +369,17 @@ namespace Vibrant.Tsdb.Sql
             currentResult.Entries.Add( entry );
          }
 
-         return new MultiReadResult<TEntry>( results );
+         return new MultiReadResult<TKey, TEntry>( results );
       }
 
-      private SegmentedReadResult<TEntry> CreateReadResult( string id, IEnumerable<SqlEntry> sqlEntries, int segmentSize, long skip )
+      private SegmentedReadResult<TKey, TEntry> CreateReadResult( TKey id, IEnumerable<SqlEntry> sqlEntries, int segmentSize, long skip )
       {
-         var entries = SqlSerializer.Deserialize<TEntry>( sqlEntries );
+         var entries = SqlSerializer.Deserialize<TKey, TEntry>( sqlEntries, _keyConverter );
          var continuationToken = new ContinuationToken( entries.Count == segmentSize, skip + segmentSize, segmentSize );
-         return new SegmentedReadResult<TEntry>( id, Sort.Descending, continuationToken, entries, CreateDeleteFunction( id, continuationToken, entries ) );
+         return new SegmentedReadResult<TKey, TEntry>( id, Sort.Descending, continuationToken, entries, CreateDeleteFunction( id, continuationToken, entries ) );
       }
 
-      private Func<Task> CreateDeleteFunction( string id, ContinuationToken token, List<TEntry> entries )
+      private Func<Task> CreateDeleteFunction( TKey id, ContinuationToken token, List<TEntry> entries )
       {
          if( entries.Count == 0 )
          {

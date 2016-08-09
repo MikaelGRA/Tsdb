@@ -8,7 +8,7 @@ using Vibrant.Tsdb.Redis;
 
 namespace Vibrant.Tsdb.Ats.Tests
 {
-   public class RedisPublishSubscribeTests : AbstractPublishSubscribeTests<RedisPublishSubscribe<BasicEntry>>
+   public class RedisPublishSubscribeTests : AbstractPublishSubscribeTests<RedisPublishSubscribe<string, BasicEntry>>
    {
       private static readonly string ConnectionString;
 
@@ -23,9 +23,9 @@ namespace Vibrant.Tsdb.Ats.Tests
          ConnectionString = ats.GetSection( "ConnectionString" ).Value;
       }
 
-      public override RedisPublishSubscribe<BasicEntry> CreatePublishSubscribe()
+      public override RedisPublishSubscribe<string, BasicEntry> CreatePublishSubscribe()
       {
-         return new RedisPublishSubscribe<BasicEntry>( ConnectionString, false );
+         return new RedisPublishSubscribe<string, BasicEntry>( ConnectionString, false );
       }
    }
 }

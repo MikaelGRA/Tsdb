@@ -63,13 +63,13 @@ namespace Vibrant.Tsdb.Redis
          _connection.Dispose();
       }
 
-      public Task SubscribeAsync<TEntry>( string id, SubscriptionType subscribe, Action<List<TEntry>> onMessage )
-         where TEntry : IRedisEntry, new()
+      public Task SubscribeAsync<TKey, TEntry>( string id, IKeyConverter<TKey> keyConverter, SubscriptionType subscribe, Action<List<TEntry>> onMessage )
+         where TEntry : IRedisEntry<TKey>, new()
       {
          var key = CreateSubscriptionKey( id, subscribe );
          return _redisSubscriber.SubscribeAsync( key, ( channel, data ) =>
          {
-            var entries = RedisSerializer.Deserialize<TEntry>( data );
+            var entries = RedisSerializer.Deserialize<TKey, TEntry>( data, keyConverter );
             onMessage( entries );
          } );
       }
@@ -80,15 +80,15 @@ namespace Vibrant.Tsdb.Redis
          return _redisSubscriber.UnsubscribeAsync( key );
       }
 
-      public Task PublishLatestAsync<TEntry>( string id, TEntry entry )
-         where TEntry : IRedisEntry
+      public Task PublishLatestAsync<TKey, TEntry>( string id, TEntry entry )
+         where TEntry : IRedisEntry<TKey>
       {
          if( _connection == null )
          {
             throw new InvalidOperationException( "The redis connection has not been started." );
          }
 
-         var data = RedisSerializer.Serialize( id, entry );
+         var data = RedisSerializer.Serialize<TKey, TEntry>( id, entry );
 
 
          var key = CreateSubscriptionKey( id, SubscriptionType.LatestPerCollection );
@@ -98,8 +98,8 @@ namespace Vibrant.Tsdb.Redis
             .ScriptEvaluateAsync( _publishLatestScript.Hash, new RedisKey[] { key }, new RedisValue[] { ticks, data } );
       }
 
-      public Task PublishAllAsync<TEntry>( string id, IEnumerable<TEntry> entries )
-         where TEntry : IRedisEntry
+      public Task PublishAllAsync<TKey, TEntry>( string id, IEnumerable<TEntry> entries )
+         where TEntry : IRedisEntry<TKey>
       {
          if( _connection == null )
          {
@@ -107,7 +107,7 @@ namespace Vibrant.Tsdb.Redis
          }
 
          var key = CreateSubscriptionKey( id, SubscriptionType.AllFromCollections );
-         var arrays = RedisSerializer.Serialize( id, entries.ToList(), 64 * 1024 );
+         var arrays = RedisSerializer.Serialize<TKey, TEntry>( id, entries.ToList(), 64 * 1024 );
          var tasks = new List<Task>();
          foreach( var data in arrays )
          {

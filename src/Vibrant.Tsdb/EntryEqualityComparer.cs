@@ -5,17 +5,17 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class EntryEqualityComparer<TEntry> : IEqualityComparer<TEntry>
-     where TEntry : IEntry
+   public class EntryEqualityComparer<TKey, TEntry> : IEqualityComparer<TEntry>
+     where TEntry : IEntry<TKey>
    {
       public bool Equals( TEntry x, TEntry y )
       {
-         return x.GetTimestamp() == y.GetTimestamp() && x.GetId() == y.GetId();
+         return x.GetTimestamp() == y.GetTimestamp() && x.GetKey().Equals( y.GetKey() );
       }
 
       public int GetHashCode( TEntry obj )
       {
-         return obj.GetTimestamp().GetHashCode() * obj.GetId().GetHashCode();
+         return obj.GetTimestamp().GetHashCode() * obj.GetKey().GetHashCode();
       }
    }
 }

@@ -5,15 +5,15 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IWorkProvider
+   public interface IWorkProvider<TKey>
    {
-      event Action<TsdbVolumeMoval> MovalChangedOrAdded;
+      event Action<TsdbVolumeMoval<TKey>> MovalChangedOrAdded;
 
-      event Action<string> MovalRemoved;
+      event Action<TKey> MovalRemoved;
 
-      Task<IEnumerable<TsdbVolumeMoval>> GetAllMovalsAsync( DateTime now );
+      Task<IEnumerable<TsdbVolumeMoval<TKey>>> GetAllMovalsAsync( DateTime now );
 
-      Task<TsdbVolumeMoval> GetMovalAsync( TsdbVolumeMoval completedMoval );
+      Task<TsdbVolumeMoval<TKey>> GetMovalAsync( TsdbVolumeMoval<TKey> completedMoval );
 
       TimeSpan GetTemporaryMovalInterval();
 

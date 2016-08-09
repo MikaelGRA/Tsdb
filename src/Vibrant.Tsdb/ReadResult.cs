@@ -6,40 +6,40 @@ using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb
 {
-   public class ReadResult<TEntry>
-     where TEntry : IEntry
+   public class ReadResult<TKey, TEntry>
+     where TEntry : IEntry<TKey>
    {
-      public ReadResult( string id, Sort sort, List<TEntry> entries )
+      public ReadResult( TKey id, Sort sort, List<TEntry> entries )
       {
          Id = id;
          Entries = entries;
          Sort = sort;
       }
 
-      public ReadResult( string id, Sort sort )
+      public ReadResult( TKey id, Sort sort )
       {
          Id = id;
          Entries = new List<TEntry>();
          Sort = sort;
       }
 
-      public string Id { get; private set; }
+      public TKey Id { get; private set; }
 
       public Sort Sort { get; private set; }
 
       public List<TEntry> Entries { get; private set; }
 
-      public ReadResult<TOutputEntry> As<TOutputEntry>()
-         where TOutputEntry : IEntry
+      public ReadResult<TKey, TOutputEntry> As<TOutputEntry>()
+         where TOutputEntry : IEntry<TKey>
       {
-         return new ReadResult<TOutputEntry>( Id, Sort, Entries.Cast<TOutputEntry>().ToList() );
+         return new ReadResult<TKey, TOutputEntry>( Id, Sort, Entries.Cast<TOutputEntry>().ToList() );
       }
 
-      public ReadResult<TEntry> MergeWith( ReadResult<TEntry> other )
+      public ReadResult<TKey, TEntry> MergeWith( ReadResult<TKey, TEntry> other )
       {
          Entries = MergeSort.Sort(
             collections: new[] { Entries, other.Entries },
-            comparer: EntryComparer.GetComparer<TEntry>( Sort ),
+            comparer: EntryComparer.GetComparer<TKey, TEntry>( Sort ),
             resolveConflict: x => x.First() );
 
          return this;
