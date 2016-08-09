@@ -135,7 +135,7 @@ namespace Vibrant.Tsdb.Sql
                records.Add( record );
             } );
 
-            using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+            using( var tx = connection.BeginTransaction( IsolationLevel.ReadUncommitted ) )
             {
                using( var command = connection.CreateCommand() )
                {
