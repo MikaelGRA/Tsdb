@@ -41,24 +41,23 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          _dataSources = new DataSource[]
          {
-            new DataSource("m2", startTime, TimeSpan.FromMilliseconds( 10 ) ),
-            new DataSource("m3", startTime, TimeSpan.FromMilliseconds( 10 ) ),
-            new DataSource("m4", startTime, TimeSpan.FromMilliseconds( 10 ) ),
-            new DataSource("m5", startTime, TimeSpan.FromMilliseconds( 10 ) ),
-            new DataSource("m6", startTime, TimeSpan.FromMilliseconds( 10 ) ),
-            new DataSource("m7", startTime, TimeSpan.FromMilliseconds( 10 ) ),
-            new DataSource("m8", startTime, TimeSpan.FromMilliseconds( 10 ) ),
-            new DataSource("m9", startTime, TimeSpan.FromMilliseconds( 10 ) ),
-            new DataSource("m1", startTime, TimeSpan.FromMilliseconds( 10 ) ),
-            new DataSource("m10", startTime, TimeSpan.FromMilliseconds( 10 ) ),
+            new DataSource("m2", startTime, TimeSpan.FromMilliseconds( 5 ) ),
+            new DataSource("m3", startTime, TimeSpan.FromMilliseconds( 5 ) ),
+            new DataSource("m4", startTime, TimeSpan.FromMilliseconds( 5 ) ),
+            new DataSource("m5", startTime, TimeSpan.FromMilliseconds( 5 ) ),
+            new DataSource("m6", startTime, TimeSpan.FromMilliseconds( 5 ) ),
+            new DataSource("m7", startTime, TimeSpan.FromMilliseconds( 5 ) ),
+            new DataSource("m8", startTime, TimeSpan.FromMilliseconds( 5 ) ),
+            new DataSource("m9", startTime, TimeSpan.FromMilliseconds( 5 ) ),
+            new DataSource("m1", startTime, TimeSpan.FromMilliseconds( 5 ) ),
+            new DataSource("m10", startTime, TimeSpan.FromMilliseconds( 5 ) ),
          };
 
-         var client = TsdbFactory.CreateClient<BasicEntry>(
-            sql.GetSection( "Table" ).Value,
-            sql.GetSection( "ConnectionString" ).Value,
-            ats.GetSection( "Table" ).Value,
+         var client = TsdbFactory.CreateAtsClient<BasicEntry>(
+            "VolumeTable",
+            "DynamicTable",
             ats.GetSection( "ConnectionString" ).Value,
-            @"C:\temp\lol\heh" );
+            @"C:\tsdb\cache" );
 
          // redis.GetSection( "ConnectionString" ).Value
 
@@ -85,40 +84,51 @@ namespace Vibrant.Tsdb.ConsoleApp
 
                Console.WriteLine( $"Writing {entries.Count} entries..." );
 
-               batcher.Write( entries ).ContinueWith( t =>
-               {
-                  if( t.IsFaulted || t.IsCanceled )
-                  {
-                     Console.WriteLine( t.Exception.Message );
-                  }
-                  else
-                  {
-                     Console.WriteLine( "Batch write completed!" );
-                  }
-               } );
+               batcher.Write( entries );
             }
 
             Thread.Sleep( 1000 );
          }
       }
 
+      private int _c1, _c2, _c3, _c4;
+
       private void Client_WriteFailure( object sender, TsdbWriteFailureEventArgs<BasicEntry> e )
       {
+         if(!( e.Exception is SqlException ) )
+         {
+
+         }
+
          Console.WriteLine( "Client_WriteFailure: " + e.Exception );
       }
 
       private void Client_TemporaryWriteFailure( object sender, TsdbWriteFailureEventArgs<BasicEntry> e )
       {
+         if( !( e.Exception is SqlException ) )
+         {
+
+         }
+
          Console.WriteLine( "Client_TemporaryWriteFailure: " + e.Exception );
       }
 
       private void Engine_MoveToVolumeStorageFailed( object sender, ExceptionEventArgs e )
       {
+         if( !( e.Exception is SqlException ) )
+         {
+         }
+
          Console.WriteLine( "Engine_MoveToVolumeStorageFailed: " + e.Exception );
       }
 
       private void Engine_MoveTemporaryDataFailed( object sender, ExceptionEventArgs e )
       {
+         if( !( e.Exception is SqlException ) )
+         {
+
+         }
+
          Console.WriteLine( "Engine_MoveTemporaryDataFailed: " + e.Exception );
       }
 
@@ -145,6 +155,11 @@ namespace Vibrant.Tsdb.ConsoleApp
       }
 
       public int GetTemporaryMovalBatchSize()
+      {
+         return 5000;
+      }
+
+      public int GetDynamicMovalBatchSize()
       {
          return 5000;
       }

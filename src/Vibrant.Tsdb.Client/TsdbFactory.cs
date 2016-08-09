@@ -34,6 +34,16 @@ namespace Vibrant.Tsdb.Client
          return new TsdbClient<TEntry>( sql, ats, sub, files );
       }
 
+      public static TsdbClient<TEntry> CreateAtsClient<TEntry>( string volumetricAtsTableName, string dynamicAtsTableName, string atsConnectionString, string temporaryFileDirectory )
+         where TEntry : IEntry, IAtsEntry, ISqlEntry, IFileEntry, IRedisEntry, new()
+      {
+         var sql = new AtsDynamicStorage<TEntry>( dynamicAtsTableName, atsConnectionString );
+         var ats = new AtsVolumeStorage<TEntry>( volumetricAtsTableName, atsConnectionString );
+         var sub = new DefaultPublishSubscribe<TEntry>( false );
+         var files = new TemporaryFileStorage<TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024 );
+         return new TsdbClient<TEntry>( sql, ats, sub, files );
+      }
+
       public static TsdbEngine<TEntry> CreateEngine<TEntry>( IWorkProvider workProvider, TsdbClient<TEntry> client )
          where TEntry : IEntry
       {

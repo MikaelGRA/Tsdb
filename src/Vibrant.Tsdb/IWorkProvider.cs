@@ -18,5 +18,7 @@ namespace Vibrant.Tsdb
       TimeSpan GetTemporaryMovalInterval();
 
       int GetTemporaryMovalBatchSize();
+
+      int GetDynamicMovalBatchSize();
    }
 }

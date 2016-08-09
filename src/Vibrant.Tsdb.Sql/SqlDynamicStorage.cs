@@ -128,15 +128,21 @@ namespace Vibrant.Tsdb.Sql
                records.Add( record );
             } );
 
-            using( var command = connection.CreateCommand() )
+            using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
             {
-               command.CommandText = Sql.GetInsertProcedureName( _tableName );
-               command.CommandType = CommandType.StoredProcedure;
-               var parameter = command.Parameters.AddWithValue( "@Inserts", records );
-               parameter.SqlDbType = SqlDbType.Structured;
-               parameter.TypeName = Sql.GetInsertParameterType( _tableName );
+               using( var command = connection.CreateCommand() )
+               {
+                  command.CommandText = Sql.GetInsertProcedureName( _tableName );
+                  command.CommandType = CommandType.StoredProcedure;
+                  command.Transaction = tx;
+                  var parameter = command.Parameters.AddWithValue( "@Inserts", records );
+                  parameter.SqlDbType = SqlDbType.Structured;
+                  parameter.TypeName = Sql.GetInsertParameterType( _tableName );
 
-               await command.ExecuteNonQueryAsync().ConfigureAwait( false );
+                  await command.ExecuteNonQueryAsync().ConfigureAwait( false );
+               }
+
+               tx.Commit();
             }
          }
       }
@@ -146,12 +152,14 @@ namespace Vibrant.Tsdb.Sql
          await CreateTable().ConfigureAwait( false );
 
          using( var connection = new SqlConnection( _connectionString ) )
+         using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
          {
             await connection.OpenAsync().ConfigureAwait( false );
 
             var sqlEntries = await connection.QueryAsync<SqlEntry>(
                sql: Sql.GetBottomlessQuery( _tableName, sort ),
-               param: new { Ids = ids, To = to } ).ConfigureAwait( false );
+               param: new { Ids = ids, To = to },
+               transaction: tx ).ConfigureAwait( false );
 
             return CreateReadResult( sqlEntries, ids, sort );
          }
@@ -165,11 +173,15 @@ namespace Vibrant.Tsdb.Sql
          {
             await connection.OpenAsync().ConfigureAwait( false );
 
-            var sqlEntries = await connection.QueryAsync<SqlEntry>(
-               sql: Sql.GetRangedQuery( _tableName, sort ),
-               param: new { Ids = ids, From = from, To = to } ).ConfigureAwait( false );
+            using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+            {
+               var sqlEntries = await connection.QueryAsync<SqlEntry>(
+                  sql: Sql.GetRangedQuery( _tableName, sort ),
+                  param: new { Ids = ids, From = from, To = to },
+                  transaction: tx ).ConfigureAwait( false );
 
-            return CreateReadResult( sqlEntries, ids, sort );
+               return CreateReadResult( sqlEntries, ids, sort );
+            }
          }
       }
 
@@ -181,11 +193,15 @@ namespace Vibrant.Tsdb.Sql
          {
             await connection.OpenAsync().ConfigureAwait( false );
 
-            var sqlEntries = await connection.QueryAsync<SqlEntry>(
-               sql: Sql.GetQuery( _tableName, sort ),
-               param: new { Ids = ids } ).ConfigureAwait( false );
+            using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+            {
+               var sqlEntries = await connection.QueryAsync<SqlEntry>(
+                  sql: Sql.GetQuery( _tableName, sort ),
+                  param: new { Ids = ids },
+                  transaction: tx ).ConfigureAwait( false );
 
-            return CreateReadResult( sqlEntries, ids, sort );
+               return CreateReadResult( sqlEntries, ids, sort );
+            }
          }
       }
 
@@ -201,9 +217,13 @@ namespace Vibrant.Tsdb.Sql
 
             foreach( var id in ids )
             {
-               tasks.Add( connection.QueryAsync<SqlEntry>(
-                  sql: Sql.GetLatestQuery( _tableName ),
-                  param: new { Id = id } ) );
+               using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+               {
+                  tasks.Add( connection.QueryAsync<SqlEntry>(
+                     sql: Sql.GetLatestQuery( _tableName ),
+                     param: new { Id = id },
+                     transaction: tx ) );
+               }
             }
 
             await Task.WhenAll( tasks ).ConfigureAwait( false );
@@ -221,11 +241,15 @@ namespace Vibrant.Tsdb.Sql
          {
             await connection.OpenAsync().ConfigureAwait( false );
 
-            var sqlEntries = await connection.QueryAsync<SqlEntry>(
-               sql: Sql.GetUpperBoundSegmentedQuery( _tableName ),
-               param: new { Id = id, To = to, Take = segmentSize, Skip = skip } ).ConfigureAwait( false );
+            using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+            {
+               var sqlEntries = await connection.QueryAsync<SqlEntry>(
+                  sql: Sql.GetUpperBoundSegmentedQuery( _tableName ),
+                  param: new { Id = id, To = to, Take = segmentSize, Skip = skip },
+                  transaction: tx ).ConfigureAwait( false );
 
-            return CreateReadResult( id, sqlEntries, segmentSize, skip );
+               return CreateReadResult( id, sqlEntries, segmentSize, skip );
+            }
          }
       }
 
@@ -238,11 +262,15 @@ namespace Vibrant.Tsdb.Sql
          {
             await connection.OpenAsync().ConfigureAwait( false );
 
-            var sqlEntries = await connection.QueryAsync<SqlEntry>(
-               sql: Sql.GetSegmentedQuery( _tableName ),
-               param: new { Id = id, Take = segmentSize, Skip = skip } ).ConfigureAwait( false );
+            using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+            {
+               var sqlEntries = await connection.QueryAsync<SqlEntry>(
+                  sql: Sql.GetSegmentedQuery( _tableName ),
+                  param: new { Id = id, Take = segmentSize, Skip = skip },
+                  transaction: tx ).ConfigureAwait( false );
 
-            return CreateReadResult( id, sqlEntries, segmentSize, skip );
+               return CreateReadResult( id, sqlEntries, segmentSize, skip );
+            }
          }
       }
 
@@ -254,9 +282,13 @@ namespace Vibrant.Tsdb.Sql
          {
             await connection.OpenAsync().ConfigureAwait( false );
 
-            return await connection.ExecuteAsync(
-               sql: Sql.GetRangedDeleteCommand( _tableName ),
-               param: new { Ids = ids, From = from, To = to } ).ConfigureAwait( false );
+            using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+            {
+               return await connection.ExecuteAsync(
+                  sql: Sql.GetRangedDeleteCommand( _tableName ),
+                  param: new { Ids = ids, From = from, To = to },
+                  transaction: tx ).ConfigureAwait( false );
+            }
          }
       }
 
@@ -268,9 +300,13 @@ namespace Vibrant.Tsdb.Sql
          {
             await connection.OpenAsync().ConfigureAwait( false );
 
-            return await connection.ExecuteAsync(
-               sql: Sql.GetBottomlessDeleteCommand( _tableName ),
-               param: new { Ids = ids, To = to } ).ConfigureAwait( false );
+            using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+            {
+               return await connection.ExecuteAsync(
+                  sql: Sql.GetBottomlessDeleteCommand( _tableName ),
+                  param: new { Ids = ids, To = to },
+                  transaction: tx ).ConfigureAwait( false );
+            }
          }
       }
 
@@ -282,9 +318,13 @@ namespace Vibrant.Tsdb.Sql
          {
             await connection.OpenAsync().ConfigureAwait( false );
 
-            return await connection.ExecuteAsync(
-               sql: Sql.GetDeleteCommand( _tableName ),
-               param: new { Ids = ids } ).ConfigureAwait( false );
+            using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+            {
+               return await connection.ExecuteAsync(
+                  sql: Sql.GetDeleteCommand( _tableName ),
+                  param: new { Ids = ids },
+                  transaction: tx ).ConfigureAwait( false );
+            }
          }
       }
 
@@ -315,8 +355,6 @@ namespace Vibrant.Tsdb.Sql
       private SegmentedReadResult<TEntry> CreateReadResult( string id, IEnumerable<SqlEntry> sqlEntries, int segmentSize, long skip )
       {
          var entries = SqlSerializer.Deserialize<TEntry>( sqlEntries );
-         var to = entries[ 0 ].GetTimestamp();
-
          var continuationToken = new ContinuationToken( entries.Count == segmentSize, skip + segmentSize, segmentSize );
          return new SegmentedReadResult<TEntry>( id, Sort.Descending, continuationToken, entries, CreateDeleteFunction( id, continuationToken, entries ) );
       }

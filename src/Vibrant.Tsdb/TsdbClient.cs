@@ -31,21 +31,21 @@ namespace Vibrant.Tsdb
          _localPublishSubscribe = new DefaultPublishSubscribe<TEntry>( false );
       }
 
-      public async Task MoveToVolumeStorage( IEnumerable<string> ids )
+      public async Task MoveToVolumeStorage( IEnumerable<string> ids, int batchSize )
       {
          var tasks = new List<Task>();
-         tasks.AddRange( ids.Select( id => MoveToVolumeStorage( id ) ) );
+         tasks.AddRange( ids.Select( id => MoveToVolumeStorage( id, batchSize ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      public async Task MoveToVolumeStorage( IEnumerable<string> ids, DateTime to )
+      public async Task MoveToVolumeStorage( IEnumerable<string> ids, int batchSize, DateTime to )
       {
          var tasks = new List<Task>();
-         tasks.AddRange( ids.Select( id => MoveToVolumeStorage( id, to ) ) );
+         tasks.AddRange( ids.Select( id => MoveToVolumeStorage( id, batchSize, to ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
-      
-      public async Task MoveToVolumeStorage( string id )
+
+      public async Task MoveToVolumeStorage( string id, int batchSize )
       {
          var dynamic = _dynamicStorageSelector.GetStorage( id );
          var volume = _volumeStorageSelector.GetStorage( id );
@@ -53,7 +53,7 @@ namespace Vibrant.Tsdb
          IContinuationToken token = null;
          do
          {
-            var segment = await dynamic.Read( id, 10000, token ).ConfigureAwait( false );
+            var segment = await dynamic.Read( id, batchSize, token ).ConfigureAwait( false );
             await volume.Write( segment.Entries ).ConfigureAwait( false );
             await segment.DeleteAsync().ConfigureAwait( false );
             token = segment.ContinuationToken;
@@ -61,7 +61,7 @@ namespace Vibrant.Tsdb
          while( token.HasMore );
       }
 
-      public async Task MoveToVolumeStorage( string id, DateTime to )
+      public async Task MoveToVolumeStorage( string id, int batchSize, DateTime to )
       {
          var dynamic = _dynamicStorageSelector.GetStorage( id );
          var volume = _volumeStorageSelector.GetStorage( id );
@@ -69,7 +69,7 @@ namespace Vibrant.Tsdb
          IContinuationToken token = null;
          do
          {
-            var segment = await dynamic.Read( id, to, 10000, token ).ConfigureAwait( false );
+            var segment = await dynamic.Read( id, to, batchSize, token ).ConfigureAwait( false );
             await volume.Write( segment.Entries ).ConfigureAwait( false );
             await segment.DeleteAsync().ConfigureAwait( false );
             token = segment.ContinuationToken;
@@ -85,16 +85,19 @@ namespace Vibrant.Tsdb
             // read
             var batch = _temporaryStorage.Read( batchSize );
 
-            // write to volumetric
-            var tasks = new List<Task>();
-            tasks.AddRange( LookupDynamicStorages( batch.Entries ).Select( c => c.Storage.Write( c.Lookups ) ) );
-            await Task.WhenAll( tasks ).ConfigureAwait( false );
-
-            // delete
-            batch.Delete();
-
             // set read count
             read = batch.Entries.Count;
+
+            if( read > 0 )
+            {
+               // write to volumetric
+               var tasks = new List<Task>();
+               tasks.AddRange( LookupDynamicStorages( batch.Entries ).Select( c => c.Storage.Write( c.Lookups ) ) );
+               await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+               // delete
+               batch.Delete();
+            }
          }
          while( read != 0 );
       }
@@ -108,7 +111,7 @@ namespace Vibrant.Tsdb
 
       public Task Write( IEnumerable<TEntry> items )
       {
-         return Write( items, PublicationType.None, Publish.Nowhere, false );
+         return Write( items, PublicationType.None, Publish.Nowhere, true );
       }
 
       public Task Write( IEnumerable<TEntry> items, bool useTemporaryStorageOnFailure )
@@ -118,7 +121,7 @@ namespace Vibrant.Tsdb
 
       public Task Write( IEnumerable<TEntry> items, PublicationType publicationType )
       {
-         return Write( items, publicationType, publicationType != PublicationType.None ? Publish.LocallyAndRemotely : Publish.Nowhere, false );
+         return Write( items, publicationType, publicationType != PublicationType.None ? Publish.LocallyAndRemotely : Publish.Nowhere, true );
       }
 
       public async Task Write( IEnumerable<TEntry> items, PublicationType publicationType, Publish publish, bool useTemporaryStorageOnFailure )
@@ -135,7 +138,7 @@ namespace Vibrant.Tsdb
 
          // Only publish things that were written
          var writtenItems = tasks.SelectMany( x => x.Result );
-         
+
          if( publish.HasFlag( Publish.Remotely ) )
          {
             await _remotePublishSubscribe.Publish( writtenItems, publicationType ).ConfigureAwait( false );

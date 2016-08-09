@@ -9,14 +9,26 @@ namespace Vibrant.Tsdb.Files
    internal static class QSFile
    {
       [ThreadStatic]
-      private static byte[] fileBuf = new byte[ 128 * 1024 ];
+      private static byte[] _fileBuffer;
+
+      private static byte[] FileBuffer
+      {
+         get
+         {
+            if( _fileBuffer == null )
+            {
+               _fileBuffer = new byte[ 128 * 1024 ];
+            }
+            return _fileBuffer;
+         }
+      }
 
       private static void SimpleCopyFilePart( FileStream f, long from, long to, int length )
       {
          f.Position = from;
-         f.Read( fileBuf, 0, length );
+         f.Read( FileBuffer, 0, length );
          f.Position = to;
-         f.Write( fileBuf, 0, length );
+         f.Write( FileBuffer, 0, length );
       }
 
       public static void CopyFilePart( string file, long fromPos, long toPos, long length )
@@ -27,38 +39,35 @@ namespace Vibrant.Tsdb.Files
 
       public static void CopyFilePart( FileStream f, long fromPos, long toPos, long length )
       {
-         lock( fileBuf )
+         int bufSize = FileBuffer.Length;
+         if( toPos > fromPos )
          {
-            int bufSize = fileBuf.Length;
-            if( toPos > fromPos )
-            {
-               if( toPos + length > f.Length )
-                  throw new ArgumentOutOfRangeException( "toPos + length", "Destination range is out of file." );
+            if( toPos + length > f.Length )
+               throw new ArgumentOutOfRangeException( "toPos + length", "Destination range is out of file." );
 
-               long i_to = toPos + length - bufSize;
-               long i_from = fromPos + length - bufSize;
-               for( long i = length / (long)bufSize ; i > 0 ; --i, i_from -= bufSize, i_to -= bufSize )
-                  SimpleCopyFilePart( f, i_from, i_to, bufSize );
+            long i_to = toPos + length - bufSize;
+            long i_from = fromPos + length - bufSize;
+            for( long i = length / (long)bufSize ; i > 0 ; --i, i_from -= bufSize, i_to -= bufSize )
+               SimpleCopyFilePart( f, i_from, i_to, bufSize );
 
-               int leftover = (int)( length % (long)bufSize );
-               if( leftover > 0 )
-                  SimpleCopyFilePart( f, fromPos, toPos, leftover );
+            int leftover = (int)( length % (long)bufSize );
+            if( leftover > 0 )
+               SimpleCopyFilePart( f, fromPos, toPos, leftover );
 
-            }
-            else
-            {
-               if( fromPos + length > f.Length )
-                  throw new ArgumentOutOfRangeException( "fromPos + length", "Source range is out of file." );
+         }
+         else
+         {
+            if( fromPos + length > f.Length )
+               throw new ArgumentOutOfRangeException( "fromPos + length", "Source range is out of file." );
 
-               long i_to = toPos;
-               long i_from = fromPos;
-               for( long i = length / (long)bufSize ; i > 0 ; --i, i_from += bufSize, i_to += bufSize )
-                  SimpleCopyFilePart( f, i_from, i_to, bufSize );
+            long i_to = toPos;
+            long i_from = fromPos;
+            for( long i = length / (long)bufSize ; i > 0 ; --i, i_from += bufSize, i_to += bufSize )
+               SimpleCopyFilePart( f, i_from, i_to, bufSize );
 
-               int leftover = (int)( length % (long)bufSize );
-               if( leftover > 0 )
-                  SimpleCopyFilePart( f, i_from, i_to, leftover );
-            }
+            int leftover = (int)( length % (long)bufSize );
+            if( leftover > 0 )
+               SimpleCopyFilePart( f, i_from, i_to, leftover );
          }
       }
 

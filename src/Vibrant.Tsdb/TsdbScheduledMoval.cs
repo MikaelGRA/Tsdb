@@ -22,11 +22,11 @@ namespace Vibrant.Tsdb
       {
          try
          {
-            await _engine.Client.MoveToVolumeStorage( new[] { _moval.Id }, _moval.To ).ConfigureAwait( false );
+            await _engine.Client.MoveToVolumeStorage( new[] { _moval.Id }, _engine.Work.GetDynamicMovalBatchSize(), _moval.To ).ConfigureAwait( false );
          }
          catch( Exception e )
          {
-            _engine.RaiseMoveTemporaryDataFailed( e );
+            _engine.RaiseMoveToVolumeStorageFailed( e );
          }
 
          var newMoval = await _engine.Work.GetMovalAsync( _moval ).ConfigureAwait( false );

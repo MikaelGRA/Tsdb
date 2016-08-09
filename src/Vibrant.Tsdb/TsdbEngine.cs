@@ -65,7 +65,7 @@ namespace Vibrant.Tsdb
          }
 
          var scheduleTime = DateTime.UtcNow + _workProvider.GetTemporaryMovalInterval();
-         _scheduler.AddCommand( scheduleTime, MoveTemporaryData );
+         _unsubscribe = _scheduler.AddCommand( scheduleTime, MoveTemporaryData );
 
          _workProvider.MovalChangedOrAdded += WorkProvider_MovalChangedOrAdded;
          _workProvider.MovalRemoved += WorkProvider_MovalRemoved;

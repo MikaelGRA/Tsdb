@@ -149,7 +149,7 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TEntry>(
             id,
             Sort.Descending,
-            results.SelectMany( x => x.GetEntries<TEntry>( Sort.Descending ) ).Take( 1 )
+            results.SelectMany( x => x.GetEntries<TEntry>( id, Sort.Descending ) ).Take( 1 )
                .ToList() );
       }
 
@@ -160,7 +160,7 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TEntry>(
             id,
             sort,
-            results.SelectMany( x => x.GetEntries<TEntry>( sort ) )
+            results.SelectMany( x => x.GetEntries<TEntry>( id, sort ) )
                .ToList() );
       }
 
@@ -171,7 +171,7 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TEntry>(
             id,
             sort,
-            results.SelectMany( x => x.GetEntries<TEntry>( sort ) )
+            results.SelectMany( x => x.GetEntries<TEntry>( id, sort ) )
                .Where( x => x.GetTimestamp() >= from && x.GetTimestamp() < to )
                .ToList() );
       }
@@ -181,7 +181,7 @@ namespace Vibrant.Tsdb.Ats
          var retrievals = await RetrieveRangeForId( id, from, to, Sort.Descending ).ConfigureAwait( false );
 
          var oldEntities = retrievals.ToDictionary( x => x.RowKey );
-         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TEntry>( Sort.Descending ) ).ToList();
+         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TEntry>( id, Sort.Descending ) ).ToList();
 
          // remove items between from and to
          int count = oldEntries.RemoveAll( x => x.GetTimestamp() >= from && x.GetTimestamp() < to );
@@ -201,7 +201,7 @@ namespace Vibrant.Tsdb.Ats
          var retrievals = await RetrieveAllForId( id, Sort.Descending ).ConfigureAwait( false );
 
          var oldEntities = retrievals.ToDictionary( x => x.RowKey );
-         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TEntry>( Sort.Descending ) ).ToList();
+         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TEntry>( id, Sort.Descending ) ).ToList();
 
          // remove items between from and to
          int count = oldEntries.Count;
@@ -224,7 +224,7 @@ namespace Vibrant.Tsdb.Ats
          var oldEntities = retrievals.ToDictionary( x => x.RowKey );
 
          // merge results
-         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TEntry>( Sort.Descending ) ).ToList();
+         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TEntry>( id, Sort.Descending ) ).ToList();
          var mergedEntries = MergeSort.Sort(
             collections: new IEnumerable<TEntry>[] { newEntries, oldEntries },
             comparer: EntryComparer.GetComparer<TEntry>( Sort.Descending ),

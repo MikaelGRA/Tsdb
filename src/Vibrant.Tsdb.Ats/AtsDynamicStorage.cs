@@ -32,6 +32,9 @@ namespace Vibrant.Tsdb.Ats
          _client = _account.CreateCloudTableClient();
          _partitioningProvider = partitioningProvider;
          _comparer = new EntryEqualityComparer<TEntry>();
+
+         // improve data insertion
+         _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
 
       public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism )
