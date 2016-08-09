@@ -72,6 +72,11 @@ namespace Vibrant.Tsdb
             _toString = key => (string)(object)key;
             _toKey = str => (TKey)(object)str;
          }
+         else if( type == typeof( Guid ) )
+         {
+            _toString = key => ( (Guid)(object)key ).ToString();
+            _toKey = str => (TKey)(object)Guid.Parse( str );
+         }
          else
          {
             throw new ArgumentException( "The type argument TKey is not supported." );
