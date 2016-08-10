@@ -49,7 +49,7 @@ namespace Vibrant.Tsdb.Ats
       }
 
       public AtsDynamicStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, 25, 25, new YearlyPartitioningProvider<TKey>() )
+         : this( tableName, connectionString, 50, 50, new YearlyPartitioningProvider<TKey>() )
       {
       }
 
@@ -255,12 +255,44 @@ namespace Vibrant.Tsdb.Ats
 
       private async Task<ReadResult<TKey, TEntry>> ReadRangeInternal( TKey id, DateTime from, DateTime to, Sort sort )
       {
-         var generalQuery = new TableQuery<TsdbTableEntity>()
-            .Where( CreateGeneralFilter( id, from, to ) );
+         // there's twos ways to accomplish this take:
+         //  1. Super fast (use iterate partition and create query for each)
+         //  2. Normal (use single query)
+         if( _partitioningProvider is IIterablePartitionProvider<TKey> )
+         {
+            // use method 1 (Super fast)
 
-         var entries = await ReadInternal( id, generalQuery, true, sort ).ConfigureAwait( false );
+            var tasks = new List<Task<List<TEntry>>>();
+            var iterable = (IIterablePartitionProvider<TKey>)_partitioningProvider;
+            foreach( var partitionRange in iterable.IteratePartitions( id, from, to ) )
+            {
+               var specificQuery = new TableQuery<TsdbTableEntity>()
+                  .Where( CreateSpecificPartitionFilter( id, from, to, partitionRange ) );
 
-         return new ReadResult<TKey, TEntry>( id, sort, entries );
+               tasks.Add( ReadInternal( id, specificQuery, true, sort ) );
+            }
+
+            await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+            var queryResults = tasks.Select( x => x.Result );
+            if( sort == Sort.Ascending )
+            {
+               queryResults = queryResults.Reverse();
+            }
+
+            // combine the results and return it
+            return new ReadResult<TKey, TEntry>( id, sort, queryResults.SelectMany( x => x ).ToList() );
+         }
+         else
+         {
+            // use method 2 (Normal)
+            var generalQuery = new TableQuery<TsdbTableEntity>()
+               .Where( CreateGeneralFilter( id, from, to ) );
+
+            var entries = await ReadInternal( id, generalQuery, true, sort ).ConfigureAwait( false );
+
+            return new ReadResult<TKey, TEntry>( id, sort, entries );
+         }
       }
 
       private Task<SegmentedReadResult<TKey, TEntry>> ReadRangeSegmentedInternal( TKey id, DateTime to, int segmentSize, ContinuationToken continuationToken )
@@ -645,6 +677,22 @@ namespace Vibrant.Tsdb.Ats
             }
             return _table;
          }
+      }
+
+      private string CreateSpecificPartitionFilter( TKey key, DateTime from, DateTime to, string partitionKeyRange )
+      {
+         var id = _keyConverter.Convert( key );
+         var fromRowKey = AtsKeyCalculator.CalculateRowKey( from );
+         var toRowKey = AtsKeyCalculator.CalculateRowKey( to );
+         var partitionKey = AtsKeyCalculator.CalculatePartitionKey( id, partitionKeyRange );
+
+         return TableQuery.CombineFilters(
+               TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.Equal, partitionKey ),
+            TableOperators.And,
+               TableQuery.CombineFilters(
+                  TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.LessThanOrEqual, fromRowKey ),
+                  TableOperators.And,
+                  TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.GreaterThan, toRowKey ) ) );
       }
 
       private string CreateGeneralFilter( TKey key, DateTime from, DateTime to )

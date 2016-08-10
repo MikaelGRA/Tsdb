@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
@@ -33,6 +34,12 @@ namespace Vibrant.Tsdb.ConsoleApp
 
       public Program( IConfiguration config )
       {
+#if !COREFX
+         ServicePointManager.DefaultConnectionLimit = 500;
+         ServicePointManager.Expect100Continue = false;
+         ServicePointManager.UseNagleAlgorithm = false;
+#endif
+
          var ats = config.GetSection( "AtsStorage" );
          var sql = config.GetSection( "SqlStorage" );
          var redis = config.GetSection( "RedisCache" );
@@ -41,16 +48,16 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          _dataSources = new DataSource[]
          {
-            new DataSource("m2", startTime, TimeSpan.FromMilliseconds( 5 ) ),
-            new DataSource("m3", startTime, TimeSpan.FromMilliseconds( 5 ) ),
-            new DataSource("m4", startTime, TimeSpan.FromMilliseconds( 5 ) ),
-            new DataSource("m5", startTime, TimeSpan.FromMilliseconds( 5 ) ),
-            new DataSource("m6", startTime, TimeSpan.FromMilliseconds( 5 ) ),
-            new DataSource("m7", startTime, TimeSpan.FromMilliseconds( 5 ) ),
-            new DataSource("m8", startTime, TimeSpan.FromMilliseconds( 5 ) ),
-            new DataSource("m9", startTime, TimeSpan.FromMilliseconds( 5 ) ),
-            new DataSource("m1", startTime, TimeSpan.FromMilliseconds( 5 ) ),
-            new DataSource("m10", startTime, TimeSpan.FromMilliseconds( 5 ) ),
+            new DataSource("m2", startTime, TimeSpan.FromMilliseconds( 1 ) ),
+            new DataSource("m3", startTime, TimeSpan.FromMilliseconds( 1 ) ),
+            new DataSource("m4", startTime, TimeSpan.FromMilliseconds( 1 ) ),
+            new DataSource("m5", startTime, TimeSpan.FromMilliseconds( 1 ) ),
+            new DataSource("m6", startTime, TimeSpan.FromMilliseconds( 1 ) ),
+            new DataSource("m7", startTime, TimeSpan.FromMilliseconds( 1 ) ),
+            new DataSource("m8", startTime, TimeSpan.FromMilliseconds( 1 ) ),
+            new DataSource("m9", startTime, TimeSpan.FromMilliseconds( 1 ) ),
+            new DataSource("m1", startTime, TimeSpan.FromMilliseconds( 1 ) ),
+            new DataSource("m10", startTime, TimeSpan.FromMilliseconds( 1 ) ),
          };
 
          var client = TsdbFactory.CreateAtsClient<string, BasicEntry>(

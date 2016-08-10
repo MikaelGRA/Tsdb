@@ -108,7 +108,7 @@ namespace Vibrant.Tsdb
                {
                   if( !_lastWarnTime.HasValue || ( DateTime.UtcNow - _lastWarnTime ) > MinWarningInterval )
                   {
-                     _logger.Warn( $"There are {_batches.Count} of ~{_maxBatchSize} entries queued batches waiting to be written. This is an indication that the storage is too slow to handle the ingestion." );
+                     _logger.Warn( $"There are {_batches.Count} batches of ~{_maxBatchSize} entries queued batches waiting to be written. This is an indication that the storage is too slow to handle the ingestion." );
                      _lastWarnTime = DateTime.UtcNow;
                   }
                }

@@ -20,7 +20,15 @@
    },
 
    "frameworks": {
+      "net46": {
+         "buildOptions": {
+            "define": []
+         }
+      },
       "netcoreapp1.0": {
+         "buildOptions": {
+            "define": ["COREFX"]
+         },
          "imports": [
             "dnxcore50",
             "portable-net451+win8"

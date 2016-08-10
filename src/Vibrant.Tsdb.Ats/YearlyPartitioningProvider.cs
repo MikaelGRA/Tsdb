@@ -5,6 +5,8 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
+   // TODO: Implement iterable version
+
    public class YearlyPartitioningProvider<TKey> : IPartitionProvider<TKey>
    {
       private static readonly string MinPartitionKeyRange = "9999";

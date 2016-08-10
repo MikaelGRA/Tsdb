@@ -1,4 +1,4 @@
-﻿{
+{
    "version": "2.1.0-*",
    "title": "TSDB infrastructure for .NET",
    "description": "An easy-to-use timeseries database client that allows storing of masses of simple of data structures identified by a string id and a timestamp.",
@@ -11,10 +11,8 @@
       "releaseNotes": "https://github.com/MikaelGRA/Tsdb/blob/master/CHANGELOG.md"
    },
    "copyright": "Copyright (c) 2015-2016 MikaelGRA",
-
    "frameworks": {
       "net45": {
-
       },
       "netstandard1.3": {
          "dependencies": {

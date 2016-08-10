@@ -54,7 +54,7 @@ namespace Vibrant.Tsdb.Ats
       }
 
       public AtsVolumeStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, 10, 25, new YearlyPartitioningProvider<TKey>() )
+         : this( tableName, connectionString, 15, 30, new YearlyPartitioningProvider<TKey>() )
       {
       }
 

@@ -17,6 +17,21 @@ namespace Vibrant.Tsdb.Ats
          return CalculatePartitionKey( keyConverter.Convert( key ), key, entry.GetTimestamp(), provider );
       }
 
+      public static string CalculatePartitionKey( string id, string partitionRange )
+      {
+         StringBuilder builder = new StringBuilder();
+
+         builder.Append( id );
+
+         if( !string.IsNullOrEmpty( partitionRange ) )
+         {
+            builder.Append( Seperator )
+               .Append( partitionRange );
+         }
+
+         return builder.ToString();
+      }
+
       public static string CalculatePartitionKey<TKey>( string id, TKey key, DateTime timestamp, IPartitionProvider<TKey> provider )
       {
          StringBuilder builder = new StringBuilder();
