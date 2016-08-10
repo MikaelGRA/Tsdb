@@ -7,7 +7,7 @@ namespace Vibrant.Tsdb.Ats
 {
    // TODO: Implement iterable version
 
-   public class YearlyPartitioningProvider<TKey> : IPartitionProvider<TKey>
+   public class YearlyPartitioningProvider<TKey> : IIterablePartitionProvider<TKey>
    {
       private static readonly string MinPartitionKeyRange = "9999";
       private static readonly string MaxPartitionKeyRange = "0000";
@@ -40,6 +40,16 @@ namespace Vibrant.Tsdb.Ats
             return inverseYear.ToString( "0000" );
          }
          return inverseYear.ToString();
+      }
+
+      public IEnumerable<string> IteratePartitions( TKey key, DateTime from, DateTime to )
+      {
+         var fromYear = from.Year;
+         var toYear = to.Year;
+         for( int current = toYear ; current >= fromYear ; current-- )
+         {
+            yield return CalculatePartitionKeyRange( current );
+         }
       }
    }
 }

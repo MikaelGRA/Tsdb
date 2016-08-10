@@ -256,12 +256,12 @@ namespace Vibrant.Tsdb.Ats
       private async Task<ReadResult<TKey, TEntry>> ReadRangeInternal( TKey id, DateTime from, DateTime to, Sort sort )
       {
          // there's twos ways to accomplish this take:
-         //  1. Super fast (use iterate partition and create query for each)
+         //  1. Super fast (iterate partitions and create query for each)
          //  2. Normal (use single query)
+
          if( _partitioningProvider is IIterablePartitionProvider<TKey> )
          {
             // use method 1 (Super fast)
-
             var tasks = new List<Task<List<TEntry>>>();
             var iterable = (IIterablePartitionProvider<TKey>)_partitioningProvider;
             foreach( var partitionRange in iterable.IteratePartitions( id, from, to ) )
