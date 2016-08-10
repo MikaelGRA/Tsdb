@@ -26,7 +26,7 @@ namespace Vibrant.Tsdb
          }
          catch( Exception e )
          {
-            _engine.RaiseMoveToVolumeStorageFailed( e );
+            _engine.Logger.Error( e, "An error ocurred while moving data from dynamic storage to volume storage." );
          }
 
          var newMoval = await _engine.Work.GetMovalAsync( _moval ).ConfigureAwait( false );

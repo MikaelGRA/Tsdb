@@ -27,7 +27,7 @@ namespace Vibrant.Tsdb.Ats
       private CloudStorageAccount _account;
       private CloudTableClient _client;
       private Task<CloudTable> _table;
-      private IPartitionProvider<TKey> _provider;
+      private IPartitionProvider<TKey> _partitioningProvider;
       private IKeyConverter<TKey> _keyConverter;
 
       public AtsVolumeStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IPartitionProvider<TKey> provider, IKeyConverter<TKey> keyConverter )
@@ -37,7 +37,7 @@ namespace Vibrant.Tsdb.Ats
          _tableName = tableName;
          _account = CloudStorageAccount.Parse( connectionString );
          _client = _account.CreateCloudTableClient();
-         _provider = provider;
+         _partitioningProvider = provider;
          _keyConverter = keyConverter;
          
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
@@ -75,9 +75,9 @@ namespace Vibrant.Tsdb.Ats
          List<Task> tasks = new List<Task>();
 
          // split all entries by their id
-         foreach( var entry in items.SplitEntriesById<TKey, TEntry>( Sort.Descending ) )
+         foreach( var entry in IterateByPartition( items ) )
          {
-            var id = entry.Id;
+            var id = entry.Key;
             var from = entry.From;
             var to = entry.To.AddTicks( 1 ); // must be inclusive on the last measure point because we may be overriding it
             var entries = entry.Entries;
@@ -218,7 +218,7 @@ namespace Vibrant.Tsdb.Ats
          return count;
       }
 
-      private async Task StoreForId( TKey id, IEnumerable<TEntry> newEntries, DateTime from, DateTime to )
+      private async Task StoreForId( TKey id, List<TEntry> newEntries, DateTime from, DateTime to )
       {
          // retrieve existing entries for this period
          var retrievals = await RetrieveRangeForId( id, from, to, Sort.Descending ).ConfigureAwait( false );
@@ -333,7 +333,7 @@ namespace Vibrant.Tsdb.Ats
             var entity = new TsdbTableEntity();
             entity.SetData( result.Data );
             entity.RowKey = AtsKeyCalculator.CalculateRowKey( result.From );
-            entity.PartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, result.From, _provider );
+            entity.PartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, result.From, _partitioningProvider );
 
             tableEntities.Add( entity );
          }
@@ -415,6 +415,33 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
+      private IEnumerable<EntrySplitResult<TKey, TEntry>> IterateByPartition( IEnumerable<TEntry> entries )
+      {
+         Dictionary<string, EntrySplitResult<TKey, TEntry>> lookup = new Dictionary<string, EntrySplitResult<TKey, TEntry>>();
+
+         foreach( var entry in entries )
+         {
+            var key = entry.GetKey();
+            var id = _keyConverter.Convert( key );
+            var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, entry.GetTimestamp(), _partitioningProvider );
+
+            EntrySplitResult<TKey, TEntry> items;
+            if( !lookup.TryGetValue( pk, out items ) )
+            {
+               items = new EntrySplitResult<TKey, TEntry>( key, id, pk );
+               lookup.Add( pk, items );
+            }
+
+            items.Insert( entry );
+         }
+
+         foreach( var result in lookup )
+         {
+            result.Value.Sort( Sort.Descending );
+            yield return result.Value;
+         }
+      }
+
       private async Task<List<TsdbTableEntity>> PerformQuery( TableQuery<TsdbTableEntity> query, bool takeAll, Sort sort )
       {
          List<TsdbTableEntity> results = new List<TsdbTableEntity>();
@@ -456,8 +483,8 @@ namespace Vibrant.Tsdb.Ats
          var id = _keyConverter.Convert( key );
          var fromRowKey = AtsKeyCalculator.CalculateRowKey( from );
          var toRowKey = AtsKeyCalculator.CalculateRowKey( to );
-         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, from, _provider );
-         var toPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, to.AddTicks( -1 ), _provider ); // -1 tick because it is an approximation value and we use gte operation
+         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, from, _partitioningProvider );
+         var toPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, to.AddTicks( -1 ), _partitioningProvider ); // -1 tick because it is an approximation value and we use gte operation
 
          return TableQuery.CombineFilters(
                TableQuery.CombineFilters(
@@ -475,8 +502,8 @@ namespace Vibrant.Tsdb.Ats
       {
          var id = _keyConverter.Convert( key );
          var fromRowKey = AtsKeyCalculator.CalculateRowKey( from );
-         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, from, _provider ); // 7125
-         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, key, _provider ); // 9999
+         var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, from, _partitioningProvider ); // 7125
+         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, key, _partitioningProvider ); // 9999
 
          return TableQuery.CombineFilters(
             TableQuery.CombineFilters(
@@ -490,8 +517,8 @@ namespace Vibrant.Tsdb.Ats
       private string CreatePartitionFilter( TKey key )
       {
          var id = _keyConverter.Convert( key );
-         var fromPartitionKey = AtsKeyCalculator.CalculateMaxPartitionKey( id, key, _provider ); // 0000
-         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, key, _provider ); // 9999
+         var fromPartitionKey = AtsKeyCalculator.CalculateMaxPartitionKey( id, key, _partitioningProvider ); // 0000
+         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, key, _partitioningProvider ); // 9999
 
          return TableQuery.CombineFilters(
             TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.GreaterThanOrEqual, fromPartitionKey ),

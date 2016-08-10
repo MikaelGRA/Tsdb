@@ -8,22 +8,26 @@ namespace Vibrant.Tsdb
    public class TsdbEngine<TKey, TEntry> : IDisposable
       where TEntry : IEntry<TKey>
    {
-      public event EventHandler<ExceptionEventArgs> MoveTemporaryDataFailed;
-      public event EventHandler<ExceptionEventArgs> MoveToVolumeStorageFailed;
-
       private EventScheduler _scheduler;
       private TsdbClient<TKey, TEntry> _client;
       private IWorkProvider<TKey> _workProvider;
       private Dictionary<TKey, TsdbScheduledMoval<TKey, TEntry>> _scheduledWork;
       private Func<bool> _unsubscribe;
+      private ITsdbLogger _logger;
       private bool _disposed = false;
 
-      public TsdbEngine( IWorkProvider<TKey> workProvider, TsdbClient<TKey, TEntry> client )
+      public TsdbEngine( IWorkProvider<TKey> workProvider, TsdbClient<TKey, TEntry> client, ITsdbLogger logger )
       {
          _client = client;
          _workProvider = workProvider;
+         _logger = logger;
          _scheduler = new EventScheduler();
          _scheduledWork = new Dictionary<TKey, TsdbScheduledMoval<TKey, TEntry>>();
+      }
+
+      public TsdbEngine( IWorkProvider<TKey> workProvider, TsdbClient<TKey, TEntry> client )
+         : this( workProvider, client, NullTsdbLogger.Default )
+      {
       }
 
       internal TsdbClient<TKey, TEntry> Client
@@ -47,6 +51,14 @@ namespace Vibrant.Tsdb
          get
          {
             return _workProvider;
+         }
+      }
+
+      internal ITsdbLogger Logger
+      {
+         get
+         {
+            return _logger;
          }
       }
 
@@ -81,7 +93,7 @@ namespace Vibrant.Tsdb
             }
             catch( Exception e )
             {
-               RaiseMoveTemporaryDataFailed( e );
+               _logger.Error( e, "An error ocurred while moving entries from temporary to dynamic storage." );
             }
 
             var scheduleTime = DateTime.UtcNow + _workProvider.GetTemporaryMovalInterval();
@@ -119,16 +131,6 @@ namespace Vibrant.Tsdb
                work.Schedule();
             }
          }
-      }
-
-      internal void RaiseMoveTemporaryDataFailed( Exception exception )
-      {
-         MoveTemporaryDataFailed?.Invoke( this, new ExceptionEventArgs( exception ) );
-      }
-
-      internal void RaiseMoveToVolumeStorageFailed( Exception exception )
-      {
-         MoveToVolumeStorageFailed?.Invoke( this, new ExceptionEventArgs( exception ) );
       }
 
       protected virtual void Dispose( bool disposing )

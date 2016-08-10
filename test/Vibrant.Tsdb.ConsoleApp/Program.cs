@@ -12,7 +12,7 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.ConsoleApp
 {
-   public class Program : IWorkProvider<string>
+   public class Program : IWorkProvider<string>, ITsdbLogger
    {
       public event Action<TsdbVolumeMoval<string>> MovalChangedOrAdded;
       public event Action<string> MovalRemoved;
@@ -55,34 +55,30 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          var client = TsdbFactory.CreateAtsClient<string, BasicEntry>(
             "VolumeTable",
+            //sql.GetSection( "ConnectionString" ).Value,
             "DynamicTable",
             ats.GetSection( "ConnectionString" ).Value,
-            @"C:\tsdb\cache" );
+            @"C:\tsdb\cache",
+            this );
 
          // redis.GetSection( "ConnectionString" ).Value
 
-         client.TemporaryWriteFailure += Client_TemporaryWriteFailure;
-         client.WriteFailure += Client_WriteFailure;
-
-         var batcher = new TsdbWriteBatcher<string, BasicEntry>( client, PublicationType.None, TimeSpan.FromSeconds( 5 ), 10000 );
+         var batcher = new TsdbWriteBatcher<string, BasicEntry>( client, PublicationType.None, TimeSpan.FromSeconds( 5 ), 20000, this );
 
          var engine = new TsdbEngine<string, BasicEntry>( this, client );
-         engine.MoveTemporaryDataFailed += Engine_MoveTemporaryDataFailed;
-         engine.MoveToVolumeStorageFailed += Engine_MoveToVolumeStorageFailed;
          engine.StartAsync().Wait();
 
          // TODO: Test if this works as expected
          //  -> Moval to temp storage and moval away from it again...
          //  -> Dont keep this moving infitely to test
 
+         Console.WriteLine( $"Info: Writing entries..." );
          while( true )
          {
             var now = DateTime.UtcNow;
             foreach( var ds in _dataSources )
             {
                var entries = ds.GetEntries( now ).ToList();
-
-               Console.WriteLine( $"Writing {entries.Count} entries..." );
 
                batcher.Write( entries );
             }
@@ -92,45 +88,6 @@ namespace Vibrant.Tsdb.ConsoleApp
       }
 
       private int _c1, _c2, _c3, _c4;
-
-      private void Client_WriteFailure( object sender, TsdbWriteFailureEventArgs<string, BasicEntry> e )
-      {
-         if(!( e.Exception is SqlException ) )
-         {
-
-         }
-
-         Console.WriteLine( "Client_WriteFailure: " + e.Exception );
-      }
-
-      private void Client_TemporaryWriteFailure( object sender, TsdbWriteFailureEventArgs<string, BasicEntry> e )
-      {
-         if( !( e.Exception is SqlException ) )
-         {
-
-         }
-
-         Console.WriteLine( "Client_TemporaryWriteFailure: " + e.Exception );
-      }
-
-      private void Engine_MoveToVolumeStorageFailed( object sender, ExceptionEventArgs e )
-      {
-         if( !( e.Exception is SqlException ) )
-         {
-         }
-
-         Console.WriteLine( "Engine_MoveToVolumeStorageFailed: " + e.Exception );
-      }
-
-      private void Engine_MoveTemporaryDataFailed( object sender, ExceptionEventArgs e )
-      {
-         if( !( e.Exception is SqlException ) )
-         {
-
-         }
-
-         Console.WriteLine( "Engine_MoveTemporaryDataFailed: " + e.Exception );
-      }
 
       public Task<IEnumerable<TsdbVolumeMoval<string>>> GetAllMovalsAsync( DateTime now )
       {
@@ -162,6 +119,56 @@ namespace Vibrant.Tsdb.ConsoleApp
       public int GetDynamicMovalBatchSize()
       {
          return 5000;
+      }
+
+      public void Debug( string message )
+      {
+         Console.WriteLine( "Debug: " + message );
+      }
+
+      public void Info( string message )
+      {
+         Console.WriteLine( "Info: " + message );
+      }
+
+      public void Warn( string message )
+      {
+         Console.WriteLine( "Warn: " + message );
+      }
+
+      public void Error( string message )
+      {
+         Console.WriteLine( "Error: " + message );
+      }
+
+      public void Fatal( string message )
+      {
+         Console.WriteLine( "Fatal: " + message );
+      }
+
+      public void Debug( Exception e, string message )
+      {
+         Console.WriteLine( "Debug: " + message + "(" + e.GetType().Name + ")" );
+      }
+
+      public void Info( Exception e, string message )
+      {
+         Console.WriteLine( "Info: " + message + "(" + e.GetType().Name + ")" );
+      }
+
+      public void Warn( Exception e, string message )
+      {
+         Console.WriteLine( "Warn: " + message + "(" + e.GetType().Name + ")" );
+      }
+
+      public void Error( Exception e, string message )
+      {
+         Console.WriteLine( "Error: " + message + "(" + e.GetType().Name + ")" );
+      }
+
+      public void Fatal( Exception e, string message )
+      {
+         Console.WriteLine( "Fatal: " + message + "(" + e.GetType().Name + ")" );
       }
    }
 }

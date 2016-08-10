@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -9,6 +10,8 @@ namespace Vibrant.Tsdb
    public class TsdbWriteBatcher<TKey, TEntry> : IDisposable
       where TEntry : IEntry<TKey>
    {
+      private static readonly TimeSpan MinWarningInterval = TimeSpan.FromMinutes( 1 );
+
       private object _sync = new object();
       private TsdbClient<TKey, TEntry> _client;
       private BatchWrite<TKey, TEntry> _currentBatch;
@@ -17,9 +20,16 @@ namespace Vibrant.Tsdb
       private PublicationType _publish;
       private bool _disposed = false;
       private CancellationTokenSource _cts;
+      private ITsdbLogger _logger;
       private int _maxBatchSize;
+      private DateTime? _lastWarnTime;
 
-      public TsdbWriteBatcher( TsdbClient<TKey, TEntry> client, PublicationType publish, TimeSpan writeInterval, int maxBatchSize )
+      public TsdbWriteBatcher( 
+         TsdbClient<TKey, TEntry> client, 
+         PublicationType publish, 
+         TimeSpan writeInterval, 
+         int maxBatchSize,
+         ITsdbLogger logger )
       {
          _client = client;
          _writeInterval = writeInterval;
@@ -27,6 +37,7 @@ namespace Vibrant.Tsdb
          _maxBatchSize = maxBatchSize;
          _batches = new Queue<BatchWrite<TKey, TEntry>>();
          _cts = new CancellationTokenSource();
+         _logger = logger;
 
          ThreadPool.QueueUserWorkItem( WriteLoop );
       }
@@ -73,8 +84,7 @@ namespace Vibrant.Tsdb
       {
          while( !_disposed )
          {
-            BatchWrite<TKey, TEntry> write = GetBatchToWrite();
-
+            var write = GetBatchToWrite();
             if( write != null )
             {
                try
@@ -93,6 +103,14 @@ namespace Vibrant.Tsdb
                if( _batches.Count == 0 )
                {
                   await Task.Delay( _writeInterval, _cts.Token ).ConfigureAwait( false );
+               }
+               else if( _batches.Count >= 10 )
+               {
+                  if( !_lastWarnTime.HasValue || ( DateTime.UtcNow - _lastWarnTime ) > MinWarningInterval )
+                  {
+                     _logger.Warn( $"There are {_batches.Count} of ~{_maxBatchSize} entries queued batches waiting to be written. This is an indication that the storage is too slow to handle the ingestion." );
+                     _lastWarnTime = DateTime.UtcNow;
+                  }
                }
             }
             catch( OperationCanceledException )

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -8,41 +9,67 @@ namespace Vibrant.Tsdb
    public class TsdbClient<TKey, TEntry> : IStorage<TKey, TEntry>, ISubscribe<TKey, TEntry>
       where TEntry : IEntry<TKey>
    {
-      public event EventHandler<TsdbWriteFailureEventArgs<TKey, TEntry>> WriteFailure;
-      public event EventHandler<TsdbWriteFailureEventArgs<TKey, TEntry>> TemporaryWriteFailure;
-
-      private TEntry[] _entries = new TEntry[ 0 ];
+      private static readonly TEntry[] _entries = new TEntry[ 0 ];
       private IDynamicStorageSelector<TKey, TEntry> _dynamicStorageSelector;
       private IVolumeStorageSelector<TKey, TEntry> _volumeStorageSelector;
       private IPublishSubscribe<TKey, TEntry> _remotePublishSubscribe;
       private ITemporaryStorage<TKey, TEntry> _temporaryStorage;
+      private ITsdbLogger _logger;
       private DefaultPublishSubscribe<TKey, TEntry> _localPublishSubscribe;
 
       public TsdbClient(
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
          IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
          IPublishSubscribe<TKey, TEntry> remotePublishSubscribe,
-         ITemporaryStorage<TKey, TEntry> temporaryStorage )
+         ITemporaryStorage<TKey, TEntry> temporaryStorage,
+         ITsdbLogger logger )
       {
          _dynamicStorageSelector = dynamicStorageSelector;
          _volumeStorageSelector = volumeStorageSelector;
          _remotePublishSubscribe = remotePublishSubscribe;
          _temporaryStorage = temporaryStorage;
          _localPublishSubscribe = new DefaultPublishSubscribe<TKey, TEntry>( false );
+         _logger = logger;
+      }
+
+      public TsdbClient(
+         IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
+         IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         IPublishSubscribe<TKey, TEntry> remotePublishSubscribe,
+         ITemporaryStorage<TKey, TEntry> temporaryStorage )
+         : this( dynamicStorageSelector, volumeStorageSelector, remotePublishSubscribe, temporaryStorage, NullTsdbLogger.Default )
+      {
       }
 
       public TsdbClient(
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
          IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
          ITemporaryStorage<TKey, TEntry> temporaryStorage )
-         : this( dynamicStorageSelector, volumeStorageSelector, null, temporaryStorage )
+         : this( dynamicStorageSelector, volumeStorageSelector, null, temporaryStorage, NullTsdbLogger.Default )
       {
       }
 
       public TsdbClient(
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
          ITemporaryStorage<TKey, TEntry> temporaryStorage )
-         : this( dynamicStorageSelector, null, null, temporaryStorage )
+         : this( dynamicStorageSelector, null, null, temporaryStorage, NullTsdbLogger.Default )
+      {
+      }
+
+      public TsdbClient(
+         IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
+         IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         ITemporaryStorage<TKey, TEntry> temporaryStorage,
+         ITsdbLogger logger )
+         : this( dynamicStorageSelector, volumeStorageSelector, null, temporaryStorage, logger )
+      {
+      }
+
+      public TsdbClient(
+         IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
+         ITemporaryStorage<TKey, TEntry> temporaryStorage,
+         ITsdbLogger logger )
+         : this( dynamicStorageSelector, null, null, temporaryStorage, logger )
       {
       }
 
@@ -80,6 +107,8 @@ namespace Vibrant.Tsdb
          var dynamic = _dynamicStorageSelector.GetStorage( id );
          var volume = _volumeStorageSelector.GetStorage( id );
 
+         var sw = Stopwatch.StartNew();
+
          IContinuationToken token = null;
          do
          {
@@ -87,6 +116,9 @@ namespace Vibrant.Tsdb
             await volume.Write( segment.Entries ).ConfigureAwait( false );
             await segment.DeleteAsync().ConfigureAwait( false );
             token = segment.ContinuationToken;
+
+            _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+            sw.Restart();
          }
          while( token.HasMore );
       }
@@ -101,6 +133,8 @@ namespace Vibrant.Tsdb
          var dynamic = _dynamicStorageSelector.GetStorage( id );
          var volume = _volumeStorageSelector.GetStorage( id );
 
+         var sw = Stopwatch.StartNew();
+
          IContinuationToken token = null;
          do
          {
@@ -108,12 +142,16 @@ namespace Vibrant.Tsdb
             await volume.Write( segment.Entries ).ConfigureAwait( false );
             await segment.DeleteAsync().ConfigureAwait( false );
             token = segment.ContinuationToken;
+
+            _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+            sw.Restart();
          }
          while( token.HasMore );
       }
 
       public async Task MoveFromTemporaryStorage( int batchSize )
       {
+         var sw = Stopwatch.StartNew();
          int read = 0;
          do
          {
@@ -132,6 +170,9 @@ namespace Vibrant.Tsdb
 
                // delete
                batch.Delete();
+
+               _logger.Info( $"Moved {batch.Entries.Count} from temporary to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+               sw.Restart();
             }
          }
          while( read != 0 );
@@ -143,10 +184,13 @@ namespace Vibrant.Tsdb
          {
             throw new InvalidOperationException( "No volume storage has been provided for this TsdbClient." );
          }
+         var sw = Stopwatch.StartNew();
 
          var tasks = new List<Task>();
          tasks.AddRange( LookupVolumeStorages( items ).Select( c => c.Storage.Write( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+         _logger.Info( $"Wrote {items.Count()} directly to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
       }
 
       public Task Write( IEnumerable<TEntry> items )
@@ -196,9 +240,11 @@ namespace Vibrant.Tsdb
 
       private async Task<IEnumerable<TEntry>> WriteToDynamicStorage( IDynamicStorage<TKey, TEntry> storage, IEnumerable<TEntry> entries, bool useTemporaryStorageOnFailure )
       {
+         var sw = Stopwatch.StartNew();
          try
          {
             await storage.Write( entries ).ConfigureAwait( false );
+            _logger.Info( $"Wrote {entries.Count()} to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
             return entries;
          }
          catch( Exception e1 )
@@ -211,11 +257,12 @@ namespace Vibrant.Tsdb
                }
                catch( Exception e2 )
                {
-                  TemporaryWriteFailure?.Invoke( this, new TsdbWriteFailureEventArgs<TKey, TEntry>( entries, e2 ) );
+                  _logger.Error( e2, $"An error ocurred while writing to temporary storage after failing to write to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
                }
             }
 
-            WriteFailure?.Invoke( this, new TsdbWriteFailureEventArgs<TKey, TEntry>( entries, e1 ) );
+            _logger.Error( e1, $"An error ocurred while writing to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+
             return _entries;
          }
       }

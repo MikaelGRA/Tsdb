@@ -11,13 +11,17 @@ namespace Vibrant.Tsdb.Ats.Helpers
       private HashSet<TEntry> _uniqueEntries;
       private List<TEntry> _entries;
 
-      public EntrySplitResult( TKey id )
+      public EntrySplitResult( TKey key, string id, string partitionKey )
       {
-         Id = id;
+         Key = key;
          _uniqueEntries = new HashSet<TEntry>( new EntryEqualityComparer<TKey, TEntry>() );
       }
 
-      public TKey Id { get; set; }
+      public TKey Key { get; set; }
+
+      public string Id { get; set; }
+
+      public string PartitionKey { get; set; }
 
       public void Insert( TEntry entry )
       {
@@ -30,7 +34,7 @@ namespace Vibrant.Tsdb.Ats.Helpers
          _entries.Sort( EntryComparer.GetComparer<TKey, TEntry>( sort ) );
       }
 
-      public IReadOnlyList<TEntry> Entries
+      public List<TEntry> Entries
       {
          get
          {

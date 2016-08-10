@@ -47,7 +47,6 @@ namespace Vibrant.Tsdb.Ats.Serialization
          var stream = new MemoryStream();
          var writer = CreateWriter( stream );
          DateTime? from = null;
-         int batchYear = 0;
 
          int currentSize = 0;
          List<byte[]> serializedEntries = new List<byte[]>();
@@ -60,31 +59,6 @@ namespace Vibrant.Tsdb.Ats.Serialization
             if( !from.HasValue )
             {
                from = timestamp;
-               batchYear = timestamp.Year;
-            }
-            else
-            {
-               int otherEntryYear = timestamp.Year;
-               if( batchYear != otherEntryYear )
-               {
-                  writer.Write( serializedEntries.Count );
-                  var length = stream.ToArray();
-
-                  // reset stream
-                  stream.Seek( 0, SeekOrigin.Begin );
-                  stream.SetLength( 0 );
-
-                  // create big array from mall the small arrays
-                  var data = CreateData( currentSize, length, serializedEntries );
-
-                  // add the created result
-                  results.Add( new AtsSerializationResult( from.Value, data ) );
-
-                  // reset parameters
-                  from = null;
-                  currentSize = 0;
-                  serializedEntries = new List<byte[]>( serializedEntries.Count );
-               }
             }
 
             if( currentSize + MaxEntrySizeInBytes > maxByteArraySize )
