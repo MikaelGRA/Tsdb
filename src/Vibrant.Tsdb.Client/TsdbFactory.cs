@@ -27,7 +27,7 @@ namespace Vibrant.Tsdb.Client
          var sql = new SqlDynamicStorage<TKey, TEntry>( sqlTableName, sqlConnectionString );
          var ats = new AtsVolumeStorage<TKey, TEntry>( atsTableNamme, atsConnectionString );
          var sub = new RedisPublishSubscribe<TKey, TEntry>( redisConnectionString, false );
-         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024 );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory );
          return new TsdbClient<TKey, TEntry>( sql, ats, sub, files, logger );
       }
 
@@ -38,15 +38,21 @@ namespace Vibrant.Tsdb.Client
          string atsConnectionString, 
          string redisConnectionString, 
          string temporaryFileDirectory,
+         int sqlReadParallelism,
+         int sqlWriteParallelism,
+         int atsReadParallelism,
+         int atsWriteParallelism,
+         int maxTemporaryFileSize,
+         int maxTemporaryStorageSize,
          ITsdbLogger logger,
          IPartitionProvider<TKey> partitionProvider, 
          IKeyConverter<TKey> keyConverter )
          where TEntry : IEntry<TKey>, IAtsEntry<TKey>, ISqlEntry<TKey>, IRedisEntry<TKey>, IFileEntry<TKey>, new()
       {
-         var sql = new SqlDynamicStorage<TKey, TEntry>( sqlTableName, sqlConnectionString, 5, 5, keyConverter );
-         var ats = new AtsVolumeStorage<TKey, TEntry>( atsTableNamme, atsConnectionString, 25, 25, partitionProvider, keyConverter );
+         var sql = new SqlDynamicStorage<TKey, TEntry>( sqlTableName, sqlConnectionString, sqlReadParallelism, sqlWriteParallelism, keyConverter );
+         var ats = new AtsVolumeStorage<TKey, TEntry>( atsTableNamme, atsConnectionString, atsReadParallelism, atsWriteParallelism, partitionProvider, keyConverter );
          var sub = new RedisPublishSubscribe<TKey, TEntry>( redisConnectionString, false, keyConverter );
-         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024, keyConverter );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, maxTemporaryFileSize, maxTemporaryStorageSize, keyConverter );
          return new TsdbClient<TKey, TEntry>( sql, ats, sub, files, logger );
       }
 
@@ -56,13 +62,15 @@ namespace Vibrant.Tsdb.Client
          string atsConnectionString, 
          string redisConnectionString, 
          string temporaryFileDirectory,
+         int maxTemporaryFileSize,
+         int maxTemporaryStorageSize,
          ITsdbLogger logger )
          where TEntry : IEntry<TKey>, IAtsEntry<TKey>, IRedisEntry<TKey>, IFileEntry<TKey>, new()
       {
          var sql = new AtsDynamicStorage<TKey, TEntry>( dynamicAtsTableName, atsConnectionString );
          var ats = new AtsVolumeStorage<TKey, TEntry>( volumeAtsTableName, atsConnectionString );
          var sub = new RedisPublishSubscribe<TKey, TEntry>( redisConnectionString, false );
-         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024 );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, maxTemporaryFileSize, maxTemporaryStorageSize );
          return new TsdbClient<TKey, TEntry>( sql, ats, sub, files, logger );
       }
 
@@ -76,7 +84,7 @@ namespace Vibrant.Tsdb.Client
       {
          var sql = new AtsDynamicStorage<TKey, TEntry>( dynamicAtsTableName, atsConnectionString );
          var ats = new AtsVolumeStorage<TKey, TEntry>( volumeAtsTableName, atsConnectionString );
-         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024 );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory );
          return new TsdbClient<TKey, TEntry>( sql, ats, files, logger );
       }
 
@@ -85,15 +93,21 @@ namespace Vibrant.Tsdb.Client
          string volumeAtsTableName,
          string atsConnectionString, 
          string temporaryFileDirectory,
+         int dynamicAtsReadParallelism,
+         int dynamicAtsWriteParallelism,
+         int volumeAtsReadParallelism,
+         int volumeAtsWriteParallelism,
+         int maxTemporaryFileSize,
+         int maxTemporaryStorageSize,
          ITsdbLogger logger,
          IPartitionProvider<TKey> dynamicPartitionProvider, 
          IPartitionProvider<TKey> volumePartitionProvider, 
          IKeyConverter<TKey> keyConverter )
          where TEntry : IEntry<TKey>, IAtsEntry<TKey>, IFileEntry<TKey>, new()
       {
-         var sql = new AtsDynamicStorage<TKey, TEntry>( dynamicAtsTableName, atsConnectionString, 25, 25, dynamicPartitionProvider, keyConverter );
-         var ats = new AtsVolumeStorage<TKey, TEntry>( volumeAtsTableName, atsConnectionString, 25, 25, volumePartitionProvider, keyConverter );
-         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024, keyConverter );
+         var sql = new AtsDynamicStorage<TKey, TEntry>( dynamicAtsTableName, atsConnectionString, dynamicAtsReadParallelism, dynamicAtsWriteParallelism, dynamicPartitionProvider, keyConverter );
+         var ats = new AtsVolumeStorage<TKey, TEntry>( volumeAtsTableName, atsConnectionString, volumeAtsReadParallelism, volumeAtsWriteParallelism, volumePartitionProvider, keyConverter );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, maxTemporaryFileSize, maxTemporaryStorageSize, keyConverter );
          return new TsdbClient<TKey, TEntry>( sql, ats, files, logger );
       }
       public static TsdbClient<TKey, TEntry> CreateSqlAtsClient<TKey, TEntry>(
@@ -107,7 +121,7 @@ namespace Vibrant.Tsdb.Client
       {
          var sql = new SqlDynamicStorage<TKey, TEntry>( sqlTableName, sqlConnectionString );
          var ats = new AtsVolumeStorage<TKey, TEntry>( atsTableNamme, atsConnectionString );
-         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024 );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory );
          return new TsdbClient<TKey, TEntry>( sql, ats, null, files, logger );
       }
 
@@ -117,14 +131,20 @@ namespace Vibrant.Tsdb.Client
          string atsTableNamme,
          string atsConnectionString,
          string temporaryFileDirectory,
+         int sqlReadParallelism,
+         int sqlWriteParallelism,
+         int atsReadParallelism,
+         int atsWriteParallelism,
+         int maxTemporaryFileSize,
+         int maxTemporaryStorageSize,
          ITsdbLogger logger,
          IPartitionProvider<TKey> partitionProvider,
          IKeyConverter<TKey> keyConverter )
          where TEntry : IEntry<TKey>, IAtsEntry<TKey>, ISqlEntry<TKey>, IRedisEntry<TKey>, IFileEntry<TKey>, new()
       {
-         var sql = new SqlDynamicStorage<TKey, TEntry>( sqlTableName, sqlConnectionString, 5, 5, keyConverter );
-         var ats = new AtsVolumeStorage<TKey, TEntry>( atsTableNamme, atsConnectionString, 25, 25, partitionProvider, keyConverter );
-         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, 1 * 1024 * 1024, 1024 * 1024 * 1024, keyConverter );
+         var sql = new SqlDynamicStorage<TKey, TEntry>( sqlTableName, sqlConnectionString, sqlReadParallelism, sqlWriteParallelism, keyConverter );
+         var ats = new AtsVolumeStorage<TKey, TEntry>( atsTableNamme, atsConnectionString, atsReadParallelism, atsWriteParallelism, partitionProvider, keyConverter );
+         var files = new TemporaryFileStorage<TKey, TEntry>( temporaryFileDirectory, maxTemporaryFileSize, maxTemporaryStorageSize, keyConverter );
          return new TsdbClient<TKey, TEntry>( sql, ats, null, files, logger );
       }
    }

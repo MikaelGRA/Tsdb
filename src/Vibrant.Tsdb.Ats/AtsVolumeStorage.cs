@@ -20,6 +20,9 @@ namespace Vibrant.Tsdb.Ats
    public class AtsVolumeStorage<TKey, TEntry> : IVolumeStorage<TKey, TEntry>, IVolumeStorageSelector<TKey, TEntry>, IDisposable
       where TEntry : IAtsEntry<TKey>, new()
    {
+      public const int DefaultReadParallelism = 15;
+      public const int DefaultWriteParallelism = 30;
+
       private object _sync = new object();
       private SemaphoreSlim _read;
       private SemaphoreSlim _write;
@@ -54,7 +57,7 @@ namespace Vibrant.Tsdb.Ats
       }
 
       public AtsVolumeStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, 15, 30, new YearlyPartitioningProvider<TKey>() )
+         : this( tableName, connectionString, DefaultReadParallelism, DefaultWriteParallelism, new YearlyPartitioningProvider<TKey>() )
       {
       }
 

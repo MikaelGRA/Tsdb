@@ -16,6 +16,9 @@ namespace Vibrant.Tsdb.Sql
    public class SqlDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
       where TEntry : ISqlEntry<TKey>, new()
    {
+      private const int DefaultReadParallelism = 5;
+      private const int DefaultWriteParallelism = 5;
+
       private object _sync = new object();
       private string _tableName;
       private string _connectionString;
@@ -43,7 +46,7 @@ namespace Vibrant.Tsdb.Sql
       }
 
       public SqlDynamicStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, 5, 5, DefaultKeyConverter<TKey>.Current )
+         : this( tableName, connectionString, DefaultReadParallelism, DefaultWriteParallelism, DefaultKeyConverter<TKey>.Current )
       {
       }
 

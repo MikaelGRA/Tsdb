@@ -14,6 +14,9 @@ namespace Vibrant.Tsdb.InfluxDB
    public class InfluxDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
       where TEntry : IInfluxEntry<TKey>, new()
    {
+      public const int DefaultReadParallelism = 20;
+      public const int DefaultWriteParallelism = 5;
+
       private DateTime _maxFrom = new DateTime( 2050, 1, 1, 0, 0, 0, DateTimeKind.Utc );
       private object _sync = new object();
       private InfluxClient _client;
@@ -40,7 +43,7 @@ namespace Vibrant.Tsdb.InfluxDB
       }
 
       public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, IKeyConverter<TKey> keyConverter )
-         : this( endpoint, database, username, password, 20, 5, keyConverter )
+         : this( endpoint, database, username, password, DefaultReadParallelism, DefaultWriteParallelism, keyConverter )
       {
       }
 
@@ -55,7 +58,7 @@ namespace Vibrant.Tsdb.InfluxDB
       }
 
       public InfluxDynamicStorage( Uri endpoint, string database, int readParallelism, int writeParallelism )
-         : this( endpoint, database, null, null, 20, 5, DefaultKeyConverter<TKey>.Current )
+         : this( endpoint, database, null, null, DefaultReadParallelism, DefaultWriteParallelism, DefaultKeyConverter<TKey>.Current )
       {
 
       }

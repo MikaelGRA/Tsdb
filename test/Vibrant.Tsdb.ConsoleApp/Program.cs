@@ -3,20 +3,22 @@ using System.Collections.Generic;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Net;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Vibrant.Tsdb.Ats;
 using Vibrant.Tsdb.Client;
 using Vibrant.Tsdb.ConsoleApp.Entries;
+using Vibrant.Tsdb.Files;
 using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.ConsoleApp
 {
-   public class Program : IWorkProvider<string>, ITsdbLogger
+   public class Program : IWorkProvider<BasicKey>, ITsdbLogger, IKeyConverter<BasicKey>
    {
-      public event Action<TsdbVolumeMoval<string>> MovalChangedOrAdded;
-      public event Action<string> MovalRemoved;
+      public event Action<TsdbVolumeMoval<BasicKey>> MovalChangedOrAdded;
+      public event Action<BasicKey> MovalRemoved;
 
       public static void Main( string[] args )
       {
@@ -30,7 +32,7 @@ namespace Vibrant.Tsdb.ConsoleApp
          Console.ReadKey();
       }
 
-      private DataSource[] _dataSources;
+      private List<DataSource> _dataSources;
 
       public Program( IConfiguration config )
       {
@@ -46,34 +48,42 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          var startTime = DateTime.UtcNow;
 
-         _dataSources = new DataSource[]
+         _dataSources = new List<DataSource>();
+         for( int i = 0 ; i < 100 ; i++ )
          {
-            new DataSource("m2", startTime, TimeSpan.FromMilliseconds( 1 ) ),
-            new DataSource("m3", startTime, TimeSpan.FromMilliseconds( 1 ) ),
-            new DataSource("m4", startTime, TimeSpan.FromMilliseconds( 1 ) ),
-            new DataSource("m5", startTime, TimeSpan.FromMilliseconds( 1 ) ),
-            new DataSource("m6", startTime, TimeSpan.FromMilliseconds( 1 ) ),
-            new DataSource("m7", startTime, TimeSpan.FromMilliseconds( 1 ) ),
-            new DataSource("m8", startTime, TimeSpan.FromMilliseconds( 1 ) ),
-            new DataSource("m9", startTime, TimeSpan.FromMilliseconds( 1 ) ),
-            new DataSource("m1", startTime, TimeSpan.FromMilliseconds( 1 ) ),
-            new DataSource("m10", startTime, TimeSpan.FromMilliseconds( 1 ) ),
-         };
+            _dataSources.Add( new DataSource( new BasicKey { Id = Guid.NewGuid(), Sampling = Sampling.Daily }, startTime, TimeSpan.FromMilliseconds( 10 ) ) );
+         }
 
-         var client = TsdbFactory.CreateAtsClient<string, BasicEntry>(
-            "VolumeTable",
-            //sql.GetSection( "ConnectionString" ).Value,
-            "DynamicTable",
+         var dats = new AtsDynamicStorage<BasicKey, BasicEntry>( 
+            "DynamicTableXX", 
             ats.GetSection( "ConnectionString" ).Value,
-            @"C:\tsdb\cache",
+            AtsDynamicStorage<BasicKey, BasicEntry>.DefaultReadParallelism,
+            AtsDynamicStorage<BasicKey, BasicEntry>.DefaultWriteParallelism, 
+            new YearlyPartitioningProvider<BasicKey>(), 
             this );
 
+         var vats = new AtsVolumeStorage<BasicKey, BasicEntry>( 
+            "VolumeTableXX", 
+            ats.GetSection( "ConnectionString" ).Value,
+            AtsVolumeStorage<BasicKey, BasicEntry>.DefaultReadParallelism,
+            AtsVolumeStorage<BasicKey, BasicEntry>.DefaultReadParallelism, 
+            new YearlyPartitioningProvider<BasicKey>(), 
+            this );
+
+         var tfs = new TemporaryFileStorage<BasicKey, BasicEntry>( 
+            @"C:\tsdb\cache",
+            TemporaryFileStorage<BasicKey, BasicEntry>.DefaultMaxFileSize,
+            TemporaryFileStorage<BasicKey, BasicEntry>.DefaultMaxStorageSize,
+            this );
+
+         var client = new TsdbClient<BasicKey, BasicEntry>( dats, vats, tfs, this );
+         
          // redis.GetSection( "ConnectionString" ).Value
 
-         var batcher = new TsdbWriteBatcher<string, BasicEntry>( client, PublicationType.None, TimeSpan.FromSeconds( 5 ), 20000, this );
+         var batcher = new TsdbWriteBatcher<BasicKey, BasicEntry>( client, PublicationType.None, TimeSpan.FromSeconds( 5 ), 20000, this );
 
-         var engine = new TsdbEngine<string, BasicEntry>( this, client );
-         engine.StartAsync().Wait();
+         //var engine = new TsdbEngine<string, BasicEntry>( this, client );
+         //engine.StartAsync().Wait();
 
          // TODO: Test if this works as expected
          //  -> Moval to temp storage and moval away from it again...
@@ -96,21 +106,21 @@ namespace Vibrant.Tsdb.ConsoleApp
 
       private int _c1, _c2, _c3, _c4;
 
-      public Task<IEnumerable<TsdbVolumeMoval<string>>> GetAllMovalsAsync( DateTime now )
+      public Task<IEnumerable<TsdbVolumeMoval<BasicKey>>> GetAllMovalsAsync( DateTime now )
       {
          // move data that is two minutes old, every minute
          var movalTime = now + TimeSpan.FromMinutes( 1 );
          var moveUntil = movalTime - TimeSpan.FromMinutes( 2 );
-         return Task.FromResult( _dataSources.Select( x => new TsdbVolumeMoval<string>( x.Id, movalTime, moveUntil ) ) );
+         return Task.FromResult( _dataSources.Select( x => new TsdbVolumeMoval<BasicKey>( x.Id, movalTime, moveUntil ) ) );
 
       }
 
-      public Task<TsdbVolumeMoval<string>> GetMovalAsync( TsdbVolumeMoval<string> completedMoval )
+      public Task<TsdbVolumeMoval<BasicKey>> GetMovalAsync( TsdbVolumeMoval<BasicKey> completedMoval )
       {
          // move data that is two minutes old, every minute
          var movalTime = completedMoval.Timestamp + TimeSpan.FromMinutes( 1 );
          var moveUntil = movalTime - TimeSpan.FromMinutes( 2 );
-         return Task.FromResult( new TsdbVolumeMoval<string>( completedMoval.Id, movalTime, moveUntil ) );
+         return Task.FromResult( new TsdbVolumeMoval<BasicKey>( completedMoval.Id, movalTime, moveUntil ) );
       }
 
       public TimeSpan GetTemporaryMovalInterval()
@@ -120,6 +130,8 @@ namespace Vibrant.Tsdb.ConsoleApp
 
       public int GetTemporaryMovalBatchSize()
       {
+         // This number should probably be very large and the items should be more or less
+         // continuously processed, BUT NOT AT THE SAME TIME!!!!! How can this be achieved?
          return 5000;
       }
 
@@ -176,6 +188,24 @@ namespace Vibrant.Tsdb.ConsoleApp
       public void Fatal( Exception e, string message )
       {
          Console.WriteLine( "Fatal: " + message + "(" + e.GetType().Name + ")" );
+      }
+
+      // requires optimal implementation
+      public BasicKey Convert( string key )
+      {
+         var parts = key.Split( '|' ); // substring or string split???
+         return new BasicKey
+         {
+            Id = Guid.Parse( parts[ 0 ] ),
+            Sampling = (Sampling)Enum.Parse( typeof(Sampling), parts[ 1 ] ), // dictionary lookup or parse?
+         };
+      }
+
+      public string Convert( BasicKey key )
+      {
+         var sb = new StringBuilder();
+         sb.Append( key.Id.ToString( "N" ) ).Append( "|" ).Append( key.Sampling ); // string builder of string concat?
+         return sb.ToString();
       }
    }
 }

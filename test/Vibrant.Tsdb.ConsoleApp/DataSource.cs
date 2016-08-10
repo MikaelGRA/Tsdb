@@ -14,14 +14,14 @@ namespace Vibrant.Tsdb.ConsoleApp
       private double _velocity = 0;
       private DateTime _currentTimestamp;
 
-      public DataSource( string id, DateTime startTime, TimeSpan interval )
+      public DataSource( BasicKey id, DateTime startTime, TimeSpan interval )
       {
          Id = id;
          _currentTimestamp = startTime;
          Interval = interval;
       }
 
-      public string Id { get; private set; }
+      public BasicKey Id { get; private set; }
 
       public TimeSpan Interval { get; private set; }
 

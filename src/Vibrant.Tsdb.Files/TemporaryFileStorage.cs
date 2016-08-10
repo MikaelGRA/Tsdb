@@ -12,6 +12,8 @@ namespace Vibrant.Tsdb.Files
    public class TemporaryFileStorage<TKey, TEntry> : ITemporaryStorage<TKey, TEntry>
       where TEntry : IFileEntry<TKey>, new()
    {
+      public const int DefaultMaxFileSize = 1 * 1024 * 1024;
+      public const long DefaultMaxStorageSize = 10L * 1024L * 1024L * 1024L;
       private static readonly string FileTemplate = "{0}.dat";
 
       private object _sync = new object();
@@ -33,7 +35,12 @@ namespace Vibrant.Tsdb.Files
       }
 
       public TemporaryFileStorage( string directory, int maxFileSize, long maxStorageSize )
-         : this(directory, maxFileSize, maxStorageSize, DefaultKeyConverter<TKey>.Current )
+         : this( directory, maxFileSize, maxStorageSize, DefaultKeyConverter<TKey>.Current )
+      {
+      }
+
+      public TemporaryFileStorage( string directory )
+         : this( directory, DefaultMaxFileSize, DefaultMaxStorageSize, DefaultKeyConverter<TKey>.Current )
       {
       }
 

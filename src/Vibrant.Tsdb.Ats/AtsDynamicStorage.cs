@@ -13,6 +13,9 @@ namespace Vibrant.Tsdb.Ats
    public class AtsDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
      where TEntry : IAtsEntry<TKey>, new()
    {
+      public const int DefaultReadParallelism = 50;
+      public const int DefaultWriteParallelism = 50;
+
       private object _sync = new object();
       private SemaphoreSlim _read;
       private SemaphoreSlim _write;
@@ -49,7 +52,7 @@ namespace Vibrant.Tsdb.Ats
       }
 
       public AtsDynamicStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, 50, 50, new YearlyPartitioningProvider<TKey>() )
+         : this( tableName, connectionString, DefaultReadParallelism, DefaultWriteParallelism, new YearlyPartitioningProvider<TKey>() )
       {
       }
 
