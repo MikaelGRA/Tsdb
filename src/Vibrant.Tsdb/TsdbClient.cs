@@ -281,7 +281,7 @@ namespace Vibrant.Tsdb
       public async Task Delete( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          var tasks = new List<Task>();
-         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, from, to ) ) );
+         tasks.AddRange( LookupDynamicStorages( ids, from, to ).Select( c => c.Storage.Delete( c.Lookups, c.From.Value, c.To.Value ) ) );
          if( _volumeStorageSelector != null )
          {
             tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Delete( c.Lookups, from, to ) ) );
@@ -291,6 +291,9 @@ namespace Vibrant.Tsdb
 
       public async Task<MultiReadResult<TKey, TEntry>> ReadLatest( IEnumerable<TKey> ids )
       {
+         // TODO: Requires overhaul
+         // REQUIRES: From + To on returned object to sort queries!
+
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
          tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.ReadLatest( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
@@ -341,10 +344,10 @@ namespace Vibrant.Tsdb
       public async Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
-         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Read( c.Lookups, from, to, sort ) ) );
+         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Read( c.Lookups, c.From.Value, c.To.Value, sort ) ) );
          if( _volumeStorageSelector != null )
          {
-            tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Read( c.Lookups, from, to, sort ) ) );
+            tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Read( c.Lookups, c.From.Value, c.To.Value, sort ) ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();
@@ -388,16 +391,76 @@ namespace Vibrant.Tsdb
 
          foreach( var entry in entries )
          {
-            var storageForId = _volumeStorageSelector.GetStorage( entry.GetKey() );
-
-            VolumeStorageLookupResult<TKey, TEntry, TEntry> existingStorage;
-            if( !result.TryGetValue( storageForId, out existingStorage ) )
+            var storage = _volumeStorageSelector.GetStorage( entry );
+            if( storage != null )
             {
-               existingStorage = new VolumeStorageLookupResult<TKey, TEntry, TEntry>( storageForId );
-               result.Add( storageForId, existingStorage );
-            }
+               VolumeStorageLookupResult<TKey, TEntry, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  existingStorage = new VolumeStorageLookupResult<TKey, TEntry, TEntry>( storage );
+                  result.Add( storage, existingStorage );
+               }
 
-            existingStorage.Lookups.Add( entry );
+               existingStorage.Lookups.Add( entry );
+            }
+         }
+
+         return result.Values;
+      }
+
+      private IEnumerable<VolumeStorageLookupResult<TKey, TKey, TEntry>> LookupVolumeStorages( IEnumerable<TKey> ids )
+      {
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>, VolumeStorageLookupResult<TKey, TKey, TEntry>>();
+
+         foreach( var id in ids )
+         {
+            var storages = _volumeStorageSelector.GetStorage( id );
+            foreach( var storage in storages )
+            {
+               VolumeStorageLookupResult<TKey, TKey, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  existingStorage = new VolumeStorageLookupResult<TKey, TKey, TEntry>( storage.Storage );
+                  result.Add( storage, existingStorage );
+               }
+
+               existingStorage.Lookups.Add( id );
+            }
+         }
+
+         return result.Values;
+      }
+
+      private IEnumerable<VolumeStorageLookupResult<TKey, TKey, TEntry>> LookupVolumeStorages( IEnumerable<TKey> ids, DateTime from, DateTime to )
+      {
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>, VolumeStorageLookupResult<TKey, TKey, TEntry>>();
+
+         foreach( var id in ids )
+         {
+            var storages = _volumeStorageSelector.GetStorage( id );
+            foreach( var storage in storages )
+            {
+               VolumeStorageLookupResult<TKey, TKey, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  var actualFrom = storage.From ?? from;
+                  if( actualFrom < from )
+                  {
+                     actualFrom = from;
+                  }
+
+                  var actualTo = storage.To ?? to;
+                  if( actualTo > to )
+                  {
+                     actualTo = to;
+                  }
+
+                  existingStorage = new VolumeStorageLookupResult<TKey, TKey, TEntry>( storage.Storage, actualFrom, actualTo );
+                  result.Add( storage, existingStorage );
+               }
+
+               existingStorage.Lookups.Add( id );
+            }
          }
 
          return result.Values;
@@ -409,13 +472,13 @@ namespace Vibrant.Tsdb
 
          foreach( var entry in entries )
          {
-            var storageForId = _dynamicStorageSelector.GetStorage( entry.GetKey() );
+            var storage = _dynamicStorageSelector.GetStorage( entry );
 
             DynamicStorageLookupResult<TKey, TEntry, TEntry> existingStorage;
-            if( !result.TryGetValue( storageForId, out existingStorage ) )
+            if( !result.TryGetValue( storage, out existingStorage ) )
             {
-               existingStorage = new DynamicStorageLookupResult<TKey, TEntry, TEntry>( storageForId );
-               result.Add( storageForId, existingStorage );
+               existingStorage = new DynamicStorageLookupResult<TKey, TEntry, TEntry>( storage );
+               result.Add( storage, existingStorage );
             }
 
             existingStorage.Lookups.Add( entry );
@@ -424,43 +487,59 @@ namespace Vibrant.Tsdb
          return result.Values;
       }
 
-      private IEnumerable<VolumeStorageLookupResult<TKey, TKey, TEntry>> LookupVolumeStorages( IEnumerable<TKey> ids )
+      private IEnumerable<DynamicStorageLookupResult<TKey, TKey, TEntry>> LookupDynamicStorages( IEnumerable<TKey> ids )
       {
-         var result = new Dictionary<IStorage<TKey, TEntry>, VolumeStorageLookupResult<TKey, TKey, TEntry>>();
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, TKey, TEntry>>();
 
          foreach( var id in ids )
          {
-            var storageForId = _volumeStorageSelector.GetStorage( id );
-
-            VolumeStorageLookupResult<TKey, TKey, TEntry> existingStorage;
-            if( !result.TryGetValue( storageForId, out existingStorage ) )
+            var storages = _dynamicStorageSelector.GetStorage( id );
+            foreach( var storage in storages )
             {
-               existingStorage = new VolumeStorageLookupResult<TKey, TKey, TEntry>( storageForId );
-               result.Add( storageForId, existingStorage );
-            }
+               DynamicStorageLookupResult<TKey, TKey, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  existingStorage = new DynamicStorageLookupResult<TKey, TKey, TEntry>( storage.Storage );
+                  result.Add( storage, existingStorage );
+               }
 
-            existingStorage.Lookups.Add( id );
+               existingStorage.Lookups.Add( id );
+            }
          }
 
          return result.Values;
       }
 
-      private IEnumerable<DynamicStorageLookupResult<TKey, TKey, TEntry>> LookupDynamicStorages( IEnumerable<TKey> ids )
+      private IEnumerable<DynamicStorageLookupResult<TKey, TKey, TEntry>> LookupDynamicStorages( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
-         var result = new Dictionary<IStorage<TKey, TEntry>, DynamicStorageLookupResult<TKey, TKey, TEntry>>();
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, TKey, TEntry>>();
 
          foreach( var id in ids )
          {
-            var storageForId = _dynamicStorageSelector.GetStorage( id );
-
-            DynamicStorageLookupResult<TKey, TKey, TEntry> existingStorage;
-            if( !result.TryGetValue( storageForId, out existingStorage ) )
+            var storages = _dynamicStorageSelector.GetStorage( id, from, to );
+            foreach( var storage in storages )
             {
-               existingStorage = new DynamicStorageLookupResult<TKey, TKey, TEntry>( storageForId );
-               result.Add( storageForId, existingStorage );
-            }
+               DynamicStorageLookupResult<TKey, TKey, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  var actualFrom = storage.From ?? from;
+                  if( actualFrom < from )
+                  {
+                     actualFrom = from;
+                  }
 
-            existingStorage.Lookups.Add( id );
+                  var actualTo = storage.To ?? to;
+                  if( actualTo > to )
+                  {
+                     actualTo = to;
+                  }
+
+                  existingStorage = new DynamicStorageLookupResult<TKey, TKey, TEntry>( storage.Storage, from, to );
+                  result.Add( storage, existingStorage );
+               }
+
+               existingStorage.Lookups.Add( id );
+            }
          }
 
          return result.Values;

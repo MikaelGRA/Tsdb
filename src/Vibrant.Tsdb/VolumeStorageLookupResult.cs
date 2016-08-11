@@ -13,5 +13,9 @@ namespace Vibrant.Tsdb
       {
 
       }
+
+      public VolumeStorageLookupResult( IVolumeStorage<TKey, TEntry> storage, DateTime? from, DateTime? to ) : base( storage, from, to )
+      {
+      }
    }
 }

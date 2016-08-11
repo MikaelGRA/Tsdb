@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class StorageSelection<TKey, TEntry, TStorage>
+   public struct StorageSelection<TKey, TEntry, TStorage>
       where TStorage : IStorage<TKey, TEntry>
       where TEntry : IEntry<TKey>
    {
@@ -19,6 +19,8 @@ namespace Vibrant.Tsdb
       public StorageSelection( TStorage storage )
       {
          Storage = storage;
+         From = null;
+         To = null;
       }
 
       public TStorage Storage { get; private set; }

@@ -7,10 +7,10 @@ namespace Vibrant.Tsdb
 {
    public interface IDynamicStorageSelector<TKey, TEntry> where TEntry : IEntry<TKey>
    {
-      IDynamicStorage<TKey, TEntry> GetStorage( TKey id );
+      IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id );
 
-      //IDynamicStorage<TKey, TEntry> GetStorage( TKey id, DateTime from, DateTime to );
+      IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime from, DateTime to );
 
-      //IDynamicStorage<TKey, TEntry> GetStorage( TEntry entry );
+      IDynamicStorage<TKey, TEntry> GetStorage( TEntry entry );
    }
 }
