@@ -15,4 +15,11 @@ namespace Vibrant.Tsdb
 
       Task Delete( IEnumerable<TKey> ids, DateTime to );
    }
+
+   public interface IExtendedDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry> where TEntry : IEntry<TKey>
+   {
+      Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime to, int segmentSize, Sort sort, object continuationToken );
+
+      Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, int segmentSize, Sort sort, object continuationToken );
+   }
 }

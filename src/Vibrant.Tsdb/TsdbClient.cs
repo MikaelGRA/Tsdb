@@ -315,7 +315,7 @@ namespace Vibrant.Tsdb
             if( missingIds.Count > 0 )
             {
                tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
-               tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.ReadLatest( c.Lookups ) ) );
+               tasks.AddRange( LookupVolumeStorages( missingIds ).Select( c => c.Storage.ReadLatest( c.Lookups ) ) );
                await Task.WhenAll( tasks ).ConfigureAwait( false );
 
                var intiallyMissingResult = tasks.Select( x => x.Result ).Combine();

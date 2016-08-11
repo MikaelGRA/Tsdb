@@ -40,6 +40,9 @@ namespace Vibrant.Tsdb
          _logger = logger;
 
          ThreadPool.QueueUserWorkItem( WriteLoop );
+         ThreadPool.QueueUserWorkItem( WriteLoop );
+         ThreadPool.QueueUserWorkItem( WriteLoop );
+         ThreadPool.QueueUserWorkItem( WriteLoop );
       }
 
       public Task Write( IEnumerable<TEntry> entries )
