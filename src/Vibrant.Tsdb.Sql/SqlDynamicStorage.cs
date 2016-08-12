@@ -184,7 +184,7 @@ namespace Vibrant.Tsdb.Sql
                {
                   var sqlEntries = await connection.QueryAsync<SqlEntry>(
                      sql: Sql.GetBottomlessQuery( _tableName, sort ),
-                     param: new { Ids = ids, To = to },
+                     param: new { Ids = ids.Select( x => _keyConverter.Convert( x ) ).ToList(), To = to },
                      transaction: tx ).ConfigureAwait( false );
 
                   return CreateReadResult( sqlEntries, ids, sort );
@@ -207,7 +207,7 @@ namespace Vibrant.Tsdb.Sql
                {
                   var sqlEntries = await connection.QueryAsync<SqlEntry>(
                      sql: Sql.GetRangedQuery( _tableName, sort ),
-                     param: new { Ids = ids, From = from, To = to },
+                     param: new { Ids = ids.Select( x => _keyConverter.Convert( x ) ).ToList(), From = from, To = to },
                      transaction: tx ).ConfigureAwait( false );
 
                   return CreateReadResult( sqlEntries, ids, sort );
@@ -230,7 +230,7 @@ namespace Vibrant.Tsdb.Sql
                {
                   var sqlEntries = await connection.QueryAsync<SqlEntry>(
                      sql: Sql.GetQuery( _tableName, sort ),
-                     param: new { Ids = ids },
+                     param: new { Ids = ids.Select( x => _keyConverter.Convert( x ) ).ToList() },
                      transaction: tx ).ConfigureAwait( false );
 
                   return CreateReadResult( sqlEntries, ids, sort );
@@ -258,7 +258,7 @@ namespace Vibrant.Tsdb.Sql
                   {
                      tasks.Add( connection.QueryAsync<SqlEntry>(
                         sql: Sql.GetLatestQuery( _tableName ),
-                        param: new { Id = id },
+                        param: new { Id = _keyConverter.Convert( id ) },
                         transaction: tx ) );
                   }
 
@@ -270,7 +270,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<SegmentedReadResult<TKey, TEntry>> RetrieveForIdSegmented( TKey id, DateTime? from, DateTime? to, int segmentSize, ContinuationToken continuationToken )
+      private async Task<SegmentedReadResult<TKey, TEntry>> RetrieveForIdSegmented( TKey key, DateTime? from, DateTime? to, int segmentSize, ContinuationToken continuationToken )
       {
          await CreateTable().ConfigureAwait( false );
          long skip = continuationToken?.Skip ?? 0;
@@ -283,14 +283,14 @@ namespace Vibrant.Tsdb.Sql
 
                using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
                {
-                  var query = Sql.GetSegmentedQuery( _tableName, from, to, skip, segmentSize );
+                  var query = Sql.GetSegmentedQuery( _tableName, _keyConverter.Convert( key ), from, to, skip, segmentSize );
 
                   var sqlEntries = await connection.QueryAsync<SqlEntry>(
                      sql: query.Sql,
                      param: query.Args,
                      transaction: tx ).ConfigureAwait( false );
 
-                  return CreateReadResult( id, sqlEntries, segmentSize, skip );
+                  return CreateReadResult( key, sqlEntries, segmentSize, skip );
                }
             }
          }
@@ -310,7 +310,7 @@ namespace Vibrant.Tsdb.Sql
                {
                   var count = await connection.ExecuteAsync(
                      sql: Sql.GetRangedDeleteCommand( _tableName ),
-                     param: new { Ids = ids, From = from, To = to },
+                     param: new { Ids = ids.Select( x => _keyConverter.Convert( x ) ).ToList(), From = from, To = to },
                      transaction: tx ).ConfigureAwait( false );
 
                   tx.Commit();
@@ -335,7 +335,7 @@ namespace Vibrant.Tsdb.Sql
                {
                   var count = await connection.ExecuteAsync(
                      sql: Sql.GetBottomlessDeleteCommand( _tableName ),
-                     param: new { Ids = ids, To = to },
+                     param: new { Ids = ids.Select( x => _keyConverter.Convert( x ) ).ToList(), To = to },
                      transaction: tx ).ConfigureAwait( false );
 
                   tx.Commit();
@@ -360,7 +360,7 @@ namespace Vibrant.Tsdb.Sql
                {
                   var count = await connection.ExecuteAsync(
                      sql: Sql.GetDeleteCommand( _tableName ),
-                     param: new { Ids = ids },
+                     param: new { Ids = ids.Select( x => _keyConverter.Convert( x ) ).ToList() },
                      transaction: tx ).ConfigureAwait( false );
 
                   tx.Commit();

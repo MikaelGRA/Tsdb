@@ -130,14 +130,14 @@ END
          }
       }
 
-      public static Query GetSegmentedQuery( string tableName, DateTime? from, DateTime? to, long skip, int take )
+      public static Query GetSegmentedQuery( string tableName, string id, DateTime? from, DateTime? to, long skip, int take )
       {
          if( from.HasValue && to.HasValue )
          {
             return new Query
             {
                Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] >= @From AND [Timestamp] < @To ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
-               Args = new { From = from.Value, To = to.Value, Skip = skip, Take = take }
+               Args = new { Id = id, From = from.Value, To = to.Value, Skip = skip, Take = take }
             };
          }
          else if( !from.HasValue && to.HasValue )
@@ -145,7 +145,7 @@ END
             return new Query
             {
                Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] < @To ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
-               Args = new { To = to.Value, Skip = skip, Take = take }
+               Args = new { Id = id, To = to.Value, Skip = skip, Take = take }
             };
          }
          else if( from.HasValue && !to.HasValue )
@@ -153,7 +153,7 @@ END
             return new Query
             {
                Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] >= @From ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
-               Args = new { From = from.Value, Skip = skip, Take = take }
+               Args = new { Id = id, From = from.Value, Skip = skip, Take = take }
             };
          }
          else
@@ -161,7 +161,7 @@ END
             return new Query
             {
                Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
-               Args = new { Skip = skip, Take = take }
+               Args = new { Id = id, Skip = skip, Take = take }
             };
          }
       }
