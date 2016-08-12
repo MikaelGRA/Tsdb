@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Vibrant.Tsdb
+namespace Vibrant.Tsdb.Client
 {
    public class TsdbWriteFailureEventArgs<TKey, TEntry> : EventArgs
       where TEntry : IEntry<TKey>

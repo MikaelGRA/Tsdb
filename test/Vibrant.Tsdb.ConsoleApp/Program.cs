@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Vibrant.Tsdb.Ats;
+using Vibrant.Tsdb.Client;
 using Vibrant.Tsdb.ConsoleApp.Entries;
 using Vibrant.Tsdb.Files;
 using Vibrant.Tsdb.Sql;
@@ -100,8 +101,6 @@ namespace Vibrant.Tsdb.ConsoleApp
             Thread.Sleep( 1000 );
          }
       }
-
-      private int _c1, _c2, _c3, _c4;
 
       public Task<IEnumerable<TsdbVolumeMoval<BasicKey>>> GetAllMovalsAsync( DateTime now )
       {

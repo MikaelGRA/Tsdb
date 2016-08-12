@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Vibrant.Tsdb
+namespace Vibrant.Tsdb.Client
 {
    public class TsdbClient<TKey, TEntry> : IStorage<TKey, TEntry>, ISubscribe<TKey, TEntry>
       where TEntry : IEntry<TKey>
