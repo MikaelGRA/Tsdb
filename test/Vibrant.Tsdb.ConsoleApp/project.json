@@ -12,11 +12,11 @@
    "dependencies": {
       "Microsoft.Extensions.Configuration": "1.0.0",
       "Microsoft.Extensions.Configuration.Json": "1.0.0",
-      "Vibrant.Tsdb": "2.1.0-*",
-      "Vibrant.Tsdb.Ats": "2.1.0-*",
-      "Vibrant.Tsdb.Client": "2.1.0-*",
-      "Vibrant.Tsdb.Redis": "2.1.0-*",
-      "Vibrant.Tsdb.Sql": "2.1.0-*"
+      "Vibrant.Tsdb": "3.0.0-*",
+      "Vibrant.Tsdb.Ats": "3.0.0-*",
+      "Vibrant.Tsdb.Client": "3.0.0-*",
+      "Vibrant.Tsdb.Redis": "3.0.0-*",
+      "Vibrant.Tsdb.Sql": "3.0.0-*"
    },
 
    "frameworks": {

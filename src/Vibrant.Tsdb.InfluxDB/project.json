@@ -1,18 +1,31 @@
 {
-  "version": "2.1.0-*",
+   "version": "3.0.0-*",
 
    "dependencies": {
       "Microsoft.CSharp": "4.0.1",
-      "Vibrant.Tsdb": "2.1.0",
+      "Vibrant.Tsdb": "3.0.0",
       "Vibrant.InfluxDB.Client": "2.1.0",
       "System.Reflection": "4.1.0",
       "System.Reflection.Extensions": "4.0.1",
       "System.Reflection.TypeExtensions": "4.1.0"
    },
 
-  "frameworks": {
-    "netstandard1.3": {
-      "imports": "dnxcore50"
-    }
-  }
+   "frameworks": {
+      "netstandard1.3": {
+         "imports": "dnxcore50"
+      }
+   },
+   "scripts": {
+      "postcompile": [
+         "dotnet pack --no-build --configuration %compile:Configuration%"
+      ]
+   },
+   "configurations": {
+      "Release": {
+         "buildOptions": {
+            "optimize": true,
+            "xmlDoc": true
+         }
+      }
+   }
 }

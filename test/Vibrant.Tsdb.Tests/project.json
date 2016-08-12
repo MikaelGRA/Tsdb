@@ -6,12 +6,12 @@
       "dotnet-test-xunit": "2.2.0-preview2-build1029",
       "Microsoft.Extensions.Configuration": "1.0.0",
       "Microsoft.Extensions.Configuration.Json": "1.0.0",
-      "Vibrant.Tsdb.Ats": "2.1.0-*",
-      "Vibrant.Tsdb.Sql": "2.1.0-*",
-      "Vibrant.Tsdb.Redis": "2.1.0-*",
-      "Vibrant.Tsdb": "2.1.0-*",
-      "Vibrant.Tsdb.InfluxDB": "2.1.0-*",
-      "Vibrant.Tsdb.Files": "2.1.0-*"
+      "Vibrant.Tsdb.Ats": "3.0.0-*",
+      "Vibrant.Tsdb.Sql": "3.0.0-*",
+      "Vibrant.Tsdb.Redis": "3.0.0-*",
+      "Vibrant.Tsdb": "3.0.0-*",
+      "Vibrant.Tsdb.InfluxDB": "3.0.0-*",
+      "Vibrant.Tsdb.Files": "3.0.0-*"
    },
    "buildOptions": {
       "copyToOutput": {

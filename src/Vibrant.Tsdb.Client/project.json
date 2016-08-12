@@ -1,5 +1,5 @@
 {
-   "version": "2.1.0-*",
+   "version": "3.0.0-*",
    "title": "TSDB client for .NET",
    "description": "An easy-to-use timeseries database client that allows storing of masses of simple of data structures identified by a string id and a timestamp.",
    "authors": [ "MikaelGRA" ],
@@ -13,11 +13,11 @@
    "copyright": "Copyright (c) 2015-2016 MikaelGRA",
 
    "dependencies": {
-      "Vibrant.Tsdb": "2.1.0-*",
-      "Vibrant.Tsdb.Ats": "2.1.0-*",
-      "Vibrant.Tsdb.Files": "2.1.0-*",
-      "Vibrant.Tsdb.Redis": "2.1.0-*",
-      "Vibrant.Tsdb.Sql": "2.1.0-*"
+      "Vibrant.Tsdb": "3.0.0-*",
+      "Vibrant.Tsdb.Ats": "3.0.0-*",
+      "Vibrant.Tsdb.Files": "3.0.0-*",
+      "Vibrant.Tsdb.Redis": "3.0.0-*",
+      "Vibrant.Tsdb.Sql": "3.0.0-*"
    },
 
    "frameworks": {

@@ -1,5 +1,5 @@
 {
-   "version": "2.1.0-*",
+   "version": "3.0.0-*",
    "title": "TSDB infrastructure for .NET",
    "description": "An easy-to-use timeseries database client that allows storing of masses of simple of data structures identified by a string id and a timestamp.",
    "authors": [ "MikaelGRA" ],

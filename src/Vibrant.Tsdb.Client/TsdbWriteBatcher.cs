@@ -38,11 +38,11 @@ namespace Vibrant.Tsdb.Client
          _batches = new Queue<BatchWrite<TKey, TEntry>>();
          _cts = new CancellationTokenSource();
          _logger = logger;
+      }
 
-         ThreadPool.QueueUserWorkItem( WriteLoop );
-         ThreadPool.QueueUserWorkItem( WriteLoop );
-         ThreadPool.QueueUserWorkItem( WriteLoop );
-         ThreadPool.QueueUserWorkItem( WriteLoop );
+      public void Handle( CancellationToken cancel = default( CancellationToken ) )
+      {
+         WriteLoop( cancel );
       }
 
       public Task Write( IEnumerable<TEntry> entries )
@@ -83,7 +83,7 @@ namespace Vibrant.Tsdb.Client
          }
       }
 
-      private async void WriteLoop( object state )
+      private async void WriteLoop( CancellationToken cancel )
       {
          while( !_disposed )
          {

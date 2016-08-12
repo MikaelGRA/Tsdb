@@ -49,7 +49,7 @@ namespace Vibrant.Tsdb.ConsoleApp
          var startTime = DateTime.UtcNow;
 
          _dataSources = new List<DataSource>();
-         for( int i = 0 ; i < 100 ; i++ )
+         for( int i = 0 ; i < 200 ; i++ )
          {
             _dataSources.Add( new DataSource( new BasicKey { Id = Guid.NewGuid(), Sampling = Sampling.Daily }, startTime, TimeSpan.FromMilliseconds( 10 ) ) );
          }
@@ -79,6 +79,8 @@ namespace Vibrant.Tsdb.ConsoleApp
          // redis.GetSection( "ConnectionString" ).Value
 
          var batcher = new TsdbWriteBatcher<BasicKey, BasicEntry>( client, PublicationType.None, TimeSpan.FromSeconds( 5 ), 20000, this );
+
+         ThreadPool.QueueUserWorkItem( obj => batcher.Handle() );
 
          //var engine = new TsdbEngine<string, BasicEntry>( this, client );
          //engine.StartAsync().Wait();
