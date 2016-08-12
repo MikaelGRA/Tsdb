@@ -23,6 +23,7 @@ namespace Vibrant.Tsdb.Ats
       public const int DefaultReadParallelism = 15;
       public const int DefaultWriteParallelism = 30;
 
+      private readonly StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>[] _defaultSelection;
       private object _sync = new object();
       private SemaphoreSlim _read;
       private SemaphoreSlim _write;
@@ -42,7 +43,8 @@ namespace Vibrant.Tsdb.Ats
          _client = _account.CreateCloudTableClient();
          _partitioningProvider = provider;
          _keyConverter = keyConverter;
-         
+         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>( this ) };
+
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
       
@@ -63,7 +65,12 @@ namespace Vibrant.Tsdb.Ats
 
       #region Public
 
-      public IVolumeStorage<TKey, TEntry> GetStorage( TKey id )
+      public IEnumerable<StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
+      {
+         return _defaultSelection;
+      }
+
+      public IVolumeStorage<TKey, TEntry> GetStorage( TEntry entry )
       {
          return this;
       }

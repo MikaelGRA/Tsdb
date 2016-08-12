@@ -19,6 +19,7 @@ namespace Vibrant.Tsdb.Sql
       private const int DefaultReadParallelism = 5;
       private const int DefaultWriteParallelism = 5;
 
+      private readonly StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>[] _defaultSelection;
       private object _sync = new object();
       private string _tableName;
       private string _connectionString;
@@ -38,6 +39,7 @@ namespace Vibrant.Tsdb.Sql
          _read = new SemaphoreSlim( readParallelism );
          _write = new SemaphoreSlim( writeParallelism );
          _keyConverter = keyConverter;
+         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
       }
 
       public SqlDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism )
@@ -50,7 +52,12 @@ namespace Vibrant.Tsdb.Sql
       {
       }
 
-      public IDynamicStorage<TKey, TEntry> GetStorage( TKey id )
+      public IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
+      {
+         return _defaultSelection;
+      }
+
+      public IDynamicStorage<TKey, TEntry> GetStorage( TEntry entry )
       {
          return this;
       }
@@ -96,14 +103,9 @@ namespace Vibrant.Tsdb.Sql
          return RetrieveForIds( ids, from, to, sort );
       }
 
-      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime to, int segmentSize, object continuationToken )
+      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime? from, DateTime? to, int segmentSize, object continuationToken )
       {
-         return RetrieveForIdSegmented( id, to, segmentSize, (ContinuationToken)continuationToken );
-      }
-
-      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, int segmentSize, object continuationToken )
-      {
-         return RetrieveForIdSegmented( id, segmentSize, (ContinuationToken)continuationToken );
+         return RetrieveForIdSegmented( id, from, to, segmentSize, (ContinuationToken)continuationToken );
       }
 
       private async Task CreateTableLocked()
@@ -293,7 +295,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<SegmentedReadResult<TKey, TEntry>> RetrieveForIdSegmented( TKey id, DateTime to, int segmentSize, ContinuationToken continuationToken )
+      private async Task<SegmentedReadResult<TKey, TEntry>> RetrieveForIdSegmented( TKey id, DateTime? from, DateTime? to, int segmentSize, ContinuationToken continuationToken )
       {
          await CreateTable().ConfigureAwait( false );
          long skip = continuationToken?.Skip ?? 0;
@@ -307,38 +309,11 @@ namespace Vibrant.Tsdb.Sql
 
                using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
                {
+                  var query = Sql.GetSegmentedQuery( _tableName, from, to, skip, segmentSize );
+
                   var sqlEntries = await connection.QueryAsync<SqlEntry>(
-                     sql: Sql.GetUpperBoundSegmentedQuery( _tableName ),
-                     param: new { Id = id, To = to, Take = segmentSize, Skip = skip },
-                     transaction: tx ).ConfigureAwait( false );
-
-                  return CreateReadResult( id, sqlEntries, segmentSize, skip );
-               }
-            }
-         }
-         finally
-         {
-            _read.Release();
-         }
-      }
-
-      private async Task<SegmentedReadResult<TKey, TEntry>> RetrieveForIdSegmented( TKey id, int segmentSize, ContinuationToken continuationToken )
-      {
-         await CreateTable().ConfigureAwait( false );
-         long skip = continuationToken?.Skip ?? 0;
-
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
-         {
-            using( var connection = new SqlConnection( _connectionString ) )
-            {
-               await connection.OpenAsync().ConfigureAwait( false );
-
-               using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
-               {
-                  var sqlEntries = await connection.QueryAsync<SqlEntry>(
-                     sql: Sql.GetSegmentedQuery( _tableName ),
-                     param: new { Id = id, Take = segmentSize, Skip = skip },
+                     sql: query.Sql,
+                     param: query.Args,
                      transaction: tx ).ConfigureAwait( false );
 
                   return CreateReadResult( id, sqlEntries, segmentSize, skip );

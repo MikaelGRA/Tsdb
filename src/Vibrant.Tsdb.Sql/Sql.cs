@@ -130,14 +130,40 @@ END
          }
       }
 
-      public static string GetUpperBoundSegmentedQuery( string tableName )
+      public static Query GetSegmentedQuery( string tableName, DateTime? from, DateTime? to, long skip, int take )
       {
-         return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] < @To ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY";
-      }
-
-      public static string GetSegmentedQuery( string tableName )
-      {
-         return $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY";
+         if( from.HasValue && to.HasValue )
+         {
+            return new Query
+            {
+               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] >= @From AND [Timestamp] < @To ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
+               Args = new { From = from.Value, To = to.Value, Skip = skip, Take = take }
+            };
+         }
+         else if( !from.HasValue && to.HasValue )
+         {
+            return new Query
+            {
+               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] < @To ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
+               Args = new { To = to.Value, Skip = skip, Take = take }
+            };
+         }
+         else if( from.HasValue && !to.HasValue )
+         {
+            return new Query
+            {
+               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] >= @From ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
+               Args = new { From = from.Value, Skip = skip, Take = take }
+            };
+         }
+         else
+         {
+            return new Query
+            {
+               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
+               Args = new { Skip = skip, Take = take }
+            };
+         }
       }
 
       public static string GetBottomlessQuery( string tableName, Sort sort )

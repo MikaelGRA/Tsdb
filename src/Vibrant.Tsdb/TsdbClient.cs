@@ -16,6 +16,7 @@ namespace Vibrant.Tsdb
       private ITemporaryStorage<TKey, TEntry> _temporaryStorage;
       private ITsdbLogger _logger;
       private DefaultPublishSubscribe<TKey, TEntry> _localPublishSubscribe;
+      private MigrationProvider<TKey, TEntry> _migrations;
 
       public TsdbClient(
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
@@ -30,6 +31,7 @@ namespace Vibrant.Tsdb
          _temporaryStorage = temporaryStorage;
          _localPublishSubscribe = new DefaultPublishSubscribe<TKey, TEntry>( false );
          _logger = logger;
+         _migrations = new MigrationProvider<TKey, TEntry>( _dynamicStorageSelector, _volumeStorageSelector );
       }
 
       public TsdbClient(
@@ -85,7 +87,7 @@ namespace Vibrant.Tsdb
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      public async Task MoveToVolumeStorage( IEnumerable<TKey> ids, int batchSize, DateTime to )
+      public async Task MoveToVolumeStorage( IEnumerable<TKey> ids, int batchSize, DateTime to, TimeSpan storageExpiration )
       {
          if( _volumeStorageSelector == null )
          {
@@ -93,7 +95,7 @@ namespace Vibrant.Tsdb
          }
 
          var tasks = new List<Task>();
-         tasks.AddRange( ids.Select( id => MoveToVolumeStorage( id, batchSize, to ) ) );
+         tasks.AddRange( ids.Select( id => MoveToVolumeStorage( id, batchSize, to, storageExpiration ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
@@ -104,49 +106,68 @@ namespace Vibrant.Tsdb
             throw new InvalidOperationException( "No volume storage has been provided for this TsdbClient." );
          }
 
-         var dynamic = _dynamicStorageSelector.GetStorage( id );
-         var volume = _volumeStorageSelector.GetStorage( id );
 
-         var sw = Stopwatch.StartNew();
-
-         IContinuationToken token = null;
-         do
+         foreach( var migration in _migrations.Provide( id, null, null ) )
          {
-            var segment = await dynamic.Read( id, batchSize, token ).ConfigureAwait( false );
-            await volume.Write( segment.Entries ).ConfigureAwait( false );
-            await segment.DeleteAsync().ConfigureAwait( false );
-            token = segment.ContinuationToken;
+            // barrier, dont migrate items from stores that has not been in use for a while
 
-            _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
-            sw.Restart();
+            var dynamic = migration.Dynamic;
+            var volume = migration.Volume;
+
+            var sw = Stopwatch.StartNew();
+
+            IContinuationToken token = null;
+            do
+            {
+               var segment = await dynamic.Read( id, migration.From, migration.To, batchSize, token ).ConfigureAwait( false );
+               await volume.Write( segment.Entries ).ConfigureAwait( false );
+               await segment.DeleteAsync().ConfigureAwait( false );
+               token = segment.ContinuationToken;
+
+               _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+               sw.Restart();
+            }
+            while( token.HasMore );
          }
-         while( token.HasMore );
       }
 
-      public async Task MoveToVolumeStorage( TKey id, int batchSize, DateTime to )
+      public async Task MoveToVolumeStorage( TKey id, int batchSize, DateTime to, TimeSpan storageExpiration )
       {
          if( _volumeStorageSelector == null )
          {
             throw new InvalidOperationException( "No volume storage has been provided for this TsdbClient." );
          }
 
-         var dynamic = _dynamicStorageSelector.GetStorage( id );
-         var volume = _volumeStorageSelector.GetStorage( id );
 
-         var sw = Stopwatch.StartNew();
-
-         IContinuationToken token = null;
-         do
+         foreach( var migration in _migrations.Provide( id, null, to ) )
          {
-            var segment = await dynamic.Read( id, to, batchSize, token ).ConfigureAwait( false );
-            await volume.Write( segment.Entries ).ConfigureAwait( false );
-            await segment.DeleteAsync().ConfigureAwait( false );
-            token = segment.ContinuationToken;
+            // barrier, dont migrate items from stores that has not been in use for a while
+            if( migration.To.HasValue )
+            {
+               if( to - migration.To.Value > storageExpiration )
+               {
+                  break;
+               }
+            }
 
-            _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
-            sw.Restart();
+            var dynamic = migration.Dynamic;
+            var volume = migration.Volume;
+
+            var sw = Stopwatch.StartNew();
+
+            IContinuationToken token = null;
+            do
+            {
+               var segment = await dynamic.Read( id, migration.From, migration.To, batchSize, token ).ConfigureAwait( false );
+               await volume.Write( segment.Entries ).ConfigureAwait( false );
+               await segment.DeleteAsync().ConfigureAwait( false );
+               token = segment.ContinuationToken;
+
+               _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+               sw.Restart();
+            }
+            while( token.HasMore );
          }
-         while( token.HasMore );
       }
 
       public async Task MoveFromTemporaryStorage( int batchSize )
@@ -344,7 +365,7 @@ namespace Vibrant.Tsdb
       public async Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
-         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.Read( c.Lookups, c.From.Value, c.To.Value, sort ) ) );
+         tasks.AddRange( LookupDynamicStorages( ids, from, to ).Select( c => c.Storage.Read( c.Lookups, c.From.Value, c.To.Value, sort ) ) );
          if( _volumeStorageSelector != null )
          {
             tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.Read( c.Lookups, c.From.Value, c.To.Value, sort ) ) );
@@ -414,7 +435,7 @@ namespace Vibrant.Tsdb
 
          foreach( var id in ids )
          {
-            var storages = _volumeStorageSelector.GetStorage( id );
+            var storages = _volumeStorageSelector.GetStorage( id, null, null );
             foreach( var storage in storages )
             {
                VolumeStorageLookupResult<TKey, TKey, TEntry> existingStorage;
@@ -437,7 +458,7 @@ namespace Vibrant.Tsdb
 
          foreach( var id in ids )
          {
-            var storages = _volumeStorageSelector.GetStorage( id );
+            var storages = _volumeStorageSelector.GetStorage( id, from, to );
             foreach( var storage in storages )
             {
                VolumeStorageLookupResult<TKey, TKey, TEntry> existingStorage;
@@ -493,7 +514,7 @@ namespace Vibrant.Tsdb
 
          foreach( var id in ids )
          {
-            var storages = _dynamicStorageSelector.GetStorage( id );
+            var storages = _dynamicStorageSelector.GetStorage( id, null, null );
             foreach( var storage in storages )
             {
                DynamicStorageLookupResult<TKey, TKey, TEntry> existingStorage;

@@ -111,7 +111,7 @@ namespace Vibrant.Tsdb.ConsoleApp
          // move data that is two minutes old, every minute
          var movalTime = now + TimeSpan.FromMinutes( 1 );
          var moveUntil = movalTime - TimeSpan.FromMinutes( 2 );
-         return Task.FromResult( _dataSources.Select( x => new TsdbVolumeMoval<BasicKey>( x.Id, movalTime, moveUntil ) ) );
+         return Task.FromResult( _dataSources.Select( x => new TsdbVolumeMoval<BasicKey>( x.Id, movalTime, moveUntil, TimeSpan.MaxValue ) ) );
 
       }
 
@@ -120,7 +120,7 @@ namespace Vibrant.Tsdb.ConsoleApp
          // move data that is two minutes old, every minute
          var movalTime = completedMoval.Timestamp + TimeSpan.FromMinutes( 1 );
          var moveUntil = movalTime - TimeSpan.FromMinutes( 2 );
-         return Task.FromResult( new TsdbVolumeMoval<BasicKey>( completedMoval.Id, movalTime, moveUntil ) );
+         return Task.FromResult( new TsdbVolumeMoval<BasicKey>( completedMoval.Id, movalTime, moveUntil, TimeSpan.MaxValue ) );
       }
 
       public TimeSpan GetTemporaryMovalInterval()

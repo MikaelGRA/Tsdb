@@ -16,6 +16,7 @@ namespace Vibrant.Tsdb.Ats
       public const int DefaultReadParallelism = 50;
       public const int DefaultWriteParallelism = 50;
 
+      private readonly StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>[] _defaultSelection;
       private object _sync = new object();
       private SemaphoreSlim _read;
       private SemaphoreSlim _write;
@@ -37,6 +38,7 @@ namespace Vibrant.Tsdb.Ats
          _partitioningProvider = partitioningProvider;
          _comparer = new EntryEqualityComparer<TKey, TEntry>();
          _keyConverter = keyConverter;
+         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
 
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
@@ -57,6 +59,16 @@ namespace Vibrant.Tsdb.Ats
       }
 
       public IDynamicStorage<TKey, TEntry> GetStorage( TKey id )
+      {
+         return this;
+      }
+
+      public IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
+      {
+         return _defaultSelection;
+      }
+
+      public IDynamicStorage<TKey, TEntry> GetStorage( TEntry entry )
       {
          return this;
       }
@@ -101,14 +113,9 @@ namespace Vibrant.Tsdb.Ats
          return WriteInternal( items );
       }
 
-      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime to, int segmentSize, object continuationToken )
+      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime? from, DateTime? to, int segmentSize, object continuationToken )
       {
-         return ReadRangeSegmentedInternal( id, to, segmentSize, (ContinuationToken)continuationToken );
-      }
-
-      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, int segmentSize, object continuationToken )
-      {
-         return ReadRangeSegmentedInternal( id, segmentSize, (ContinuationToken)continuationToken );
+         return ReadRangeSegmentedInternal( id, from, to, segmentSize, (ContinuationToken)continuationToken );
       }
 
       private async Task<int> DeleteAllInternal( IEnumerable<TKey> ids )
@@ -298,12 +305,30 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private Task<SegmentedReadResult<TKey, TEntry>> ReadRangeSegmentedInternal( TKey id, DateTime to, int segmentSize, ContinuationToken continuationToken )
+      private Task<SegmentedReadResult<TKey, TEntry>> ReadRangeSegmentedInternal( TKey id, DateTime? from, DateTime? to, int segmentSize, ContinuationToken continuationToken )
       {
          to = continuationToken?.To ?? to;
 
+         string filter = null;
+         if( from.HasValue && to.HasValue )
+         {
+            filter = CreateGeneralFilter( id, from.Value, to.Value );
+         }
+         else if( !from.HasValue && to.HasValue )
+         {
+            filter = CreateBeforeFilter( id, to.Value );
+         }
+         else if( from.HasValue && !to.HasValue )
+         {
+            filter = CreateAfterFilter( id, from.Value );
+         }
+         else
+         {
+            filter = CreatePartitionFilter( id );
+         }
+
          var generalQuery = new TableQuery<TsdbTableEntity>()
-            .Where( CreateBeforeFilter( id, to ) );
+            .Where( filter );
 
          return ReadSegmentedInternal( id, generalQuery, segmentSize );
       }
@@ -718,20 +743,36 @@ namespace Vibrant.Tsdb.Ats
                   TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.GreaterThan, toRowKey ) ) );
       }
 
-      private string CreateBeforeFilter( TKey key, DateTime from )
+      private string CreateAfterFilter( TKey key, DateTime from )
       {
          var id = _keyConverter.Convert( key );
          var fromRowKey = AtsKeyCalculator.CalculateRowKey( from );
          var fromPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, from, _partitioningProvider ); // 7125
-         var toPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, key, _partitioningProvider ); // 9999
+         var toPartitionKey = AtsKeyCalculator.CalculateMaxPartitionKey( id, key, _partitioningProvider ); // 0000
 
          return TableQuery.CombineFilters(
-            TableQuery.CombineFilters(
-               TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.GreaterThanOrEqual, fromPartitionKey ),
-               TableOperators.And,
-               TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.LessThanOrEqual, toPartitionKey ) ),
+               TableQuery.CombineFilters(
+                  TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.LessThanOrEqual, fromPartitionKey ),
+                  TableOperators.And,
+                  TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.GreaterThanOrEqual, toPartitionKey ) ),
             TableOperators.And,
-            TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.GreaterThan, fromRowKey ) );
+               TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.LessThanOrEqual, fromRowKey ) );
+      }
+
+      private string CreateBeforeFilter( TKey key, DateTime to )
+      {
+         var id = _keyConverter.Convert( key );
+         var toRowKey = AtsKeyCalculator.CalculateRowKey( to );
+         var toPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, to, _partitioningProvider ); // 7125
+         var fromPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, key, _partitioningProvider ); // 9999
+
+         return TableQuery.CombineFilters(
+               TableQuery.CombineFilters(
+                  TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.LessThanOrEqual, fromPartitionKey ),
+                  TableOperators.And,
+                  TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.GreaterThanOrEqual, toPartitionKey ) ),
+            TableOperators.And,
+               TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.GreaterThan, toRowKey ) );
       }
 
       private string CreatePartitionFilter( TKey key )

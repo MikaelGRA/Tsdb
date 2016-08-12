@@ -17,7 +17,8 @@ namespace Vibrant.Tsdb.InfluxDB
       public const int DefaultReadParallelism = 20;
       public const int DefaultWriteParallelism = 5;
 
-      private DateTime _maxFrom = new DateTime( 2050, 1, 1, 0, 0, 0, DateTimeKind.Utc );
+      private readonly StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>[] _defaultSelection;
+      private DateTime _maxTo = new DateTime( 2050, 1, 1, 0, 0, 0, DateTimeKind.Utc );
       private object _sync = new object();
       private InfluxClient _client;
       private string _database;
@@ -40,6 +41,7 @@ namespace Vibrant.Tsdb.InfluxDB
 
          _read = new SemaphoreSlim( readParallelism );
          _write = new SemaphoreSlim( writeParallelism );
+         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
       }
 
       public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, IKeyConverter<TKey> keyConverter )
@@ -48,7 +50,7 @@ namespace Vibrant.Tsdb.InfluxDB
       }
 
       public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, int readParallelism, int writeParallelism )
-         : this(endpoint, database, username, password, readParallelism, writeParallelism, DefaultKeyConverter<TKey>.Current )
+         : this( endpoint, database, username, password, readParallelism, writeParallelism, DefaultKeyConverter<TKey>.Current )
       {
       }
 
@@ -70,6 +72,16 @@ namespace Vibrant.Tsdb.InfluxDB
       }
 
       public IDynamicStorage<TKey, TEntry> GetStorage( TKey id )
+      {
+         return this;
+      }
+
+      public IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
+      {
+         return _defaultSelection;
+      }
+
+      public IDynamicStorage<TKey, TEntry> GetStorage( TEntry entry )
       {
          return this;
       }
@@ -191,7 +203,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime to, int segmentSize, object continuationToken )
+      public async Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime? from, DateTime? to, int segmentSize, object continuationToken )
       {
          await _read.WaitAsync().ConfigureAwait( false );
          try
@@ -199,33 +211,7 @@ namespace Vibrant.Tsdb.InfluxDB
             await CreateDatabase().ConfigureAwait( false );
             var token = (ContinuationToken)continuationToken;
             to = token?.To ?? to;
-            var resultSet = await _client.ReadAsync<TEntry>( _database, CreateUpperBoundSegmentedSelectQuery( id, to, segmentSize ) ).ConfigureAwait( false );
-            bool hasMore = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows.Count == segmentSize;
-            return Convert( id, resultSet, segmentSize );
-         }
-         finally
-         {
-            _read.Release();
-         }
-      }
-
-      public async Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, int segmentSize, object continuationToken )
-      {
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
-         {
-            await CreateDatabase().ConfigureAwait( false );
-            var token = (ContinuationToken)continuationToken;
-            var to = token?.To;
-            InfluxResultSet<TEntry> resultSet;
-            if( to.HasValue )
-            {
-               resultSet = await _client.ReadAsync<TEntry>( _database, CreateUpperBoundSegmentedSelectQuery( id, to.Value, segmentSize ) ).ConfigureAwait( false );
-            }
-            else
-            {
-               resultSet = await _client.ReadAsync<TEntry>( _database, CreateSegmentedSelectQuery( id, segmentSize ) ).ConfigureAwait( false );
-            }
+            var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSegmentedSelectQuery( id, from, to, segmentSize ) ).ConfigureAwait( false );
             bool hasMore = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows.Count == segmentSize;
             return Convert( id, resultSet, segmentSize );
          }
@@ -275,14 +261,24 @@ namespace Vibrant.Tsdb.InfluxDB
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
-      private string CreateUpperBoundSegmentedSelectQuery( TKey id, DateTime to, int take )
+      private string CreateSegmentedSelectQuery( TKey id, DateTime? from, DateTime? to, int take )
       {
-         return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{to.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
-      }
-
-      private string CreateSegmentedSelectQuery( TKey id, int take )
-      {
-         return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxFrom.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
+         if( from.HasValue && to.HasValue )
+         {
+            return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.Value.ToIso8601()}' <= time AND time < '{to.Value.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
+         }
+         else if( !from.HasValue && to.HasValue )
+         {
+            return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{to.Value.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
+         }
+         else if( from.HasValue && !to.HasValue )
+         {
+            return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.Value.ToIso8601()}' <= time AND time < '{_maxTo.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
+         }
+         else
+         {
+            return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxTo.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
+         }
       }
 
       private string CreateSelectQuery( IEnumerable<TKey> ids, DateTime to, Sort sort )
@@ -300,7 +296,7 @@ namespace Vibrant.Tsdb.InfluxDB
          StringBuilder sb = new StringBuilder();
          foreach( var id in ids )
          {
-            sb.Append( $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxFrom.ToIso8601()}' ORDER BY time {GetQuery( sort )};" );
+            sb.Append( $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxTo.ToIso8601()}' ORDER BY time {GetQuery( sort )};" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
@@ -310,7 +306,7 @@ namespace Vibrant.Tsdb.InfluxDB
          StringBuilder sb = new StringBuilder();
          foreach( var id in ids )
          {
-            sb.Append( $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxFrom.ToIso8601()}' ORDER BY time DESC LIMIT 1;" );
+            sb.Append( $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxTo.ToIso8601()}' ORDER BY time DESC LIMIT 1;" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
