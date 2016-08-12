@@ -15,6 +15,8 @@
       "Vibrant.Tsdb": "3.0.0-*",
       "Vibrant.Tsdb.Ats": "3.0.0-*",
       "Vibrant.Tsdb.Client": "3.0.0-*",
+      "Vibrant.Tsdb.Files": "3.0.0-*",
+      "Vibrant.Tsdb.InfluxDB": "3.0.0-*",
       "Vibrant.Tsdb.Redis": "3.0.0-*",
       "Vibrant.Tsdb.Sql": "3.0.0-*"
    },
