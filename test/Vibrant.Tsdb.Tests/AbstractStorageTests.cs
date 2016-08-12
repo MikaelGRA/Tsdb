@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Vibrant.Tsdb.Ats.Tests.Entries;
+using Vibrant.Tsdb.Tests.Entries;
 using Xunit;
 
-namespace Vibrant.Tsdb.Ats.Tests
+namespace Vibrant.Tsdb.Tests
 {
    public abstract class AbstractStorageTests<TStorage>
       where TStorage : IStorage<string, BasicEntry>

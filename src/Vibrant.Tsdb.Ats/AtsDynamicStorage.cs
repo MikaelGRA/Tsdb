@@ -18,20 +18,18 @@ namespace Vibrant.Tsdb.Ats
 
       private readonly StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>[] _defaultSelection;
       private object _sync = new object();
-      private SemaphoreSlim _read;
-      private SemaphoreSlim _write;
       private string _tableName;
       private CloudStorageAccount _account;
       private CloudTableClient _client;
       private Task<CloudTable> _table;
       private IPartitionProvider<TKey> _partitioningProvider;
-      private EntryEqualityComparer<TKey, TEntry> _comparer;
       private IKeyConverter<TKey> _keyConverter;
+      private IConcurrencyControl _cc;
+      private EntryEqualityComparer<TKey, TEntry> _comparer;
 
-      public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IPartitionProvider<TKey> partitioningProvider, IKeyConverter<TKey> keyConverter )
+      public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, IKeyConverter<TKey> keyConverter )
       {
-         _read = new SemaphoreSlim( readParallelism );
-         _write = new SemaphoreSlim( writeParallelism );
+         _cc = concurrency;
          _tableName = tableName;
          _account = CloudStorageAccount.Parse( connectionString );
          _client = _account.CreateCloudTableClient();
@@ -43,18 +41,18 @@ namespace Vibrant.Tsdb.Ats
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
 
-      public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IPartitionProvider<TKey> partitioningProvider )
-         : this( tableName, connectionString, readParallelism, writeParallelism, partitioningProvider, DefaultKeyConverter<TKey>.Current )
+      public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider )
+         : this( tableName, connectionString, concurrency, partitioningProvider, DefaultKeyConverter<TKey>.Current )
       {
       }
 
-      public AtsDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism )
-         : this( tableName, connectionString, readParallelism, writeParallelism, new YearlyPartitioningProvider<TKey>() )
+      public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency )
+         : this( tableName, connectionString, concurrency, new YearlyPartitioningProvider<TKey>() )
       {
       }
 
       public AtsDynamicStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, DefaultReadParallelism, DefaultWriteParallelism, new YearlyPartitioningProvider<TKey>() )
+         : this( tableName, connectionString, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), new YearlyPartitioningProvider<TKey>() )
       {
       }
 
@@ -362,17 +360,12 @@ namespace Vibrant.Tsdb.Ats
          TableContinuationToken token = null;
          do
          {
-            await _read.WaitAsync().ConfigureAwait( false );
-            try
+            using( await _cc.ReadAsync().ConfigureAwait( false ) )
             {
                var rows = await table.ExecuteQuerySegmentedAsync( query, takeAll ? token : null ).ConfigureAwait( false );
                var entries = Convert( rows, id );
                results.AddRange( entries );
                token = rows.ContinuationToken;
-            }
-            finally
-            {
-               _read.Release();
             }
          }
          while( token != null && takeAll );
@@ -398,8 +391,7 @@ namespace Vibrant.Tsdb.Ats
          int read = 0;
          do
          {
-            await _read.WaitAsync().ConfigureAwait( false );
-            try
+            using( await _cc.ReadAsync().ConfigureAwait( false ) )
             {
                var rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
                var entries = Convert( rows, id );
@@ -433,10 +425,6 @@ namespace Vibrant.Tsdb.Ats
                {
                   token = null;
                }
-            }
-            finally
-            {
-               _read.Release();
             }
          }
          while( token != null );
@@ -493,8 +481,7 @@ namespace Vibrant.Tsdb.Ats
          {
             TableQuerySegment<TsdbTableEntity> rows;
 
-            await _read.WaitAsync().ConfigureAwait( false );
-            try
+            using( await _cc.ReadAsync().ConfigureAwait( false ) )
             {
                rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
                foreach( var row in rows )
@@ -502,10 +489,6 @@ namespace Vibrant.Tsdb.Ats
                   row.ETag = "*";
                }
                token = rows.ContinuationToken;
-            }
-            finally
-            {
-               _read.Release();
             }
 
             // iterate by partition and 100s
@@ -532,8 +515,7 @@ namespace Vibrant.Tsdb.Ats
       {
          int count = 0;
 
-         await _write.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             var operation = new TableBatchOperation();
             foreach( var entity in entries )
@@ -543,10 +525,6 @@ namespace Vibrant.Tsdb.Ats
             }
             var table = await GetTable().ConfigureAwait( false );
             await table.ExecuteBatchAsync( operation ).ConfigureAwait( false );
-         }
-         finally
-         {
-            _write.Release();
          }
 
          return count;
@@ -570,8 +548,7 @@ namespace Vibrant.Tsdb.Ats
 
       private async Task WriteInternalLocked( string partitionKey, IEnumerable<TEntry> entries )
       {
-         await _write.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             var operation = new TableBatchOperation();
             foreach( var entity in Convert( entries, partitionKey ) )
@@ -580,10 +557,6 @@ namespace Vibrant.Tsdb.Ats
             }
             var table = await GetTable().ConfigureAwait( false );
             await table.ExecuteBatchAsync( operation ).ConfigureAwait( false );
-         }
-         finally
-         {
-            _write.Release();
          }
       }
 
@@ -797,8 +770,7 @@ namespace Vibrant.Tsdb.Ats
          {
             if( disposing )
             {
-               _read.Dispose();
-               _write.Dispose();
+
             }
 
             _disposed = true;

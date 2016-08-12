@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Vibrant.Tsdb.Ats;
-using Vibrant.Tsdb.Client;
 using Vibrant.Tsdb.ConsoleApp.Entries;
 using Vibrant.Tsdb.Files;
 using Vibrant.Tsdb.Sql;
@@ -57,16 +56,14 @@ namespace Vibrant.Tsdb.ConsoleApp
          var dats = new AtsDynamicStorage<BasicKey, BasicEntry>( 
             "DynamicTableXX", 
             ats.GetSection( "ConnectionString" ).Value,
-            AtsDynamicStorage<BasicKey, BasicEntry>.DefaultReadParallelism,
-            AtsDynamicStorage<BasicKey, BasicEntry>.DefaultWriteParallelism, 
+            new ConcurrencyControl( AtsDynamicStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsDynamicStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
             new YearlyPartitioningProvider<BasicKey>(), 
             this );
 
          var vats = new AtsVolumeStorage<BasicKey, BasicEntry>( 
             "VolumeTableXX", 
             ats.GetSection( "ConnectionString" ).Value,
-            AtsVolumeStorage<BasicKey, BasicEntry>.DefaultReadParallelism,
-            AtsVolumeStorage<BasicKey, BasicEntry>.DefaultReadParallelism, 
+            new ConcurrencyControl( AtsVolumeStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsVolumeStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
             new YearlyPartitioningProvider<BasicKey>(), 
             this );
 

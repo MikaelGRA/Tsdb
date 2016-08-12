@@ -5,12 +5,13 @@ using System.Linq;
 using System.Threading.Tasks;
 using Vibrant.InfluxDB.Client;
 using Vibrant.InfluxDB.Client.Rows;
+using Vibrant.Tsdb.Ats;
 using Vibrant.Tsdb.Files;
 using Vibrant.Tsdb.InfluxDB;
 using Vibrant.Tsdb.Redis;
 using Vibrant.Tsdb.Sql;
 
-namespace Vibrant.Tsdb.Ats.Tests.Entries
+namespace Vibrant.Tsdb.Tests.Entries
 {
    public class BasicEntry : IEntry<string>, IAtsEntry<string>, ISqlEntry<string>, IRedisEntry<string>, IInfluxEntry<string>, IFileEntry<string>
    {

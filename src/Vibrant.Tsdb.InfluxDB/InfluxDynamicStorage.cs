@@ -25,10 +25,9 @@ namespace Vibrant.Tsdb.InfluxDB
       private Task _createDatabase;
       private EntryEqualityComparer<TKey, TEntry> _comparer;
       private IKeyConverter<TKey> _keyConverter;
-      private SemaphoreSlim _read;
-      private SemaphoreSlim _write;
+      private IConcurrencyControl _cc;
 
-      public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, int readParallelism, int writeParallelism, IKeyConverter<TKey> keyConverter )
+      public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, IConcurrencyControl concurrency, IKeyConverter<TKey> keyConverter )
       {
          _client = new InfluxClient( endpoint, username, password );
          _database = database;
@@ -38,19 +37,18 @@ namespace Vibrant.Tsdb.InfluxDB
 
          _comparer = new EntryEqualityComparer<TKey, TEntry>();
          _keyConverter = keyConverter;
+         _cc = concurrency;
 
-         _read = new SemaphoreSlim( readParallelism );
-         _write = new SemaphoreSlim( writeParallelism );
          _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
       }
 
       public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, IKeyConverter<TKey> keyConverter )
-         : this( endpoint, database, username, password, DefaultReadParallelism, DefaultWriteParallelism, keyConverter )
+         : this( endpoint, database, username, password, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), keyConverter )
       {
       }
 
-      public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, int readParallelism, int writeParallelism )
-         : this( endpoint, database, username, password, readParallelism, writeParallelism, DefaultKeyConverter<TKey>.Current )
+      public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, IConcurrencyControl concurrency )
+         : this( endpoint, database, username, password, concurrency, DefaultKeyConverter<TKey>.Current )
       {
       }
 
@@ -59,8 +57,8 @@ namespace Vibrant.Tsdb.InfluxDB
       {
       }
 
-      public InfluxDynamicStorage( Uri endpoint, string database, int readParallelism, int writeParallelism )
-         : this( endpoint, database, null, null, DefaultReadParallelism, DefaultWriteParallelism, DefaultKeyConverter<TKey>.Current )
+      public InfluxDynamicStorage( Uri endpoint, string database, IConcurrencyControl concurrency )
+         : this( endpoint, database, null, null, concurrency, DefaultKeyConverter<TKey>.Current )
       {
 
       }
@@ -88,125 +86,84 @@ namespace Vibrant.Tsdb.InfluxDB
 
       public async Task Write( IEnumerable<TEntry> items )
       {
-         await _write.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
             var uniqueEntries = Unique.Ensure<TKey, TEntry>( items, _comparer );
             await _client.WriteAsync( _database, uniqueEntries ).ConfigureAwait( false );
          }
-         finally
-         {
-            _write.Release();
-         }
       }
 
       public async Task Delete( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
-         await _write.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateDeleteQuery( ids, from, to ) ).ConfigureAwait( false );
-         }
-         finally
-         {
-            _write.Release();
          }
       }
 
       public async Task Delete( IEnumerable<TKey> ids, DateTime to )
       {
-         await _write.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateDeleteQuery( ids, to ) ).ConfigureAwait( false );
-         }
-         finally
-         {
-            _write.Release();
          }
       }
 
       public async Task Delete( IEnumerable<TKey> ids )
       {
-         await _write.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateDeleteQuery( ids ) ).ConfigureAwait( false );
-         }
-         finally
-         {
-            _write.Release();
          }
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> ReadLatest( IEnumerable<TKey> ids )
       {
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateLatestSelectQuery( ids ) ).ConfigureAwait( false );
             return Convert( ids, resultSet, Sort.Descending );
          }
-         finally
-         {
-            _read.Release();
-         }
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
       {
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( ids, sort ) ).ConfigureAwait( false );
             return Convert( ids, resultSet, sort );
          }
-         finally
-         {
-            _read.Release();
-         }
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
       {
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( ids, to, sort ) ).ConfigureAwait( false );
             return Convert( ids, resultSet, sort );
          }
-         finally
-         {
-            _read.Release();
-         }
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( ids, from, to, sort ) ).ConfigureAwait( false );
             return Convert( ids, resultSet, sort );
          }
-         finally
-         {
-            _read.Release();
-         }
       }
 
       public async Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime? from, DateTime? to, int segmentSize, object continuationToken )
       {
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
             var token = (ContinuationToken)continuationToken;
@@ -214,10 +171,6 @@ namespace Vibrant.Tsdb.InfluxDB
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSegmentedSelectQuery( id, from, to, segmentSize ) ).ConfigureAwait( false );
             bool hasMore = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows.Count == segmentSize;
             return Convert( id, resultSet, segmentSize );
-         }
-         finally
-         {
-            _read.Release();
          }
       }
 
@@ -394,8 +347,6 @@ namespace Vibrant.Tsdb.InfluxDB
             if( disposing )
             {
                _client.Dispose();
-               _read.Dispose();
-               _write.Dispose();
             }
 
             _dispose = true;

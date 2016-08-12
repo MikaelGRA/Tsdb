@@ -109,8 +109,6 @@ namespace Vibrant.Tsdb
 
          foreach( var migration in _migrations.Provide( id, null, null ) )
          {
-            // barrier, dont migrate items from stores that has not been in use for a while
-
             var dynamic = migration.Dynamic;
             var volume = migration.Volume;
 
@@ -312,42 +310,39 @@ namespace Vibrant.Tsdb
 
       public async Task<MultiReadResult<TKey, TEntry>> ReadLatest( IEnumerable<TKey> ids )
       {
-         // TODO: Requires overhaul
-         // REQUIRES: From + To on returned object to sort queries!
-
-         var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
-         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.ReadLatest( c.Lookups ) ) );
+         var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
+         tasks.AddRange( ids.Select( x => ReadLatestInternal( x ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         // at this point we need to check if we have a measurement for each id. We might not becuase we only looked in dynamic store
-         var result = tasks.Select( x => x.Result ).Combine();
+         return tasks.Select( x => x.Result ).Combine();
+      }
 
-         if( _volumeStorageSelector != null )
+      private async Task<ReadResult<TKey, TEntry>> ReadLatestInternal( TKey key )
+      {
+         var dynamics = _dynamicStorageSelector.GetStorage( key, null, null );
+         foreach( var dynamic in dynamics )
          {
-            // find missing ids
-            List<TKey> missingIds = new List<TKey>();
-            foreach( var id in ids )
+            var rr = await dynamic.Storage.ReadLatest( key );
+            if( rr.Entries.Count > 0 )
             {
-               var resultForId = result.FindResult( id );
-               if( resultForId.Entries.Count == 0 )
-               {
-                  missingIds.Add( id );
-               }
-            }
-
-            // if missing ids, then we look at volume storage
-            if( missingIds.Count > 0 )
-            {
-               tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
-               tasks.AddRange( LookupVolumeStorages( missingIds ).Select( c => c.Storage.ReadLatest( c.Lookups ) ) );
-               await Task.WhenAll( tasks ).ConfigureAwait( false );
-
-               var intiallyMissingResult = tasks.Select( x => x.Result ).Combine();
-               intiallyMissingResult.MergeInto( result );
+               return rr;
             }
          }
 
-         return result;
+         if( _volumeStorageSelector != null )
+         {
+            var volumes = _volumeStorageSelector.GetStorage( key, null, null );
+            foreach( var volume in volumes )
+            {
+               var rr = await volume.Storage.ReadLatest( key );
+               if( rr.Entries.Count > 0 )
+               {
+                  return rr;
+               }
+            }
+         }
+
+         return new ReadResult<TKey, TEntry>( key, Sort.Descending );
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, Sort sort = Sort.Descending )

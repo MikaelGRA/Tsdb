@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Vibrant.Tsdb.Ats.Tests.Selectors
+namespace Vibrant.Tsdb.Tests.Selectors
 {
    public class MyDynamicStorageSelector<TKey, TEntry> : DynamicStorageSelectorBase<TKey, TEntry>
      where TEntry : IEntry<TKey>

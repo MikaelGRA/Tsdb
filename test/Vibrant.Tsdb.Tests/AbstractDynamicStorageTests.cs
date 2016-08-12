@@ -2,10 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Vibrant.Tsdb.Ats.Tests.Entries;
+using Vibrant.Tsdb.Tests.Entries;
 using Xunit;
 
-namespace Vibrant.Tsdb.Ats.Tests
+namespace Vibrant.Tsdb.Tests
 {
    public abstract class AbstractDynamicStorageTests<TStorage> : AbstractStorageTests<TStorage>
      where TStorage : IDynamicStorage<string, BasicEntry>

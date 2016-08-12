@@ -26,29 +26,27 @@ namespace Vibrant.Tsdb.Sql
       private Task _createTable;
       private EntryEqualityComparer<TKey, TEntry> _comparer;
       private IKeyConverter<TKey> _keyConverter;
-      private SemaphoreSlim _read;
-      private SemaphoreSlim _write;
+      private IConcurrencyControl _cc;
 
-      public SqlDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IKeyConverter<TKey> keyConverter )
+      public SqlDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IKeyConverter<TKey> keyConverter )
       {
          SqlMapper.AddTypeMap( typeof( DateTime ), DbType.DateTime2 );
 
          _tableName = tableName;
          _connectionString = connectionString;
          _comparer = new EntryEqualityComparer<TKey, TEntry>();
-         _read = new SemaphoreSlim( readParallelism );
-         _write = new SemaphoreSlim( writeParallelism );
+         _cc = concurrency;
          _keyConverter = keyConverter;
          _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
       }
 
-      public SqlDynamicStorage( string tableName, string connectionString, int readParallelism, int writeParallelism )
-         : this( tableName, connectionString, readParallelism, writeParallelism, DefaultKeyConverter<TKey>.Current )
+      public SqlDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency )
+         : this( tableName, connectionString, concurrency, DefaultKeyConverter<TKey>.Current )
       {
       }
 
       public SqlDynamicStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, DefaultReadParallelism, DefaultWriteParallelism, DefaultKeyConverter<TKey>.Current )
+         : this( tableName, connectionString, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), DefaultKeyConverter<TKey>.Current )
       {
       }
 
@@ -136,8 +134,7 @@ namespace Vibrant.Tsdb.Sql
       {
          await CreateTable().ConfigureAwait( false );
 
-         await _write.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             using( var connection = new SqlConnection( _connectionString ) )
             {
@@ -171,35 +168,28 @@ namespace Vibrant.Tsdb.Sql
                }
             }
          }
-         finally
-         {
-            _write.Release();
-         }
       }
 
       private async Task<MultiReadResult<TKey, TEntry>> RetrieveForIds( IEnumerable<TKey> ids, DateTime to, Sort sort )
       {
          await CreateTable().ConfigureAwait( false );
 
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             using( var connection = new SqlConnection( _connectionString ) )
-            using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
             {
                await connection.OpenAsync().ConfigureAwait( false );
 
-               var sqlEntries = await connection.QueryAsync<SqlEntry>(
-                  sql: Sql.GetBottomlessQuery( _tableName, sort ),
-                  param: new { Ids = ids, To = to },
-                  transaction: tx ).ConfigureAwait( false );
+               using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+               {
+                  var sqlEntries = await connection.QueryAsync<SqlEntry>(
+                     sql: Sql.GetBottomlessQuery( _tableName, sort ),
+                     param: new { Ids = ids, To = to },
+                     transaction: tx ).ConfigureAwait( false );
 
-               return CreateReadResult( sqlEntries, ids, sort );
+                  return CreateReadResult( sqlEntries, ids, sort );
+               }
             }
-         }
-         finally
-         {
-            _read.Release();
          }
       }
 
@@ -207,8 +197,7 @@ namespace Vibrant.Tsdb.Sql
       {
          await CreateTable().ConfigureAwait( false );
 
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             using( var connection = new SqlConnection( _connectionString ) )
             {
@@ -225,18 +214,13 @@ namespace Vibrant.Tsdb.Sql
                }
             }
          }
-         finally
-         {
-            _read.Release();
-         }
       }
 
       private async Task<MultiReadResult<TKey, TEntry>> RetrieveForIds( IEnumerable<TKey> ids, Sort sort )
       {
          await CreateTable().ConfigureAwait( false );
 
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             using( var connection = new SqlConnection( _connectionString ) )
             {
@@ -253,18 +237,13 @@ namespace Vibrant.Tsdb.Sql
                }
             }
          }
-         finally
-         {
-            _read.Release();
-         }
       }
 
       private async Task<MultiReadResult<TKey, TEntry>> RetrieveLatestForIds( IEnumerable<TKey> ids )
       {
          await CreateTable().ConfigureAwait( false );
 
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             using( var connection = new SqlConnection( _connectionString ) )
             {
@@ -289,10 +268,6 @@ namespace Vibrant.Tsdb.Sql
                }
             }
          }
-         finally
-         {
-            _read.Release();
-         }
       }
 
       private async Task<SegmentedReadResult<TKey, TEntry>> RetrieveForIdSegmented( TKey id, DateTime? from, DateTime? to, int segmentSize, ContinuationToken continuationToken )
@@ -300,8 +275,7 @@ namespace Vibrant.Tsdb.Sql
          await CreateTable().ConfigureAwait( false );
          long skip = continuationToken?.Skip ?? 0;
 
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             using( var connection = new SqlConnection( _connectionString ) )
             {
@@ -320,18 +294,13 @@ namespace Vibrant.Tsdb.Sql
                }
             }
          }
-         finally
-         {
-            _read.Release();
-         }
       }
 
       private async Task<int> DeleteForIds( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          await CreateTable().ConfigureAwait( false );
 
-         await _write.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             using( var connection = new SqlConnection( _connectionString ) )
             {
@@ -350,18 +319,13 @@ namespace Vibrant.Tsdb.Sql
                }
             }
          }
-         finally
-         {
-            _write.Release();
-         }
       }
 
       private async Task<int> DeleteForIds( IEnumerable<TKey> ids, DateTime to )
       {
          await CreateTable().ConfigureAwait( false );
 
-         await _write.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             using( var connection = new SqlConnection( _connectionString ) )
             {
@@ -380,18 +344,13 @@ namespace Vibrant.Tsdb.Sql
                }
             }
          }
-         finally
-         {
-            _write.Release();
-         }
       }
 
       private async Task<int> DeleteForIds( IEnumerable<TKey> ids )
       {
          await CreateTable().ConfigureAwait( false );
 
-         await _write.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             using( var connection = new SqlConnection( _connectionString ) )
             {
@@ -409,10 +368,6 @@ namespace Vibrant.Tsdb.Sql
                   return count;
                }
             }
-         }
-         finally
-         {
-            _write.Release();
          }
       }
 
@@ -475,8 +430,6 @@ namespace Vibrant.Tsdb.Sql
          {
             if( disposing )
             {
-               _read.Dispose();
-               _write.Dispose();
             }
 
             _disposed = true;

@@ -25,19 +25,17 @@ namespace Vibrant.Tsdb.Ats
 
       private readonly StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>[] _defaultSelection;
       private object _sync = new object();
-      private SemaphoreSlim _read;
-      private SemaphoreSlim _write;
       private string _tableName;
       private CloudStorageAccount _account;
       private CloudTableClient _client;
       private Task<CloudTable> _table;
       private IPartitionProvider<TKey> _partitioningProvider;
       private IKeyConverter<TKey> _keyConverter;
+      private IConcurrencyControl _cc;
 
-      public AtsVolumeStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IPartitionProvider<TKey> provider, IKeyConverter<TKey> keyConverter )
+      public AtsVolumeStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> provider, IKeyConverter<TKey> keyConverter )
       {
-         _read = new SemaphoreSlim( readParallelism );
-         _write = new SemaphoreSlim( writeParallelism );
+         _cc = concurrency;
          _tableName = tableName;
          _account = CloudStorageAccount.Parse( connectionString );
          _client = _account.CreateCloudTableClient();
@@ -47,19 +45,19 @@ namespace Vibrant.Tsdb.Ats
 
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
-      
-      public AtsVolumeStorage( string tableName, string connectionString, int readParallelism, int writeParallelism, IPartitionProvider<TKey> provider )
-         : this( tableName, connectionString, readParallelism, writeParallelism, provider, DefaultKeyConverter<TKey>.Current )
+
+      public AtsVolumeStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> provider )
+         : this( tableName, connectionString, concurrency, provider, DefaultKeyConverter<TKey>.Current )
       {
       }
 
-      public AtsVolumeStorage( string tableName, string connectionString, int readParallelism, int writeParallelism )
-         : this( tableName, connectionString, readParallelism, writeParallelism, new YearlyPartitioningProvider<TKey>() )
+      public AtsVolumeStorage( string tableName, string connectionString, IConcurrencyControl concurrency )
+         : this( tableName, connectionString, concurrency, new YearlyPartitioningProvider<TKey>() )
       {
       }
 
       public AtsVolumeStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, DefaultReadParallelism, DefaultWriteParallelism, new YearlyPartitioningProvider<TKey>() )
+         : this( tableName, connectionString, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), new YearlyPartitioningProvider<TKey>() )
       {
       }
 
@@ -319,16 +317,10 @@ namespace Vibrant.Tsdb.Ats
 
       private async Task ExecuteBatchOperation( TableBatchOperation operation )
       {
-         await _write.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             var table = await GetTable();
-
             await table.ExecuteBatchAsync( operation ).ConfigureAwait( false );
-         }
-         finally
-         {
-            _write.Release();
          }
       }
 
@@ -353,8 +345,7 @@ namespace Vibrant.Tsdb.Ats
 
       private async Task<List<TsdbTableEntity>> RetrieveAllForId( TKey id, Sort sort )
       {
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             var fullQuery = new TableQuery<TsdbTableEntity>()
                .Where( CreatePartitionFilter( id ) );
@@ -368,16 +359,11 @@ namespace Vibrant.Tsdb.Ats
 
             return query;
          }
-         finally
-         {
-            _read.Release();
-         }
       }
 
       private async Task<List<TsdbTableEntity>> RetrieveLatestForId( TKey id )
       {
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             var fullQuery = new TableQuery<TsdbTableEntity>()
                .Where( CreatePartitionFilter( id ) )
@@ -387,16 +373,11 @@ namespace Vibrant.Tsdb.Ats
 
             return query;
          }
-         finally
-         {
-            _read.Release();
-         }
       }
 
       private async Task<List<TsdbTableEntity>> RetrieveRangeForId( TKey id, DateTime from, DateTime to, Sort sort )
       {
-         await _read.WaitAsync().ConfigureAwait( false );
-         try
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             var generalQuery = new TableQuery<TsdbTableEntity>()
                .Where( CreateGeneralFilter( id, from, to ) );
@@ -418,10 +399,6 @@ namespace Vibrant.Tsdb.Ats
             }
 
             return firstQueryTask.Result;
-         }
-         finally
-         {
-            _read.Release();
          }
       }
 
@@ -546,8 +523,7 @@ namespace Vibrant.Tsdb.Ats
          {
             if( disposing )
             {
-               _read.Dispose();
-               _write.Dispose();
+
             }
 
             _disposed = true;

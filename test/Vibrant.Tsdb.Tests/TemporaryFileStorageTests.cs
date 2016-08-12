@@ -3,10 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
-using Vibrant.Tsdb.Ats.Tests.Entries;
+using Vibrant.Tsdb.Tests.Entries;
 using Vibrant.Tsdb.Files;
 
-namespace Vibrant.Tsdb.Ats.Tests
+namespace Vibrant.Tsdb.Tests
 {
    public class TemporaryFileStorageTests : AbstractTemporaryStorageTests<TemporaryFileStorage<string, BasicEntry>>
    {

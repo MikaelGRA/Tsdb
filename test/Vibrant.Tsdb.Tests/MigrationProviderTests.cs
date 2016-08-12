@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Vibrant.Tsdb.Ats.Tests.Entries;
-using Vibrant.Tsdb.Ats.Tests.Selectors;
+using Vibrant.Tsdb.Tests.Entries;
+using Vibrant.Tsdb.Tests.Selectors;
 using Xunit;
 
-namespace Vibrant.Tsdb.Ats.Tests
+namespace Vibrant.Tsdb.Tests
 {
    public class MigrationProviderTests
    {
