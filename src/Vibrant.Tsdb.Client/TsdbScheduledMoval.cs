@@ -22,7 +22,7 @@ namespace Vibrant.Tsdb.Client
       {
          try
          {
-            await _engine.Client.MoveToVolumeStorage( new[] { _moval.Id }, _engine.Work.GetDynamicMovalBatchSize(), _moval.To, _moval.StorageExpiration ).ConfigureAwait( false );
+            await _engine.Client.MoveToVolumeStorageAsync( new[] { _moval.Id }, _engine.Work.GetDynamicMovalBatchSize(), _moval.To, _moval.StorageExpiration ).ConfigureAwait( false );
          }
          catch( Exception e )
          {

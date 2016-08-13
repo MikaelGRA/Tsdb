@@ -92,7 +92,7 @@ namespace Vibrant.Tsdb.Client
             {
                try
                {
-                  await _client.Write( write.Entries, _publish ).ConfigureAwait( false );
+                  await _client.WriteAsync( write.Entries, _publish ).ConfigureAwait( false );
                   write.Complete();
                }
                catch( Exception e )

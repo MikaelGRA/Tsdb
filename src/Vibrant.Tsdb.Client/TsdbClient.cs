@@ -75,7 +75,7 @@ namespace Vibrant.Tsdb.Client
       {
       }
 
-      public async Task MoveToVolumeStorage( IEnumerable<TKey> ids, int batchSize )
+      public async Task MoveToVolumeStorageAsync( IEnumerable<TKey> ids, int batchSize )
       {
          if( _volumeStorageSelector == null )
          {
@@ -83,11 +83,11 @@ namespace Vibrant.Tsdb.Client
          }
 
          var tasks = new List<Task>();
-         tasks.AddRange( ids.Select( id => MoveToVolumeStorage( id, batchSize ) ) );
+         tasks.AddRange( ids.Select( id => MoveToVolumeStorageAsync( id, batchSize ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      public async Task MoveToVolumeStorage( IEnumerable<TKey> ids, int batchSize, DateTime to, TimeSpan storageExpiration )
+      public async Task MoveToVolumeStorageAsync( IEnumerable<TKey> ids, int batchSize, DateTime to, TimeSpan storageExpiration )
       {
          if( _volumeStorageSelector == null )
          {
@@ -95,11 +95,11 @@ namespace Vibrant.Tsdb.Client
          }
 
          var tasks = new List<Task>();
-         tasks.AddRange( ids.Select( id => MoveToVolumeStorage( id, batchSize, to, storageExpiration ) ) );
+         tasks.AddRange( ids.Select( id => MoveToVolumeStorageAsync( id, batchSize, to, storageExpiration ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      public async Task MoveToVolumeStorage( TKey id, int batchSize )
+      public async Task MoveToVolumeStorageAsync( TKey id, int batchSize )
       {
          if( _volumeStorageSelector == null )
          {
@@ -129,7 +129,7 @@ namespace Vibrant.Tsdb.Client
          }
       }
 
-      public async Task MoveToVolumeStorage( TKey id, int batchSize, DateTime to, TimeSpan storageExpiration )
+      public async Task MoveToVolumeStorageAsync( TKey id, int batchSize, DateTime to, TimeSpan storageExpiration )
       {
          if( _volumeStorageSelector == null )
          {
@@ -168,7 +168,7 @@ namespace Vibrant.Tsdb.Client
          }
       }
 
-      public async Task MoveFromTemporaryStorage( int batchSize )
+      public async Task MoveFromTemporaryStorageAsync( int batchSize )
       {
          var sw = Stopwatch.StartNew();
          int read = 0;
@@ -197,7 +197,7 @@ namespace Vibrant.Tsdb.Client
          while( read != 0 );
       }
 
-      public async Task WriteDirectlyToVolumeStorage( IEnumerable<TEntry> items )
+      public async Task WriteDirectlyToVolumeStorageAsync( IEnumerable<TEntry> items )
       {
          if( _volumeStorageSelector == null )
          {
@@ -214,20 +214,20 @@ namespace Vibrant.Tsdb.Client
 
       public Task WriteAsync( IEnumerable<TEntry> items )
       {
-         return Write( items, PublicationType.None, Publish.Nowhere, true );
+         return WriteAsync( items, PublicationType.None, Publish.Nowhere, true );
       }
 
-      public Task Write( IEnumerable<TEntry> items, bool useTemporaryStorageOnFailure )
+      public Task WriteAsync( IEnumerable<TEntry> items, bool useTemporaryStorageOnFailure )
       {
-         return Write( items, PublicationType.None, Publish.Nowhere, useTemporaryStorageOnFailure );
+         return WriteAsync( items, PublicationType.None, Publish.Nowhere, useTemporaryStorageOnFailure );
       }
 
-      public Task Write( IEnumerable<TEntry> items, PublicationType publicationType )
+      public Task WriteAsync( IEnumerable<TEntry> items, PublicationType publicationType )
       {
-         return Write( items, publicationType, publicationType != PublicationType.None ? Publish.LocallyAndRemotely : Publish.Nowhere, true );
+         return WriteAsync( items, publicationType, publicationType != PublicationType.None ? Publish.LocallyAndRemotely : Publish.Nowhere, true );
       }
 
-      public async Task Write( IEnumerable<TEntry> items, PublicationType publicationType, Publish publish, bool useTemporaryStorageOnFailure )
+      public async Task WriteAsync( IEnumerable<TEntry> items, PublicationType publicationType, Publish publish, bool useTemporaryStorageOnFailure )
       {
          // ensure we only iterate the original collection once, if it is not a list or array
          if( !( items is IList<TEntry> || items is Array ) )
@@ -236,7 +236,7 @@ namespace Vibrant.Tsdb.Client
          }
 
          var tasks = new List<Task<IEnumerable<TEntry>>>();
-         tasks.AddRange( LookupDynamicStorages( items ).Select( c => WriteToDynamicStorage( c.Storage, c.Lookups, useTemporaryStorageOnFailure ) ) );
+         tasks.AddRange( LookupDynamicStorages( items ).Select( c => WriteToDynamicStorageAsync( c.Storage, c.Lookups, useTemporaryStorageOnFailure ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
          // Only publish things that were written
@@ -257,7 +257,7 @@ namespace Vibrant.Tsdb.Client
          }
       }
 
-      private async Task<IEnumerable<TEntry>> WriteToDynamicStorage( IDynamicStorage<TKey, TEntry> storage, IEnumerable<TEntry> entries, bool useTemporaryStorageOnFailure )
+      private async Task<IEnumerable<TEntry>> WriteToDynamicStorageAsync( IDynamicStorage<TKey, TEntry> storage, IEnumerable<TEntry> entries, bool useTemporaryStorageOnFailure )
       {
          var sw = Stopwatch.StartNew();
          try
@@ -389,12 +389,12 @@ namespace Vibrant.Tsdb.Client
          return _remotePublishSubscribe.SubscribeToAllAsync( subscribe, callback );
       }
 
-      public Task<Func<Task>> SubscribeLocally( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
+      public Task<Func<Task>> SubscribeLocallyAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
       {
          return _localPublishSubscribe.SubscribeAsync( ids, subscribe, callback );
       }
 
-      public Task<Func<Task>> SubscribeToAllLocally( SubscriptionType subscribe, Action<List<TEntry>> callback )
+      public Task<Func<Task>> SubscribeToAllLocallyAsync( SubscriptionType subscribe, Action<List<TEntry>> callback )
       {
          return _localPublishSubscribe.SubscribeToAllAsync( subscribe, callback );
       }

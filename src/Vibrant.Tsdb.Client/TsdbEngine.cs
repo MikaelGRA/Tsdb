@@ -89,7 +89,7 @@ namespace Vibrant.Tsdb.Client
          {
             try
             {
-               await _client.MoveFromTemporaryStorage( _workProvider.GetTemporaryMovalBatchSize() ).ConfigureAwait( false );
+               await _client.MoveFromTemporaryStorageAsync( _workProvider.GetTemporaryMovalBatchSize() ).ConfigureAwait( false );
             }
             catch( Exception e )
             {
