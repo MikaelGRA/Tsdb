@@ -60,48 +60,48 @@ namespace Vibrant.Tsdb.Sql
          return this;
       }
 
-      public Task Write( IEnumerable<TEntry> items )
+      public Task WriteAsync( IEnumerable<TEntry> items )
       {
          var uniqueEntries = Unique.Ensure<TKey, TEntry>( items, _comparer );
          return StoreForAll( uniqueEntries );
       }
 
-      public Task Delete( IEnumerable<TKey> ids, DateTime from, DateTime to )
+      public Task DeleteAsync( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          return DeleteForIds( ids, from, to );
       }
 
-      public Task Delete( IEnumerable<TKey> ids, DateTime to )
+      public Task DeleteAsync( IEnumerable<TKey> ids, DateTime to )
       {
          return DeleteForIds( ids, to );
       }
 
-      public Task Delete( IEnumerable<TKey> ids )
+      public Task DeleteAsync( IEnumerable<TKey> ids )
       {
          return DeleteForIds( ids );
       }
 
-      public Task<MultiReadResult<TKey, TEntry>> ReadLatest( IEnumerable<TKey> ids )
+      public Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids )
       {
          return RetrieveLatestForIds( ids );
       }
 
-      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
       {
          return RetrieveForIds( ids, sort );
       }
 
-      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
       {
          return RetrieveForIds( ids, to, sort );
       }
 
-      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          return RetrieveForIds( ids, from, to, sort );
       }
 
-      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime? from, DateTime? to, int segmentSize, object continuationToken )
+      public Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedAsync( TKey id, DateTime? from, DateTime? to, int segmentSize, IContinuationToken continuationToken )
       {
          return RetrieveForIdSegmented( id, from, to, segmentSize, (ContinuationToken)continuationToken );
       }
@@ -414,7 +414,7 @@ namespace Vibrant.Tsdb.Sql
             var from = entries[ entries.Count - 1 ].GetTimestamp();
             return async () =>
             {
-               await this.Delete( id, from, to ).ConfigureAwait( false );
+               await this.DeleteAsync( id, from, to ).ConfigureAwait( false );
                token.SkippedWasDeleted();
             };
          }

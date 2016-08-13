@@ -71,47 +71,47 @@ namespace Vibrant.Tsdb.Ats
          return this;
       }
 
-      public Task Delete( IEnumerable<TKey> ids )
+      public Task DeleteAsync( IEnumerable<TKey> ids )
       {
          return DeleteAllInternal( ids );
       }
 
-      public Task Delete( IEnumerable<TKey> ids, DateTime to )
+      public Task DeleteAsync( IEnumerable<TKey> ids, DateTime to )
       {
          return DeleteUntilInternal( ids, to );
       }
 
-      public Task Delete( IEnumerable<TKey> ids, DateTime from, DateTime to )
+      public Task DeleteAsync( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          return DeleteRangeInternal( ids, from, to );
       }
 
-      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
       {
          return ReadAllInternal( ids, sort );
       }
 
-      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
       {
          return ReadUntilInternal( ids, to, sort );
       }
 
-      public Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
+      public Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          return ReadRangeInternal( ids, from, to, sort );
       }
 
-      public Task<MultiReadResult<TKey, TEntry>> ReadLatest( IEnumerable<TKey> ids )
+      public Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids )
       {
          return ReadLatestInternal( ids );
       }
 
-      public Task Write( IEnumerable<TEntry> items )
+      public Task WriteAsync( IEnumerable<TEntry> items )
       {
          return WriteInternal( items );
       }
 
-      public Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime? from, DateTime? to, int segmentSize, object continuationToken )
+      public Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedAsync( TKey id, DateTime? from, DateTime? to, int segmentSize, IContinuationToken continuationToken )
       {
          return ReadRangeSegmentedInternal( id, from, to, segmentSize, (ContinuationToken)continuationToken );
       }

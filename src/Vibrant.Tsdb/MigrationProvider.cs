@@ -25,6 +25,8 @@ namespace Vibrant.Tsdb
          var dynamicEnumerator = _dynamics.GetStorage( id, minFrom, maxTo ).GetEnumerator();
          bool hasMoreDynamics = dynamicEnumerator.MoveNext();
 
+         // TODO: Could this be simplified to simply compare the returned results?
+
          while( volumeEnumerator.MoveNext() )
          {
             var volume = volumeEnumerator.Current;

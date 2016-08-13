@@ -10,137 +10,187 @@ namespace Vibrant.Tsdb
    {
       public static void WritePrimitive( this BinaryWriter writer, sbyte value )
       {
-         writer.Write( BinaryConstants.Code_Sbyte );
+         writer.Write( (byte)TypeCode.SByte );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, byte value )
       {
-         writer.Write( BinaryConstants.Code_Byte );
+         writer.Write( (byte)TypeCode.Byte );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, short value )
       {
-         writer.Write( BinaryConstants.Code_Short );
+         writer.Write( (byte)TypeCode.Int16 );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, ushort value )
       {
-         writer.Write( BinaryConstants.Code_Ushort );
+         writer.Write( (byte)TypeCode.UInt16 );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, int value )
       {
-         writer.Write( BinaryConstants.Code_Int );
+         writer.Write( (byte)TypeCode.Int32 );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, uint value )
       {
-         writer.Write( BinaryConstants.Code_Uint );
+         writer.Write( (byte)TypeCode.UInt32 );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, long value )
       {
-         writer.Write( BinaryConstants.Code_Long );
+         writer.Write( (byte)TypeCode.Int64 );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, ulong value )
       {
-         writer.Write( BinaryConstants.Code_Ulong );
+         writer.Write( (byte)TypeCode.UInt64 );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, float value )
       {
-         writer.Write( BinaryConstants.Code_Float );
+         writer.Write( (byte)TypeCode.Single );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, double value )
       {
-         writer.Write( BinaryConstants.Code_Double );
+         writer.Write( (byte)TypeCode.Double );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, decimal value )
       {
-         writer.Write( BinaryConstants.Code_Decimal );
+         writer.Write( (byte)TypeCode.Decimal );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, bool value )
       {
-         writer.Write( BinaryConstants.Code_Boolean );
+         writer.Write( (byte)TypeCode.Boolean );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, char value )
       {
-         writer.Write( BinaryConstants.Code_Char );
+         writer.Write( (byte)TypeCode.Char );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, string value )
       {
-         writer.Write( BinaryConstants.Code_String );
+         writer.Write( (byte)TypeCode.String );
          writer.Write( value );
       }
 
       public static void WritePrimitive( this BinaryWriter writer, DateTime value )
       {
-         writer.Write( BinaryConstants.Code_DateTime );
+         writer.Write( (byte)TypeCode.DateTime );
          writer.Write( value.Ticks );
       }
 
-      public static void WritePrimitive( this BinaryWriter writer, TimeSpan value )
+      public static void WritePrimitive( this BinaryWriter writer, object value )
       {
-         writer.Write( BinaryConstants.Code_TimeSpan );
-         writer.Write( value.Ticks );
+         var typeCode = Convert.GetTypeCode( value );
+         writer.Write( (byte)typeCode );
+         switch( typeCode )
+         {
+            case TypeCode.Boolean:
+               writer.Write( (bool)value );
+               break;
+            case TypeCode.Char:
+               writer.Write( (char)value );
+               break;
+            case TypeCode.SByte:
+               writer.Write( (sbyte)value );
+               break;
+            case TypeCode.Byte:
+               writer.Write( (byte)value );
+               break;
+            case TypeCode.Int16:
+               writer.Write( (short)value );
+               break;
+            case TypeCode.UInt16:
+               writer.Write( (ushort)value );
+               break;
+            case TypeCode.Int32:
+               writer.Write( (int)value );
+               break;
+            case TypeCode.UInt32:
+               writer.Write( (uint)value );
+               break;
+            case TypeCode.Int64:
+               writer.Write( (long)value );
+               break;
+            case TypeCode.UInt64:
+               writer.Write( (ulong)value );
+               break;
+            case TypeCode.Single:
+               writer.Write( (float)value );
+               break;
+            case TypeCode.Double:
+               writer.Write( (double)value );
+               break;
+            case TypeCode.Decimal:
+               writer.Write( (decimal)value );
+               break;
+            case TypeCode.DateTime:
+               writer.Write( ( (DateTime)value ).Ticks );
+               break;
+            case TypeCode.String:
+               writer.Write( (string)value );
+               break;
+            case TypeCode.Empty:
+            case TypeCode.Object:
+            default:
+               throw new ArgumentException( $"The specified type of value ({value.GetType().Name}) is not supported." );
+         }
       }
 
       public static object ReadPrimitive( this BinaryReader reader )
       {
-         var code = reader.ReadByte();
-         switch( code )
+         var typeCode = (TypeCode)reader.ReadByte();
+         switch( typeCode )
          {
-            case BinaryConstants.Code_Sbyte:
+            case TypeCode.SByte:
                return reader.ReadSByte();
-            case BinaryConstants.Code_Byte:
+            case TypeCode.Byte:
                return reader.ReadByte();
-            case BinaryConstants.Code_Short:
+            case TypeCode.Int16:
                return reader.ReadInt16();
-            case BinaryConstants.Code_Ushort:
+            case TypeCode.UInt16:
                return reader.ReadUInt16();
-            case BinaryConstants.Code_Int:
+            case TypeCode.Int32:
                return reader.ReadInt32();
-            case BinaryConstants.Code_Uint:
+            case TypeCode.UInt32:
                return reader.ReadUInt32();
-            case BinaryConstants.Code_Long:
+            case TypeCode.Int64:
                return reader.ReadInt64();
-            case BinaryConstants.Code_Ulong:
+            case TypeCode.UInt64:
                return reader.ReadUInt64();
-            case BinaryConstants.Code_Float:
+            case TypeCode.Single:
                return reader.ReadSingle();
-            case BinaryConstants.Code_Double:
+            case TypeCode.Double:
                return reader.ReadDouble();
-            case BinaryConstants.Code_Decimal:
+            case TypeCode.Decimal:
                return reader.ReadDecimal();
-            case BinaryConstants.Code_Boolean:
+            case TypeCode.Boolean:
                return reader.ReadBoolean();
-            case BinaryConstants.Code_Char:
+            case TypeCode.Char:
                return reader.ReadChar();
-            case BinaryConstants.Code_String:
+            case TypeCode.String:
                return reader.ReadString();
-            case BinaryConstants.Code_DateTime:
+            case TypeCode.DateTime:
                return new DateTime( reader.ReadInt64(), DateTimeKind.Utc );
-            case BinaryConstants.Code_TimeSpan:
-               return new TimeSpan( reader.ReadInt64() );
             default:
                throw new InvalidOperationException();
          }

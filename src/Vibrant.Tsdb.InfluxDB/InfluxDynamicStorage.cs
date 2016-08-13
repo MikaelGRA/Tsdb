@@ -84,7 +84,7 @@ namespace Vibrant.Tsdb.InfluxDB
          return this;
       }
 
-      public async Task Write( IEnumerable<TEntry> items )
+      public async Task WriteAsync( IEnumerable<TEntry> items )
       {
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
@@ -94,7 +94,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task Delete( IEnumerable<TKey> ids, DateTime from, DateTime to )
+      public async Task DeleteAsync( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
@@ -103,7 +103,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task Delete( IEnumerable<TKey> ids, DateTime to )
+      public async Task DeleteAsync( IEnumerable<TKey> ids, DateTime to )
       {
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
@@ -112,7 +112,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task Delete( IEnumerable<TKey> ids )
+      public async Task DeleteAsync( IEnumerable<TKey> ids )
       {
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
@@ -121,7 +121,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task<MultiReadResult<TKey, TEntry>> ReadLatest( IEnumerable<TKey> ids )
+      public async Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -131,7 +131,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
+      public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -141,7 +141,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
+      public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -151,7 +151,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
+      public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -161,7 +161,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task<SegmentedReadResult<TKey, TEntry>> Read( TKey id, DateTime? from, DateTime? to, int segmentSize, object continuationToken )
+      public async Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedAsync( TKey id, DateTime? from, DateTime? to, int segmentSize, IContinuationToken continuationToken )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -300,7 +300,7 @@ namespace Vibrant.Tsdb.InfluxDB
          {
             var to = ( (IEntry<TKey>)entries[ 0 ] ).GetTimestamp().AddTicks( 1 );
             var from = ( (IEntry<TKey>)entries[ entries.Count - 1 ] ).GetTimestamp();
-            return () => this.Delete( id, from, to );
+            return () => this.DeleteAsync( id, from, to );
          }
       }
 

@@ -8,6 +8,6 @@ namespace Vibrant.Tsdb
    public interface IPublish<TKey,TEntry>
       where TEntry : IEntry<TKey>
    {
-      Task Publish( IEnumerable<TEntry> entries, PublicationType publish );
+      Task PublishAsync( IEnumerable<TEntry> entries, PublicationType publish );
    }
 }

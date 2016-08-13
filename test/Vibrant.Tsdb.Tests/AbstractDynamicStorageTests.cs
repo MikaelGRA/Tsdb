@@ -22,14 +22,14 @@ namespace Vibrant.Tsdb.Tests
 
          var written = CreateRows( "rowlol2", from, count );
 
-         await store.Write( written );
+         await store.WriteAsync( written );
 
          IContinuationToken token = null;
          int round = 0;
          do
          {
             round++;
-            var segment = await store.Read( "rowlol2", null, new DateTime( 2018, 12, 31, 0, 0, 0 ), 10000, token );
+            var segment = await store.ReadSegmentedAsync( "rowlol2", null, new DateTime( 2018, 12, 31, 0, 0, 0 ), 10000, token );
 
             if( round == 5 )
             {
@@ -45,7 +45,7 @@ namespace Vibrant.Tsdb.Tests
          }
          while( token.HasMore );
 
-         await store.Delete( "rowlol2" );
+         await store.DeleteAsync( "rowlol2" );
       }
 
       [Fact]
@@ -60,14 +60,14 @@ namespace Vibrant.Tsdb.Tests
 
          var written = CreateRows( "rowlol3", from, count );
 
-         await store.Write( written );
+         await store.WriteAsync( written );
 
          IContinuationToken token = null;
          int round = 0;
          do
          {
             round++;
-            var segment = await store.Read( "rowlol3", null, null, 10000, token );
+            var segment = await store.ReadSegmentedAsync( "rowlol3", null, null, 10000, token );
 
             if( round == 5 )
             {
@@ -83,7 +83,7 @@ namespace Vibrant.Tsdb.Tests
          }
          while( token.HasMore );
 
-         await store.Delete( "rowlol3" );
+         await store.DeleteAsync( "rowlol3" );
       }
 
       [Fact]
@@ -98,14 +98,14 @@ namespace Vibrant.Tsdb.Tests
 
          var written = CreateRows( "rowlol2", from, count );
 
-         await store.Write( written );
+         await store.WriteAsync( written );
 
          IContinuationToken token = null;
          int round = 0;
          do
          {
             round++;
-            var segment = await store.Read( "rowlol2", null, new DateTime( 2018, 12, 31, 0, 0, 0 ), 10000, token );
+            var segment = await store.ReadSegmentedAsync( "rowlol2", null, new DateTime( 2018, 12, 31, 0, 0, 0 ), 10000, token );
 
             if( round == 5 )
             {
@@ -122,7 +122,7 @@ namespace Vibrant.Tsdb.Tests
          }
          while( token.HasMore );
 
-         var read = await store.Read( "rowlol2" );
+         var read = await store.ReadAsync( "rowlol2" );
 
          Assert.Equal( 0, read.Entries.Count );
       }

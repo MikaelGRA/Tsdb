@@ -78,7 +78,7 @@ namespace Vibrant.Tsdb.Ats
       /// </summary>
       /// <param name="items">The entries to be written.</param>
       /// <returns></returns>
-      public async Task Write( IEnumerable<TEntry> items )
+      public async Task WriteAsync( IEnumerable<TEntry> items )
       {
          List<Task> tasks = new List<Task>();
 
@@ -96,7 +96,7 @@ namespace Vibrant.Tsdb.Ats
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      public async Task Delete( IEnumerable<TKey> ids, DateTime from, DateTime to )
+      public async Task DeleteAsync( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          var tasks = new List<Task<int>>();
          foreach( var id in ids )
@@ -106,7 +106,7 @@ namespace Vibrant.Tsdb.Ats
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      public async Task Delete( IEnumerable<TKey> ids )
+      public async Task DeleteAsync( IEnumerable<TKey> ids )
       {
          var tasks = new List<Task<int>>();
          foreach( var id in ids )
@@ -116,7 +116,7 @@ namespace Vibrant.Tsdb.Ats
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      public async Task<MultiReadResult<TKey, TEntry>> ReadLatest( IEnumerable<TKey> ids )
+      public async Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids )
       {
          var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
          foreach( var id in ids )
@@ -127,7 +127,7 @@ namespace Vibrant.Tsdb.Ats
          return tasks.Select( x => x.Result ).Combine();
       }
 
-      public async Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
+      public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
          foreach( var id in ids )
@@ -138,7 +138,7 @@ namespace Vibrant.Tsdb.Ats
          return new MultiReadResult<TKey, TEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
       }
 
-      public async Task<MultiReadResult<TKey, TEntry>> Read( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
+      public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
          foreach( var id in ids )

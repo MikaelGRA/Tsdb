@@ -79,9 +79,9 @@ namespace Vibrant.Tsdb.Tests
          var to = from.AddSeconds( count );
 
          var written = CreateRows( from, count );
-         await store.Write( written );
-         var read = await store.Read( Ids, from, to, sort );
-         var latest = await store.ReadLatest( Ids );
+         await store.WriteAsync( written );
+         var read = await store.ReadAsync( Ids, from, to, sort );
+         var latest = await store.ReadLatestAsync( Ids );
 
          Dictionary<string, List<BasicEntry>> entries = new Dictionary<string, List<BasicEntry>>();
          foreach( var item in written )
@@ -95,7 +95,7 @@ namespace Vibrant.Tsdb.Tests
             items.Add( item );
          }
 
-         await store.Delete( Ids, from, to );
+         await store.DeleteAsync( Ids, from, to );
 
          foreach( var readResult in read )
          {
@@ -140,11 +140,11 @@ namespace Vibrant.Tsdb.Tests
 
          var written = CreateRows( from, count );
 
-         await store.Write( written );
+         await store.WriteAsync( written );
 
-         await store.Delete( Ids, from, to );
+         await store.DeleteAsync( Ids, from, to );
 
-         var read = await store.Read( Ids, from, to, sort );
+         var read = await store.ReadAsync( Ids, from, to, sort );
 
          Assert.Equal( 0, read.Sum( x => x.Entries.Count ) );
       }
@@ -160,18 +160,18 @@ namespace Vibrant.Tsdb.Tests
 
          var from1 = new DateTime( 2012, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var written1 = CreateRows( from1, count );
-         await store.Write( written1 );
+         await store.WriteAsync( written1 );
 
          var from2 = new DateTime( 2013, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var written2 = CreateRows( from2, count );
-         await store.Write( written2 );
+         await store.WriteAsync( written2 );
 
 
-         var rows = await store.Read( Ids );
+         var rows = await store.ReadAsync( Ids );
 
-         await store.Delete( Ids );
+         await store.DeleteAsync( Ids );
 
-         var read = await store.Read( Ids, sort );
+         var read = await store.ReadAsync( Ids, sort );
 
          Assert.Equal( count * 2, rows.Sum( x => x.Entries.Count ) );
          Assert.Equal( 0, read.Sum( x => x.Entries.Count ) );
@@ -190,11 +190,11 @@ namespace Vibrant.Tsdb.Tests
             new BasicEntry { Id = "row1", Timestamp = from, Value = 37.13 },
          };
 
-         await store.Write( written );
+         await store.WriteAsync( written );
 
-         var read = await store.Read( Ids );
+         var read = await store.ReadAsync( Ids );
 
-         await store.Delete( Ids );
+         await store.DeleteAsync( Ids );
 
          Assert.Equal( 1, read.Sum( x => x.Entries.Count ) );
       }

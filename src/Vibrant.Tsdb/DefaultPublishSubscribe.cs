@@ -49,12 +49,12 @@ namespace Vibrant.Tsdb
          }
       }
 
-      public virtual Task WaitWhileDisconnected()
+      public virtual Task WaitWhileDisconnectedAsync()
       {
          return _completed;
       }
 
-      public async Task Publish( IEnumerable<TEntry> entries, PublicationType publish )
+      public async Task PublishAsync( IEnumerable<TEntry> entries, PublicationType publish )
       {
          if( publish == PublicationType.None )
          {
@@ -64,7 +64,7 @@ namespace Vibrant.Tsdb
          await OnPublished( entries, publish ).ConfigureAwait( false );
       }
 
-      public async Task<Func<Task>> Subscribe( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
+      public async Task<Func<Task>> SubscribeAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<List<TEntry>> callback )
       {
          IDictionary<TKey, HashSet<Action<List<TEntry>>>> single;
          switch( subscribe )
@@ -128,7 +128,7 @@ namespace Vibrant.Tsdb
          }
       }
 
-      public async Task<Func<Task>> SubscribeToAll( SubscriptionType subscribe, Action<List<TEntry>> callback )
+      public async Task<Func<Task>> SubscribeToAllAsync( SubscriptionType subscribe, Action<List<TEntry>> callback )
       {
          IDictionary<Action<List<TEntry>>, byte> all;
          switch( subscribe )

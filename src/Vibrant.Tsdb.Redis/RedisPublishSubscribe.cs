@@ -63,7 +63,7 @@ namespace Vibrant.Tsdb.Redis
          // simply log
       }
 
-      public override Task WaitWhileDisconnected()
+      public override Task WaitWhileDisconnectedAsync()
       {
          return _waitWhileDisconnected.Task;
       }
