@@ -49,20 +49,34 @@ namespace Vibrant.Tsdb.ConsoleApp
          var startTime = DateTime.UtcNow;
 
          _dataSources = new List<DataSource>();
-         for( int i = 0 ; i < 200 ; i++ )
+         for( int i = 0 ; i < 20 ; i++ )
          {
             _dataSources.Add( new DataSource( new BasicKey { Id = Guid.NewGuid(), Sampling = Sampling.Daily }, startTime, TimeSpan.FromMilliseconds( 10 ) ) );
          }
-
+         
          var dats = new AtsDynamicStorage<BasicKey, BasicEntry>( 
-            "DynamicTableXX", 
+            "VatsTables", 
             ats.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( AtsDynamicStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsDynamicStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
             new YearlyPartitioningProvider<BasicKey>(), 
             this );
 
+         var dsql = new SqlDynamicStorage<BasicKey, BasicEntry>(
+            "SqlTable",
+            sql.GetSection( "ConnectionString" ).Value,
+            new ConcurrencyControl( 5, 5 ),
+            this );
+
+         var switchDate = new DateTime( 2016, 8, 14, 18, 25, 0, DateTimeKind.Utc );
+
+         var selector = new TestDynamicStorageSelector( new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>[]
+         {
+            new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>( dats, null, switchDate ),
+            new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>( dsql, switchDate, null ),
+         } );
+
          var vats = new AtsVolumeStorage<BasicKey, BasicEntry>( 
-            "VolumeTableXX", 
+            "DatsTables", 
             ats.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( AtsVolumeStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsVolumeStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
             new YearlyPartitioningProvider<BasicKey>(), 
@@ -74,7 +88,7 @@ namespace Vibrant.Tsdb.ConsoleApp
             TemporaryFileStorage<BasicKey, BasicEntry>.DefaultMaxStorageSize,
             this );
 
-         var client = new TsdbClient<BasicKey, BasicEntry>( dats, vats, tfs, this );
+         var client = new TsdbClient<BasicKey, BasicEntry>( selector, vats, tfs, this );
          
          // redis.GetSection( "ConnectionString" ).Value
 
