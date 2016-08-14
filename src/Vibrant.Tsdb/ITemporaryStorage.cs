@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb
 {
    public interface ITemporaryStorage<TKey, TEntry>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       void Write( IEnumerable<TEntry> entries );
 

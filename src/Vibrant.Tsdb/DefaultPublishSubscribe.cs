@@ -11,7 +11,7 @@ namespace Vibrant.Tsdb
    /// Simple publish subscribe implementation that only works locally.
    /// </summary>
    public class DefaultPublishSubscribe<TKey, TEntry> : IPublishSubscribe<TKey, TEntry>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       private Task _completed = Task.FromResult( 0 );
       private IDictionary<TKey, HashSet<Action<List<TEntry>>>> _latestCallbacksForSingle;

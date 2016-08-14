@@ -5,9 +5,9 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IStorage<TKey, TEntry> where TEntry : IEntry<TKey>
+   public interface IStorage<TKey, TEntry> where TEntry : IEntry
    {
-      Task WriteAsync( IEnumerable<TEntry> items );
+      Task WriteAsync<TKeyedEntry>( IEnumerable<TKeyedEntry> items ) where TKeyedEntry : TEntry, IKeyedEntry<TKey>;
 
       Task DeleteAsync( IEnumerable<TKey> ids, DateTime from, DateTime to );
 

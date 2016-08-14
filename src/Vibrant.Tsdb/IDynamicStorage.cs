@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IDynamicStorage<TKey, TEntry> : IStorage<TKey, TEntry> where TEntry : IEntry<TKey>
+   public interface IDynamicStorage<TKey, TEntry> : IStorage<TKey, TEntry> where TEntry : IEntry
    {
       Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedAsync( TKey id, DateTime? from, DateTime? to, int segmentSize, IContinuationToken continuationToken );
 

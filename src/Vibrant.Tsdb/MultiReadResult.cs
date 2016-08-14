@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb
 {
    public class MultiReadResult<TKey, TEntry> : IEnumerable<ReadResult<TKey, TEntry>>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       private IDictionary<TKey, ReadResult<TKey, TEntry>> _results;
 
@@ -67,7 +67,7 @@ namespace Vibrant.Tsdb
          return _results.Values.GetEnumerator();
       }
       public MultiReadResult<TKey, TOutputEntry> As<TOutputEntry>()
-         where TOutputEntry : IEntry<TKey>
+         where TOutputEntry : IEntry
       {
          return new MultiReadResult<TKey, TOutputEntry>( _results.ToDictionary( x => x.Key, x => x.Value.As<TOutputEntry>() ) );
       }

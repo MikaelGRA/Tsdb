@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb
 {
    public class EntryEqualityComparer<TKey, TEntry> : IEqualityComparer<TEntry>
-     where TEntry : IEntry<TKey>
+     where TEntry : IEntry
    {
       public bool Equals( TEntry x, TEntry y )
       {

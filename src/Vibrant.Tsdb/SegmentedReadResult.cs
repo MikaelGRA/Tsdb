@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb
 {
    public class SegmentedReadResult<TKey, TEntry> : ReadResult<TKey, TEntry>
-     where TEntry : IEntry<TKey>
+     where TEntry : IEntry
    {
       private Func<Task> _delete;
 

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb
 {
    public abstract class DynamicStorageSelectorBase<TKey, TEntry> : IDynamicStorageSelector<TKey, TEntry>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       protected abstract IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> IterateAllStoragesFor( TKey key );
 

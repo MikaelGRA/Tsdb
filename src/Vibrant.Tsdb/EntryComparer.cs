@@ -8,7 +8,7 @@ namespace Vibrant.Tsdb
    public static class EntryComparer
    {
       public static IComparer<TEntry> GetComparer<TKey, TEntry>( Sort sort )
-         where TEntry : IEntry<TKey>
+         where TEntry : IEntry
       {
          switch( sort )
          {

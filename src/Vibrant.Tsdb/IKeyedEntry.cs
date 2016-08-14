@@ -1,15 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IEntry
+   public interface IKeyedEntry<TKey> : IEntry
    {
-      DateTime GetTimestamp();
-
-      void SetTimestamp( DateTime timestamp );
+      TKey GetKey();
    }
 }

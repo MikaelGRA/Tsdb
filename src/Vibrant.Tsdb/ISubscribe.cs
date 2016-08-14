@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb
 {
    public interface ISubscribe<TKey, TEntry>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       Task<Func<Task>> SubscribeAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<List<TEntry>> callback );
 

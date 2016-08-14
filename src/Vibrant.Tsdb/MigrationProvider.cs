@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb
 {
    public class MigrationProvider<TKey, TEntry>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       private IDynamicStorageSelector<TKey, TEntry> _dynamics;
       private IVolumeStorageSelector<TKey, TEntry> _volumes;

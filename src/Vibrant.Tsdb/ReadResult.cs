@@ -7,7 +7,7 @@ using Vibrant.Tsdb.Helpers;
 namespace Vibrant.Tsdb
 {
    public class ReadResult<TKey, TEntry>
-     where TEntry : IEntry<TKey>
+     where TEntry : IEntry
    {
       public ReadResult( TKey id, Sort sort, List<TEntry> entries )
       {
@@ -30,7 +30,7 @@ namespace Vibrant.Tsdb
       public List<TEntry> Entries { get; private set; }
 
       public ReadResult<TKey, TOutputEntry> As<TOutputEntry>()
-         where TOutputEntry : IEntry<TKey>
+         where TOutputEntry : IEntry
       {
          return new ReadResult<TKey, TOutputEntry>( Id, Sort, Entries.Cast<TOutputEntry>().ToList() );
       }

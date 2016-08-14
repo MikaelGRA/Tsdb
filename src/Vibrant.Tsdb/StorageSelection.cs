@@ -7,7 +7,7 @@ namespace Vibrant.Tsdb
 {
    public struct StorageSelection<TKey, TEntry, TStorage>
       where TStorage : IStorage<TKey, TEntry>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       public StorageSelection( TStorage storage, DateTime? from, DateTime? to )
       {

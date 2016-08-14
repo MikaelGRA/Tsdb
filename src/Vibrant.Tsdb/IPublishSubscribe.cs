@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb
 {
    public interface IPublishSubscribe<TKey, TEntry> : IPublish<TKey, TEntry>, ISubscribe<TKey, TEntry>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       Task WaitWhileDisconnectedAsync();
    }

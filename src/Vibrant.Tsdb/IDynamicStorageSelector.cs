@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IDynamicStorageSelector<TKey, TEntry> where TEntry : IEntry<TKey>
+   public interface IDynamicStorageSelector<TKey, TEntry> where TEntry : IEntry
    {
       IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to );
 

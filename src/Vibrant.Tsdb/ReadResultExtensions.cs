@@ -8,7 +8,7 @@ namespace Vibrant.Tsdb
    public static class ReadResultExtensions
    {
       public static MultiReadResult<TKey, TEntry> Combine<TKey, TEntry>( this IEnumerable<MultiReadResult<TKey, TEntry>> that )
-         where TEntry : IEntry<TKey>
+         where TEntry : IEntry
       {
          var result = new MultiReadResult<TKey, TEntry>();
          foreach( var item in that )
@@ -19,7 +19,7 @@ namespace Vibrant.Tsdb
       }
 
       public static MultiReadResult<TKey, TEntry> Combine<TKey, TEntry>( this IEnumerable<ReadResult<TKey, TEntry>> that )
-         where TEntry : IEntry<TKey>
+         where TEntry : IEntry
       {
          var result = new MultiReadResult<TKey, TEntry>();
          foreach( var item in that )
