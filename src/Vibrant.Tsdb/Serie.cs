@@ -21,6 +21,12 @@ namespace Vibrant.Tsdb
          Entries.Add( entry );
       }
 
+      public Serie( TKey key )
+      {
+         Key = key;
+         Entries = new List<TEntry>();
+      }
+
       public TKey Key { get; private set; }
 
       public List<TEntry> Entries { get; private set; }

@@ -484,7 +484,7 @@ namespace Vibrant.Tsdb.Client
 
       private IEnumerable<DynamicStorageLookupResult<TKey, ISerie<TKey, TEntry>, TEntry>> LookupDynamicStorages( IEnumerable<ISerie<TKey, TEntry>> series )
       {
-         var result = new Dictionary<IStorage<TKey, TEntry>, DynamicStorageLookupResult<TKey, ISerie<TKey, TEntry>, TEntry>>();
+         var result = new Dictionary<StorageKey<TKey, TEntry>, DynamicStorageLookupResult<TKey, ISerie<TKey, TEntry>, TEntry>>();
 
          foreach( var serie in series )
          {
@@ -492,18 +492,20 @@ namespace Vibrant.Tsdb.Client
             foreach( var entry in serie.Entries )
             {
                var storage = _dynamicStorageSelector.GetStorage( key, entry );
-
-               // TODO: Use storage + key (representing serie) for key
+               var storageKey = new StorageKey<TKey, TEntry>( key, storage );
 
                DynamicStorageLookupResult<TKey, ISerie<TKey, TEntry>, TEntry> existingStorage;
-               if( !result.TryGetValue( storage, out existingStorage ) )
+               if( !result.TryGetValue( storageKey, out existingStorage ) )
                {
                   existingStorage = new DynamicStorageLookupResult<TKey, ISerie<TKey, TEntry>, TEntry>( storage );
-                  result.Add( storage, existingStorage );
+                  result.Add( storageKey, existingStorage );
                }
 
-               // TODO: create series if not exists, add to series afterwards
-               existingStorage.Lookups.Add( entry );
+               if( existingStorage.Lookups.Count == 0 )
+               {
+                  existingStorage.Lookups.Add( new Serie<TKey, TEntry>( key ) );
+               }
+               existingStorage.Lookups[ 0 ].Entries.Add( entry );
             }
          }
 
