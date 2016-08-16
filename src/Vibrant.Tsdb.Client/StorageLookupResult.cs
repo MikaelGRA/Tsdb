@@ -7,7 +7,7 @@ namespace Vibrant.Tsdb.Client
 {
    internal class StorageLookupResult<TKey, TStorage, TEntry, TLookup>
       where TStorage : IStorage<TKey, TEntry>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       public StorageLookupResult( TStorage storage )
       {

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Client
 {
    public class TsdbEngine<TKey, TEntry> : IDisposable
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       private EventScheduler _scheduler;
       private TsdbClient<TKey, TEntry> _client;

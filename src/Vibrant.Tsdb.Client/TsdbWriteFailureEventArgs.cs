@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Client
 {
    public class TsdbWriteFailureEventArgs<TKey, TEntry> : EventArgs
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       private IEnumerable<TEntry> _entries;
       private Exception _exception;

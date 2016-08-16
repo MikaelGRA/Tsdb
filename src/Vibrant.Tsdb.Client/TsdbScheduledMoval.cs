@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Client
 {
    public class TsdbScheduledMoval<TKey, TEntry>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       private TsdbVolumeMoval<TKey> _moval;
       private TsdbEngine<TKey, TEntry> _engine;

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Client
 {
    public class TsdbClient<TKey, TEntry> : IStorage<TKey, TEntry>, ISubscribe<TKey, TEntry>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       private static readonly TEntry[] _entries = new TEntry[ 0 ];
       private IDynamicStorageSelector<TKey, TEntry> _dynamicStorageSelector;
@@ -212,25 +212,25 @@ namespace Vibrant.Tsdb.Client
          _logger.Info( $"Wrote {items.Count()} directly to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
       }
 
-      public Task WriteAsync( IEnumerable<TEntry> items )
+      public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items )
       {
          return WriteAsync( items, PublicationType.None, Publish.Nowhere, true );
       }
 
-      public Task WriteAsync( IEnumerable<TEntry> items, bool useTemporaryStorageOnFailure )
+      public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items, bool useTemporaryStorageOnFailure )
       {
          return WriteAsync( items, PublicationType.None, Publish.Nowhere, useTemporaryStorageOnFailure );
       }
 
-      public Task WriteAsync( IEnumerable<TEntry> items, PublicationType publicationType )
+      public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items, PublicationType publicationType )
       {
          return WriteAsync( items, publicationType, publicationType != PublicationType.None ? Publish.LocallyAndRemotely : Publish.Nowhere, true );
       }
 
-      public async Task WriteAsync( IEnumerable<TEntry> items, PublicationType publicationType, Publish publish, bool useTemporaryStorageOnFailure )
+      public async Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items, PublicationType publicationType, Publish publish, bool useTemporaryStorageOnFailure )
       {
          // ensure we only iterate the original collection once, if it is not a list or array
-         if( !( items is IList<TEntry> || items is Array ) )
+         if( !( items is IList<ISerie<TKey, TEntry>> || items is Array ) )
          {
             items = items.ToList();
          }
@@ -257,14 +257,14 @@ namespace Vibrant.Tsdb.Client
          }
       }
 
-      private async Task<IEnumerable<TEntry>> WriteToDynamicStorageAsync( IDynamicStorage<TKey, TEntry> storage, IEnumerable<TEntry> entries, bool useTemporaryStorageOnFailure )
+      private async Task<IEnumerable<ISerie<TKey, TEntry>>> WriteToDynamicStorageAsync( IDynamicStorage<TKey, TEntry> storage, IEnumerable<ISerie<TKey, TEntry>> series, bool useTemporaryStorageOnFailure )
       {
          var sw = Stopwatch.StartNew();
          try
          {
-            await storage.WriteAsync( entries ).ConfigureAwait( false );
-            _logger.Info( $"Wrote {entries.Count()} to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
-            return entries;
+            await storage.WriteAsync( series ).ConfigureAwait( false );
+            _logger.Info( $"Wrote {series.Sum( x => x.Entries.Count )} to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+            return series;
          }
          catch( Exception e1 )
          {
@@ -482,22 +482,29 @@ namespace Vibrant.Tsdb.Client
          return result.Values;
       }
 
-      private IEnumerable<DynamicStorageLookupResult<TKey, TEntry, TEntry>> LookupDynamicStorages( IEnumerable<TEntry> entries )
+      private IEnumerable<DynamicStorageLookupResult<TKey, ISerie<TKey, TEntry>, TEntry>> LookupDynamicStorages( IEnumerable<ISerie<TKey, TEntry>> series )
       {
-         var result = new Dictionary<IStorage<TKey, TEntry>, DynamicStorageLookupResult<TKey, TEntry, TEntry>>();
+         var result = new Dictionary<IStorage<TKey, TEntry>, DynamicStorageLookupResult<TKey, ISerie<TKey, TEntry>, TEntry>>();
 
-         foreach( var entry in entries )
+         foreach( var serie in series )
          {
-            var storage = _dynamicStorageSelector.GetStorage( entry );
-
-            DynamicStorageLookupResult<TKey, TEntry, TEntry> existingStorage;
-            if( !result.TryGetValue( storage, out existingStorage ) )
+            var key = serie.Key;
+            foreach( var entry in serie.Entries )
             {
-               existingStorage = new DynamicStorageLookupResult<TKey, TEntry, TEntry>( storage );
-               result.Add( storage, existingStorage );
-            }
+               var storage = _dynamicStorageSelector.GetStorage( key, entry );
 
-            existingStorage.Lookups.Add( entry );
+               // TODO: Use storage + key (representing serie) for key
+
+               DynamicStorageLookupResult<TKey, ISerie<TKey, TEntry>, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  existingStorage = new DynamicStorageLookupResult<TKey, ISerie<TKey, TEntry>, TEntry>( storage );
+                  result.Add( storage, existingStorage );
+               }
+
+               // TODO: create series if not exists, add to series afterwards
+               existingStorage.Lookups.Add( entry );
+            }
          }
 
          return result.Values;

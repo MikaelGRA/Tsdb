@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Client
 {
    internal class BatchWrite<TKey, TEntry>
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       private TaskCompletionSource<bool> _tcs;
       private List<TEntry> _entries;

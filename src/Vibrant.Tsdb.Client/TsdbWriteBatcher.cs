@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Client
 {
    public class TsdbWriteBatcher<TKey, TEntry> : IDisposable
-      where TEntry : IEntry<TKey>
+      where TEntry : IEntry
    {
       private static readonly TimeSpan MinWarningInterval = TimeSpan.FromMinutes( 1 );
 
