@@ -7,6 +7,12 @@ namespace Vibrant.Tsdb
 {
    public static class StorageExtensions
    {
+      public static Task WriteAsync<TKey, TEntry>( this IStorage<TKey, TEntry> storage, ISerie<TKey, TEntry> serie )
+         where TEntry : IEntry
+      {
+         return storage.WriteAsync( new[] { serie } );
+      }
+
       public static Task DeleteAsync<TKey, TEntry>( this IStorage<TKey, TEntry> storage, TKey id, DateTime from, DateTime to )
          where TEntry : IEntry
       {
