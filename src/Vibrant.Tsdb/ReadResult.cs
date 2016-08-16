@@ -6,24 +6,24 @@ using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb
 {
-   public class ReadResult<TKey, TEntry>
+   public class ReadResult<TKey, TEntry> : ISerie<TKey, TEntry>
      where TEntry : IEntry
    {
       public ReadResult( TKey id, Sort sort, List<TEntry> entries )
       {
-         Id = id;
+         Key = id;
          Entries = entries;
          Sort = sort;
       }
 
       public ReadResult( TKey id, Sort sort )
       {
-         Id = id;
+         Key = id;
          Entries = new List<TEntry>();
          Sort = sort;
       }
 
-      public TKey Id { get; private set; }
+      public TKey Key { get; private set; }
 
       public Sort Sort { get; private set; }
 
@@ -32,7 +32,7 @@ namespace Vibrant.Tsdb
       public ReadResult<TKey, TOutputEntry> As<TOutputEntry>()
          where TOutputEntry : IEntry
       {
-         return new ReadResult<TKey, TOutputEntry>( Id, Sort, Entries.Cast<TOutputEntry>().ToList() );
+         return new ReadResult<TKey, TOutputEntry>( Key, Sort, Entries.Cast<TOutputEntry>().ToList() );
       }
 
       public ReadResult<TKey, TEntry> MergeWith( ReadResult<TKey, TEntry> other )

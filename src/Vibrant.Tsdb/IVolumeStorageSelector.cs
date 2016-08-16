@@ -9,6 +9,6 @@ namespace Vibrant.Tsdb
    {
       IEnumerable<StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to );
 
-      IVolumeStorage<TKey, TEntry> GetStorage( TEntry entry );
+      IVolumeStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry );
    }
 }

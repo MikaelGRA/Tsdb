@@ -5,8 +5,11 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface IKeyedEntry<TKey> : IEntry
+   public interface ISerie<TKey, TEntry>
+     where TEntry : IEntry
    {
-      TKey GetKey();
+      TKey Key { get; }
+
+      List<TEntry> Entries { get; }
    }
 }

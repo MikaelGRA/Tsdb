@@ -18,7 +18,7 @@ namespace Vibrant.Tsdb
 
       public MultiReadResult( IEnumerable<ReadResult<TKey, TEntry>> results )
       {
-         _results = results.ToDictionary( x => x.Id );
+         _results = results.ToDictionary( x => x.Key );
       }
 
       public MultiReadResult()
@@ -47,13 +47,13 @@ namespace Vibrant.Tsdb
       public void AddOrMerge( ReadResult<TKey, TEntry> result )
       {
          ReadResult<TKey, TEntry> existing;
-         if( _results.TryGetValue( result.Id, out existing ) )
+         if( _results.TryGetValue( result.Key, out existing ) )
          {
             existing.MergeWith( result );
          }
          else
          {
-            _results.Add( result.Id, result );
+            _results.Add( result.Key, result );
          }
       }
 
@@ -76,7 +76,7 @@ namespace Vibrant.Tsdb
       {
          foreach( var thisResult in this )
          {
-            var otherResult = other.FindResult( thisResult.Id );
+            var otherResult = other.FindResult( thisResult.Key );
             thisResult.MergeWith( otherResult );
          }
          return this;
@@ -86,7 +86,7 @@ namespace Vibrant.Tsdb
       {
          foreach( var otherResult in other )
          {
-            var thisResult = FindResult( otherResult.Id );
+            var thisResult = FindResult( otherResult.Key );
             otherResult.MergeWith( thisResult );
          }
          return this;

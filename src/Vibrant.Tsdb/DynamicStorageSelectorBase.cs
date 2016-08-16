@@ -10,9 +10,9 @@ namespace Vibrant.Tsdb
    {
       protected abstract IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> IterateAllStoragesFor( TKey key );
 
-      public IDynamicStorage<TKey, TEntry> GetStorage( TEntry entry )
+      public IDynamicStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
       {
-         foreach( var storage in IterateAllStoragesFor( entry.GetKey() ) )
+         foreach( var storage in IterateAllStoragesFor( key ) )
          {
             var storageFrom = storage.From ?? DateTime.MinValue;
             var storageTo = storage.To ?? DateTime.MaxValue;

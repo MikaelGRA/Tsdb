@@ -99,7 +99,7 @@ namespace Vibrant.Tsdb.Tests
 
          foreach( var readResult in read )
          {
-            var sourceList = entries[ readResult.Id ].ToList();
+            var sourceList = entries[ readResult.Key ].ToList();
             if( sort == Sort.Descending )
             {
                sourceList.Reverse();
@@ -116,7 +116,7 @@ namespace Vibrant.Tsdb.Tests
 
                if( ( i == 0 && sort == Sort.Descending ) || ( i == sourceList.Count - 1 && sort == Sort.Ascending ) )
                {
-                  var latestEntry = latest.First( x => x.Id == readResult.Id );
+                  var latestEntry = latest.First( x => x.Id == readResult.Key );
                   var entry = latestEntry.Entries[ 0 ];
 
                   Assert.Equal( original.Value, entry.Value, 5 );

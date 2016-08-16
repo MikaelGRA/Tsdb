@@ -384,7 +384,7 @@ namespace Vibrant.Tsdb.Sql
          foreach( var entry in SqlSerializer.Deserialize<TKey, TEntry>( sqlEntries, _keyConverter ) )
          {
             var id = entry.GetKey();
-            if( currentResult == null || !currentResult.Id.Equals( id ) )
+            if( currentResult == null || !currentResult.Key.Equals( id ) )
             {
                currentResult = results[ id ];
             }

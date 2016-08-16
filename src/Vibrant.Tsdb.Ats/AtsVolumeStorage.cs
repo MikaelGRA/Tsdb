@@ -135,7 +135,7 @@ namespace Vibrant.Tsdb.Ats
             tasks.Add( ReadForId( id, sort ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return new MultiReadResult<TKey, TEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
+         return new MultiReadResult<TKey, TEntry>( tasks.ToDictionary( x => x.Result.Key, x => x.Result ) );
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
@@ -146,7 +146,7 @@ namespace Vibrant.Tsdb.Ats
             tasks.Add( ReadForId( id, from, to, sort ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return new MultiReadResult<TKey, TEntry>( tasks.ToDictionary( x => x.Result.Id, x => x.Result ) );
+         return new MultiReadResult<TKey, TEntry>( tasks.ToDictionary( x => x.Result.Key, x => x.Result ) );
       }
 
       #endregion

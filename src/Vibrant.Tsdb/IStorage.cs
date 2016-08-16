@@ -7,7 +7,7 @@ namespace Vibrant.Tsdb
 {
    public interface IStorage<TKey, TEntry> where TEntry : IEntry
    {
-      Task WriteAsync<TKeyedEntry>( IEnumerable<TKeyedEntry> items ) where TKeyedEntry : TEntry, IKeyedEntry<TKey>;
+      Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> series );
 
       Task DeleteAsync( IEnumerable<TKey> ids, DateTime from, DateTime to );
 

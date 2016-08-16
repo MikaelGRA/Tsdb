@@ -10,12 +10,12 @@ namespace Vibrant.Tsdb
    {
       public bool Equals( TEntry x, TEntry y )
       {
-         return x.GetTimestamp() == y.GetTimestamp() && x.GetKey().Equals( y.GetKey() );
+         return x.GetTimestamp() == y.GetTimestamp();
       }
 
       public int GetHashCode( TEntry obj )
       {
-         return obj.GetTimestamp().GetHashCode() * obj.GetKey().GetHashCode();
+         return obj.GetTimestamp().GetHashCode();
       }
    }
 }
