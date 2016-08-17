@@ -11,19 +11,17 @@ namespace Vibrant.Tsdb.Client
    {
       public StorageLookupResult( TStorage storage )
       {
-         Lookups = new List<TLookup>();
          Storage = storage;
       }
 
       public StorageLookupResult( TStorage storage, DateTime? from, DateTime? to )
       {
-         Lookups = new List<TLookup>();
          Storage = storage;
          From = from;
          To = to;
       }
 
-      public List<TLookup> Lookups { get; private set; }
+      public TLookup Lookups { get; set; }
 
       public TStorage Storage { get; private set; }
 

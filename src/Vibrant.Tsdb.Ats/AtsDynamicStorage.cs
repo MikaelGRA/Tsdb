@@ -11,7 +11,7 @@ using Vibrant.Tsdb.Ats.Serialization;
 namespace Vibrant.Tsdb.Ats
 {
    public class AtsDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
-     where TEntry : IAtsEntry<TKey>, new()
+     where TEntry : IAtsEntry, new()
    {
       public const int DefaultReadParallelism = 50;
       public const int DefaultWriteParallelism = 50;
@@ -56,17 +56,12 @@ namespace Vibrant.Tsdb.Ats
       {
       }
 
-      public IDynamicStorage<TKey, TEntry> GetStorage( TKey id )
-      {
-         return this;
-      }
-
       public IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
       {
          return _defaultSelection;
       }
 
-      public IDynamicStorage<TKey, TEntry> GetStorage( TEntry entry )
+      public IDynamicStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
       {
          return this;
       }
@@ -106,9 +101,9 @@ namespace Vibrant.Tsdb.Ats
          return ReadLatestInternal( ids );
       }
 
-      public Task WriteAsync( IEnumerable<TEntry> items )
+      public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> series )
       {
-         return WriteInternal( items );
+         return WriteInternal( series );
       }
 
       public Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedAsync( TKey id, DateTime? from, DateTime? to, int segmentSize, IContinuationToken continuationToken )
@@ -363,7 +358,7 @@ namespace Vibrant.Tsdb.Ats
             using( await _cc.ReadAsync().ConfigureAwait( false ) )
             {
                var rows = await table.ExecuteQuerySegmentedAsync( query, takeAll ? token : null ).ConfigureAwait( false );
-               var entries = Convert( rows, id );
+               var entries = Convert( rows );
                results.AddRange( entries );
                token = rows.ContinuationToken;
             }
@@ -394,7 +389,7 @@ namespace Vibrant.Tsdb.Ats
             using( await _cc.ReadAsync().ConfigureAwait( false ) )
             {
                var rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
-               var entries = Convert( rows, id );
+               var entries = Convert( rows );
 
                isLastFull = rows.Results.Count == 1000;
 
@@ -530,11 +525,11 @@ namespace Vibrant.Tsdb.Ats
          return count;
       }
 
-      private async Task WriteInternal( IEnumerable<TEntry> entries )
+      private async Task WriteInternal( IEnumerable<ISerie<TKey, TEntry>> series )
       {
          List<Task> tasks = new List<Task>();
 
-         foreach( var kvp in IterateByPartition( entries ) )
+         foreach( var kvp in IterateByPartition( series ) )
          {
             var partitionKey = kvp.Key;
             var items = kvp.Value;
@@ -584,45 +579,49 @@ namespace Vibrant.Tsdb.Ats
          return entity;
       }
 
-      private IEnumerable<TEntry> Convert( IEnumerable<TsdbTableEntity> entities, TKey id )
+      private IEnumerable<TEntry> Convert( IEnumerable<TsdbTableEntity> entities )
       {
          foreach( var entity in entities )
          {
             var stream = new MemoryStream( entity.P0 );
             using( var reader = AtsSerializer.CreateReader( stream ) )
             {
-               yield return Convert( reader, entity, id );
+               yield return Convert( reader, entity );
             }
          }
       }
 
-      private TEntry Convert( BinaryReader reader, TsdbTableEntity entity, TKey id )
+      private TEntry Convert( BinaryReader reader, TsdbTableEntity entity )
       {
-         return AtsSerializer.DeserializeEntry<TKey, TEntry>( reader, id );
+         return AtsSerializer.DeserializeEntry<TKey, TEntry>( reader );
       }
 
-      private IEnumerable<KeyValuePair<string, HashSet<TEntry>>> IterateByPartition( IEnumerable<TEntry> entries )
+      private IEnumerable<KeyValuePair<string, HashSet<TEntry>>> IterateByPartition( IEnumerable<ISerie<TKey, TEntry>> series )
       {
          Dictionary<string, HashSet<TEntry>> lookup = new Dictionary<string, HashSet<TEntry>>();
 
-         foreach( var entry in entries )
+         foreach( var serie in series )
          {
-            var key = entry.GetKey();
+            var key = serie.GetKey();
             var id = _keyConverter.Convert( key );
-            var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, entry.GetTimestamp(), _partitioningProvider );
 
-            HashSet<TEntry> items;
-            if( !lookup.TryGetValue( pk, out items ) )
+            foreach( var entry in serie.GetEntries() )
             {
-               items = new HashSet<TEntry>( _comparer );
-               lookup.Add( pk, items );
-            }
+               var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, entry.GetTimestamp(), _partitioningProvider );
 
-            items.Add( entry );
-            if( items.Count == 100 )
-            {
-               lookup.Remove( pk );
-               yield return new KeyValuePair<string, HashSet<TEntry>>( pk, items );
+               HashSet<TEntry> items;
+               if( !lookup.TryGetValue( pk, out items ) )
+               {
+                  items = new HashSet<TEntry>( _comparer );
+                  lookup.Add( pk, items );
+               }
+
+               items.Add( entry );
+               if( items.Count == 100 )
+               {
+                  lookup.Remove( pk );
+                  yield return new KeyValuePair<string, HashSet<TEntry>>( pk, items );
+               }
             }
          }
 

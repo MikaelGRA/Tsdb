@@ -24,44 +24,51 @@ namespace Vibrant.Tsdb.Tests
 
       protected static readonly Random _rng = new Random();
 
-      protected static List<BasicEntry> CreateRows( DateTime startTime, int count )
+      protected static Dictionary<string, Serie<string, BasicEntry>> CreateRows( DateTime startTime, int count )
       {
-         var entries = new List<BasicEntry>();
+         var series = new Dictionary<string, Serie<string, BasicEntry>>();
 
          DateTime current = startTime;
          for( int i = 0 ; i < count ; i++ )
          {
+            var id = Ids[ _rng.Next( Ids.Length ) ];
+
+            Serie<string, BasicEntry> serie;
+            if( series.TryGetValue( id, out serie ) )
+            {
+               serie = new Serie<string, BasicEntry>( id );
+               series.Add( id, serie );
+            }
+
             var entry = new BasicEntry();
-            entry.Id = Ids[ _rng.Next( Ids.Length ) ];
             entry.Timestamp = current;
             entry.Value = _rng.NextDouble();
 
             current = current.AddSeconds( 1 );
 
-            entries.Add( entry );
+            serie.Entries.Add( entry );
          }
 
-         return entries;
+         return series;
       }
 
-      protected static List<BasicEntry> CreateRows( string id, DateTime startTime, int count )
+      protected static Serie<string, BasicEntry> CreateRows( string id, DateTime startTime, int count )
       {
-         var entries = new List<BasicEntry>();
+         var serie = new Serie<string, BasicEntry>( id );
 
          DateTime current = startTime;
          for( int i = 0 ; i < count ; i++ )
          {
             var entry = new BasicEntry();
-            entry.Id = id;
             entry.Timestamp = current;
             entry.Value = _rng.NextDouble();
 
             current = current.AddSeconds( 1 );
 
-            entries.Add( entry );
+            serie.Entries.Add( entry );
          }
 
-         return entries;
+         return serie;
       }
 
       public abstract TStorage GetStorage( string tableName );
@@ -78,28 +85,16 @@ namespace Vibrant.Tsdb.Tests
          var from = new DateTime( 2016, 12, 31, 0, 0, 0, DateTimeKind.Utc );
          var to = from.AddSeconds( count );
 
-         var written = CreateRows( from, count );
-         await store.WriteAsync( written );
+         var series = CreateRows( from, count );
+         await store.WriteAsync( series.Values );
          var read = await store.ReadAsync( Ids, from, to, sort );
          var latest = await store.ReadLatestAsync( Ids );
-
-         Dictionary<string, List<BasicEntry>> entries = new Dictionary<string, List<BasicEntry>>();
-         foreach( var item in written )
-         {
-            List<BasicEntry> items;
-            if( !entries.TryGetValue( item.GetKey(), out items ) )
-            {
-               items = new List<BasicEntry>();
-               entries[ item.GetKey() ] = items;
-            }
-            items.Add( item );
-         }
 
          await store.DeleteAsync( Ids, from, to );
 
          foreach( var readResult in read )
          {
-            var sourceList = entries[ readResult.Key ].ToList();
+            var sourceList = series[ readResult.Key ].Entries.ToList();
             if( sort == Sort.Descending )
             {
                sourceList.Reverse();
@@ -116,7 +111,7 @@ namespace Vibrant.Tsdb.Tests
 
                if( ( i == 0 && sort == Sort.Descending ) || ( i == sourceList.Count - 1 && sort == Sort.Ascending ) )
                {
-                  var latestEntry = latest.First( x => x.Id == readResult.Key );
+                  var latestEntry = latest.First( x => x.GetKey() == readResult.Key );
                   var entry = latestEntry.Entries[ 0 ];
 
                   Assert.Equal( original.Value, entry.Value, 5 );
@@ -140,7 +135,7 @@ namespace Vibrant.Tsdb.Tests
 
          var written = CreateRows( from, count );
 
-         await store.WriteAsync( written );
+         await store.WriteAsync( written.Values );
 
          await store.DeleteAsync( Ids, from, to );
 
@@ -160,11 +155,11 @@ namespace Vibrant.Tsdb.Tests
 
          var from1 = new DateTime( 2012, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var written1 = CreateRows( from1, count );
-         await store.WriteAsync( written1 );
+         await store.WriteAsync( written1.Values );
 
          var from2 = new DateTime( 2013, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var written2 = CreateRows( from2, count );
-         await store.WriteAsync( written2 );
+         await store.WriteAsync( written2.Values );
 
 
          var rows = await store.ReadAsync( Ids );
@@ -184,13 +179,13 @@ namespace Vibrant.Tsdb.Tests
 
          var from = new DateTime( 2016, 12, 31, 0, 0, 0, DateTimeKind.Utc );
 
-         var written = new BasicEntry[]
+         var serie = new Serie<string, BasicEntry>( "row1", new[]
          {
-            new BasicEntry { Id = "row1", Timestamp = from, Value = 13.37 },
-            new BasicEntry { Id = "row1", Timestamp = from, Value = 37.13 },
-         };
+            new BasicEntry { Timestamp = from, Value = 13.37 },
+            new BasicEntry { Timestamp = from, Value = 37.13 },
+         } );
 
-         await store.WriteAsync( written );
+         await store.WriteAsync( serie );
 
          var read = await store.ReadAsync( Ids );
 

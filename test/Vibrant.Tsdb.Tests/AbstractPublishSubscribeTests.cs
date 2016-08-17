@@ -20,38 +20,38 @@ namespace Vibrant.Tsdb.Tests
          await ps.WaitWhileDisconnectedAsync();
 
          int received1 = 0;
-         var unsubscribe1 = await ps.SubscribeAsync( new[] { "row1" }, SubscriptionType.AllFromCollections, entries =>
+         var unsubscribe1 = await ps.SubscribeAsync( new[] { "row1" }, SubscriptionType.AllFromCollections, serie =>
          {
-            foreach( var entry in entries )
+            Assert.Equal( "row1", serie.GetKey() );
+            foreach( var entry in serie.GetEntries() )
             {
-               Assert.Equal( "row1", entry.GetKey() );
                received1++;
             }
          } );
 
          int received2 = 0;
-         var unsubscribe2 = await ps.SubscribeAsync( new[] { "row2" }, SubscriptionType.AllFromCollections, entries =>
+         var unsubscribe2 = await ps.SubscribeAsync( new[] { "row2" }, SubscriptionType.AllFromCollections, serie =>
          {
-            foreach( var entry in entries )
+            Assert.Equal( "row2", serie.GetKey() );
+            foreach( var entry in serie.GetEntries() )
             {
-               Assert.Equal( "row2", entry.GetKey() );
                received2++;
             }
          } );
 
          int received3 = 0;
-         var unsubscribe3 = await ps.SubscribeToAllAsync( SubscriptionType.AllFromCollections, entries =>
+         var unsubscribe3 = await ps.SubscribeToAllAsync( SubscriptionType.AllFromCollections, serie =>
          {
-            foreach( var entry in entries )
+            foreach( var entry in serie.GetEntries() )
             {
                received3++;
             }
          } );
 
          int received4 = 0;
-         var unsubscribe4 = await ps.SubscribeAsync( new[] { "row6" }, SubscriptionType.LatestPerCollection, entries =>
+         var unsubscribe4 = await ps.SubscribeAsync( new[] { "row6" }, SubscriptionType.LatestPerCollection, serie =>
          {
-            foreach( var entry in entries )
+            foreach( var entry in serie.GetEntries() )
             {
                received4++;
             }
@@ -59,14 +59,24 @@ namespace Vibrant.Tsdb.Tests
 
          var now = DateTime.UtcNow;
 
-         var toPublish = new[] {
-               new BasicEntry { Id = "row1", Timestamp = now, Value = 23.53 },
-               new BasicEntry { Id = "row1", Timestamp = now + TimeSpan.FromSeconds( 1 ), Value = 50.23 },
-               new BasicEntry { Id = "row2", Timestamp = now + TimeSpan.FromSeconds( 2 ), Value = 23 },
-               new BasicEntry { Id = "row6", Timestamp = now + TimeSpan.FromSeconds( 3 ), Value = 2364 },
-            };
+         var series = new[]
+         {
+            new Serie<string, BasicEntry>( "row1", new[]
+            {
+               new BasicEntry { Timestamp = now, Value = 23.53 },
+               new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 1 ), Value = 50.23 },
+            } ),
+            new Serie<string, BasicEntry>( "row2", new[]
+            {
+               new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 2 ), Value = 23 },
+            } ),
+            new Serie<string, BasicEntry>( "row6", new[]
+            {
+               new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 3 ), Value = 2364 },
+            } ),
+         };
 
-         await ps.PublishAsync( toPublish, PublicationType.Both );
+         await ps.PublishAsync( series, PublicationType.Both );
          await Task.Delay( 3000 );
 
          Assert.Equal( 2, received1 );
@@ -75,7 +85,7 @@ namespace Vibrant.Tsdb.Tests
          Assert.Equal( 1, received4 );
 
          await unsubscribe3();
-         await ps.PublishAsync( toPublish, PublicationType.Both );
+         await ps.PublishAsync( series, PublicationType.Both );
          await Task.Delay( 3000 );
 
          Assert.Equal( 4, received1 );
@@ -84,7 +94,7 @@ namespace Vibrant.Tsdb.Tests
          Assert.Equal( 1, received4 );
 
          await unsubscribe2();
-         await ps.PublishAsync( toPublish, PublicationType.Both );
+         await ps.PublishAsync( series, PublicationType.Both );
          await Task.Delay( 3000 );
 
          Assert.Equal( 6, received1 );
@@ -93,7 +103,7 @@ namespace Vibrant.Tsdb.Tests
          Assert.Equal( 1, received4 );
 
          await unsubscribe1();
-         await ps.PublishAsync( toPublish, PublicationType.Both );
+         await ps.PublishAsync( series, PublicationType.Both );
          await Task.Delay( 3000 );
 
          Assert.Equal( 6, received1 );
@@ -101,7 +111,7 @@ namespace Vibrant.Tsdb.Tests
          Assert.Equal( 4, received3 );
          Assert.Equal( 1, received4 );
 
-         await ps.PublishAsync( new[] { new BasicEntry { Id = "row6", Timestamp = now + TimeSpan.FromSeconds( 5 ), Value = 1337 } }, PublicationType.LatestPerCollection );
+         await ps.PublishAsync( new Serie<string, BasicEntry>( "row6", new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 5 ), Value = 1337 } ), PublicationType.LatestPerCollection );
          await Task.Delay( 3000 );
 
          Assert.Equal( 6, received1 );

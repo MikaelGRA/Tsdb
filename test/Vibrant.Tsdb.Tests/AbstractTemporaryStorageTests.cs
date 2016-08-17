@@ -25,44 +25,32 @@ namespace Vibrant.Tsdb.Tests
 
       protected static readonly Random _rng = new Random();
 
-      protected static List<BasicEntry> CreateRows( DateTime startTime, int count )
+      protected static Dictionary<string, Serie<string, BasicEntry>> CreateRows( DateTime startTime, int count )
       {
-         var entries = new List<BasicEntry>();
+         var series = new Dictionary<string, Serie<string, BasicEntry>>();
 
          DateTime current = startTime;
          for( int i = 0 ; i < count ; i++ )
          {
+            var id = Ids[ _rng.Next( Ids.Length ) ];
+
+            Serie<string, BasicEntry> serie;
+            if( series.TryGetValue( id, out serie ) )
+            {
+               serie = new Serie<string, BasicEntry>( id );
+               series.Add( id, serie );
+            }
+
             var entry = new BasicEntry();
-            entry.Id = Ids[ _rng.Next( Ids.Length ) ];
             entry.Timestamp = current;
             entry.Value = _rng.NextDouble();
 
             current = current.AddSeconds( 1 );
 
-            entries.Add( entry );
+            serie.Entries.Add( entry );
          }
 
-         return entries;
-      }
-
-      protected static List<BasicEntry> CreateRows( string id, DateTime startTime, int count )
-      {
-         var entries = new List<BasicEntry>();
-
-         DateTime current = startTime;
-         for( int i = 0 ; i < count ; i++ )
-         {
-            var entry = new BasicEntry();
-            entry.Id = id;
-            entry.Timestamp = current;
-            entry.Value = _rng.NextDouble();
-
-            current = current.AddSeconds( 1 );
-
-            entries.Add( entry );
-         }
-
-         return entries;
+         return series;
       }
 
       public abstract TStorage GetStorage();
@@ -76,30 +64,26 @@ namespace Vibrant.Tsdb.Tests
          var to = from.AddSeconds( count );
 
          var written = CreateRows( from, count );
-         store.Write( written );
+         store.Write( written.Values );
 
          int i = 0;
-         int entryCount = 0;
+         int seriesCount = 0;
          do
          {
             var segment = store.Read( 533 );
-            for( int j = 0 ; j < segment.Entries.Count ; j++ )
+            foreach( var serie in segment.Series )
             {
-               var read = segment.Entries[ j ];
-               var orignal = written[ i ];
-
-               Assert.Equal( orignal.Id, read.Id );
-               Assert.Equal( orignal.Timestamp, read.Timestamp );
-               Assert.Equal( orignal.Value, read.Value );
-
-               i++;
+               foreach( var entry in serie.Entries )
+               {
+                  i++;
+               }
             }
 
             segment.Delete();
 
-            entryCount = segment.Entries.Count;
+            seriesCount = segment.Series.Count;
          }
-         while( entryCount != 0 );
+         while( seriesCount != 0 );
 
          Assert.Equal( count, i );
       }

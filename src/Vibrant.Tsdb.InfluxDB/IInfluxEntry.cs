@@ -6,7 +6,7 @@ using Vibrant.InfluxDB.Client.Rows;
 
 namespace Vibrant.Tsdb.InfluxDB
 {
-   public interface IInfluxEntry<TKey> : IEntry<TKey>, IInfluxRow, IHaveMeasurementName
+   public interface IInfluxEntry : IEntry, IInfluxRow
    {
    }
 }

@@ -25,24 +25,23 @@ namespace Vibrant.Tsdb.Ats.Serialization
       }
 
       public static void SerializeEntry<TKey, TEntry>( BinaryWriter writer, TEntry entry )
-         where TEntry : IRedisEntry<TKey>
+         where TEntry : IRedisEntry
       {
          writer.Write( entry.GetTimestamp().Ticks );
          entry.Write( writer );
       }
 
-      public static TEntry DeserializeEntry<TKey, TEntry>( TKey id, BinaryReader reader )
-         where TEntry : IRedisEntry<TKey>, new()
+      public static TEntry DeserializeEntry<TKey, TEntry>( BinaryReader reader )
+         where TEntry : IRedisEntry, new()
       {
          var entry = new TEntry();
-         entry.SetKey( id );
          entry.SetTimestamp( new DateTime( reader.ReadInt64(), DateTimeKind.Utc ) );
          entry.Read( reader );
          return entry;
       }
 
       public static List<byte[]> Serialize<Tkey, TEntry>( string id, List<TEntry> entries, int maxByteArraySize )
-         where TEntry : IRedisEntry<Tkey>
+         where TEntry : IRedisEntry
       {
          var results = new List<byte[]>();
          var stream = new MemoryStream();
@@ -100,7 +99,7 @@ namespace Vibrant.Tsdb.Ats.Serialization
       }
 
       public static byte[] Serialize<TKey, TEntry>( string id, TEntry entry )
-         where TEntry : IRedisEntry<TKey>
+         where TEntry : IRedisEntry
       {
          var stream = new MemoryStream();
          using( var writer = CreateWriter( stream ) )
@@ -126,23 +125,23 @@ namespace Vibrant.Tsdb.Ats.Serialization
          return data;
       }
 
-      public static List<TEntry> Deserialize<TKey, TEntry>( byte[] bytes, IKeyConverter<TKey> keyConverter )
-         where TEntry : IRedisEntry<TKey>, new()
+      public static Serie<TKey, TEntry> Deserialize<TKey, TEntry>( byte[] bytes, IKeyConverter<TKey> keyConverter )
+         where TEntry : IRedisEntry, new()
       {
          var stream = new MemoryStream( bytes );
          var reader = CreateReader( stream );
-         List<TEntry> entries = new List<TEntry>();
 
          var id = reader.ReadString();
          var key = keyConverter.Convert( id );
+         var serie = new Serie<TKey, TEntry>( key );
 
          while( stream.Length != stream.Position )
          {
-            var entry = DeserializeEntry<TKey, TEntry>( key, reader );
-            entries.Add( entry );
+            var entry = DeserializeEntry<TKey, TEntry>( reader );
+            serie.Entries.Add( entry );
          }
 
-         return entries;
+         return serie;
       }
    }
 }

@@ -109,9 +109,9 @@ namespace Vibrant.Tsdb.ConsoleApp
             var now = DateTime.UtcNow;
             foreach( var ds in _dataSources )
             {
-               var entries = ds.GetEntries( now ).ToList();
+               var serie = ds.GetEntries( now );
 
-               batcher.Write( entries );
+               batcher.Write( serie );
             }
 
             Thread.Sleep( 1000 );

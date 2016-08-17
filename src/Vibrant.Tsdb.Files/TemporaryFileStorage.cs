@@ -10,7 +10,7 @@ using Vibrant.Tsdb.Exceptions;
 namespace Vibrant.Tsdb.Files
 {
    public class TemporaryFileStorage<TKey, TEntry> : ITemporaryStorage<TKey, TEntry>
-      where TEntry : IFileEntry<TKey>, new()
+      where TEntry : IFileEntry, new()
    {
       public const int DefaultMaxFileSize = 1 * 1024 * 1024;
       public const long DefaultMaxStorageSize = 10L * 1024L * 1024L * 1024L;
@@ -49,7 +49,7 @@ namespace Vibrant.Tsdb.Files
          lock( _sync )
          {
             int read = 0;
-            List<TEntry> entries = new List<TEntry>();
+            Dictionary<string, Serie<TKey, TEntry>> series = new Dictionary<string, Serie<TKey, TEntry>>();
             List<FileModificationRef> modifications = new List<FileModificationRef>();
             foreach( var fi in _directory.EnumerateFiles( "*.dat" ) )
             {
@@ -61,11 +61,17 @@ namespace Vibrant.Tsdb.Files
                   {
                      var entry = new TEntry();
                      var id = reader.ReadString();
+                     Serie<TKey, TEntry> serie;
+                     if( !series.TryGetValue( id, out serie ) )
+                     {
+                        serie = new Serie<TKey, TEntry>( _keyConverter.Convert( id ) );
+                        series.Add( id, serie );
+                     }
+
                      var timestamp = new DateTime( reader.ReadInt64(), DateTimeKind.Utc );
-                     entry.SetKey( _keyConverter.Convert( id ) );
                      entry.SetTimestamp( timestamp );
                      entry.Read( reader );
-                     entries.Add( entry );
+                     serie.Entries.Add( entry );
                      read++;
                   }
 
@@ -80,11 +86,11 @@ namespace Vibrant.Tsdb.Files
                }
             }
 
-            return new TemporaryReadResult<TKey, TEntry>( entries, () => Delete( modifications ) );
+            return new TemporaryReadResult<TKey, TEntry>( series.Values.ToList(), () => Delete( modifications ) );
          }
       }
 
-      public void Write( IEnumerable<TEntry> entries )
+      public void Write( IEnumerable<ISerie<TKey, TEntry>> series )
       {
          lock( _sync )
          {
@@ -108,54 +114,60 @@ namespace Vibrant.Tsdb.Files
 
             long beforeLength = startFileSize;
             long afterLength = beforeLength;
-            foreach( var entry in entries )
+            foreach( var serie in series )
             {
-               beforeLength = afterLength;
+               var key = serie.GetKey();
+               var id = _keyConverter.Convert( key );
 
-               if( beforeLength > _maxFileSize )
+               foreach( var entry in serie.GetEntries() )
                {
-                  // flush to file
-                  writer.Flush();
+                  beforeLength = afterLength;
 
-                  // increment storage size
-                  _currentSize += ( beforeLength - startFileSize );
+                  if( beforeLength > _maxFileSize )
+                  {
+                     // flush to file
+                     writer.Flush();
 
-                  // close the current file stream
-                  writer.Dispose();
-                  fileStream.Dispose();
+                     // increment storage size
+                     _currentSize += ( beforeLength - startFileSize );
 
-                  // create a new file reference...
-                  fileInfo = CreateCurrentFile();
-                  fileStream = fileInfo.Open( FileMode.OpenOrCreate, FileAccess.ReadWrite );
-                  writer = new BinaryWriter( fileStream, Encoding.ASCII, true );
-                  startFileSize = fileStream.Length;
-                  beforeLength = startFileSize;
-                  afterLength = beforeLength;
+                     // close the current file stream
+                     writer.Dispose();
+                     fileStream.Dispose();
+
+                     // create a new file reference...
+                     fileInfo = CreateCurrentFile();
+                     fileStream = fileInfo.Open( FileMode.OpenOrCreate, FileAccess.ReadWrite );
+                     writer = new BinaryWriter( fileStream, Encoding.ASCII, true );
+                     startFileSize = fileStream.Length;
+                     beforeLength = startFileSize;
+                     afterLength = beforeLength;
+                  }
+
+                  long storageSize = _currentSize + ( beforeLength - startFileSize );
+                  if( storageSize > _maxStorageSize )
+                  {
+                     // flush to file
+                     writer.Flush();
+
+                     // increment storage size
+                     _currentSize += ( beforeLength - startFileSize );
+
+                     // close the current file stream
+                     writer.Dispose();
+                     fileStream.Dispose();
+                     disposed = true;
+
+                     // throw exception indicating which entries could not be inserted (with skip)
+                     throw new TsdbException( "Could not write all the entries to the temporary file storage because it exceeds the maximum storage size." );
+                  }
+
+                  writer.Write( id );
+                  writer.Write( entry.GetTimestamp().Ticks );
+                  entry.Write( writer );
+
+                  afterLength = fileStream.Length;
                }
-
-               long storageSize = _currentSize + ( beforeLength - startFileSize );
-               if( storageSize > _maxStorageSize )
-               {
-                  // flush to file
-                  writer.Flush();
-
-                  // increment storage size
-                  _currentSize += ( beforeLength - startFileSize );
-
-                  // close the current file stream
-                  writer.Dispose();
-                  fileStream.Dispose();
-                  disposed = true;
-
-                  // throw exception indicating which entries could not be inserted (with skip)
-                  throw new TsdbException( "Could not write all the entries to the temporary file storage because it exceeds the maximum storage size." );
-               }
-
-               writer.Write( _keyConverter.Convert( entry.GetKey() ) );
-               writer.Write( entry.GetTimestamp().Ticks );
-               entry.Write( writer );
-
-               afterLength = fileStream.Length;
             }
 
             writer.Flush();

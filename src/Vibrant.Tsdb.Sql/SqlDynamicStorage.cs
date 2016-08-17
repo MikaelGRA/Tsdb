@@ -14,7 +14,7 @@ using Vibrant.Tsdb.Sql.Serialization;
 namespace Vibrant.Tsdb.Sql
 {
    public class SqlDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
-      where TEntry : ISqlEntry<TKey>, new()
+      where TEntry : ISqlEntry, new()
    {
       private const int DefaultReadParallelism = 5;
       private const int DefaultWriteParallelism = 5;
@@ -24,7 +24,6 @@ namespace Vibrant.Tsdb.Sql
       private string _tableName;
       private string _connectionString;
       private Task _createTable;
-      private EntryEqualityComparer<TKey, TEntry> _comparer;
       private IKeyConverter<TKey> _keyConverter;
       private IConcurrencyControl _cc;
 
@@ -34,7 +33,6 @@ namespace Vibrant.Tsdb.Sql
 
          _tableName = tableName;
          _connectionString = connectionString;
-         _comparer = new EntryEqualityComparer<TKey, TEntry>();
          _cc = concurrency;
          _keyConverter = keyConverter;
          _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
@@ -55,15 +53,14 @@ namespace Vibrant.Tsdb.Sql
          return _defaultSelection;
       }
 
-      public IDynamicStorage<TKey, TEntry> GetStorage( TEntry entry )
+      public IDynamicStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
       {
          return this;
       }
 
-      public Task WriteAsync( IEnumerable<TEntry> items )
+      public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items )
       {
-         var uniqueEntries = Unique.Ensure<TKey, TEntry>( items, _comparer );
-         return StoreForAll( uniqueEntries );
+         return StoreForAll( items );
       }
 
       public Task DeleteAsync( IEnumerable<TKey> ids, DateTime from, DateTime to )
@@ -130,7 +127,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task StoreForAll( IEnumerable<TEntry> entries )
+      private async Task StoreForAll( IEnumerable<ISerie<TKey, TEntry>> series )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -139,16 +136,29 @@ namespace Vibrant.Tsdb.Sql
             using( var connection = new SqlConnection( _connectionString ) )
             {
                await connection.OpenAsync().ConfigureAwait( false );
-
+               var keys = new HashSet<EntryKey<TKey>>();
+               
                List<SqlDataRecord> records = new List<SqlDataRecord>();
-               SqlSerializer.Serialize<TKey, TEntry>( entries, ( entry, data ) =>
+               foreach( var serie in series )
                {
-                  SqlDataRecord record = new SqlDataRecord( Sql.InsertParameterMetadata );
-                  record.SetString( 0, _keyConverter.Convert( entry.GetKey() ) );
-                  record.SetDateTime( 1, entry.GetTimestamp() );
-                  record.SetSqlBinary( 2, new SqlBinary( data ) );
-                  records.Add( record );
-               } );
+                  var key = serie.GetKey();
+                  SqlSerializer.Serialize<TKey, TEntry>( serie.GetEntries(), ( entry, data ) =>
+                  {
+                     var timestamp = entry.GetTimestamp();
+                     var hashkey = new EntryKey<TKey>( key, timestamp );
+
+                     if( !keys.Contains( hashkey ) )
+                     {
+                        SqlDataRecord record = new SqlDataRecord( Sql.InsertParameterMetadata );
+                        record.SetString( 0, _keyConverter.Convert( key ) );
+                        record.SetDateTime( 1, timestamp );
+                        record.SetSqlBinary( 2, new SqlBinary( data ) );
+                        records.Add( record );
+
+                        keys.Add( hashkey );
+                     }
+                  } );
+               }
 
                using( var tx = connection.BeginTransaction( IsolationLevel.ReadUncommitted ) )
                {
@@ -381,9 +391,11 @@ namespace Vibrant.Tsdb.Sql
 
          ReadResult<TKey, TEntry> currentResult = null;
 
-         foreach( var entry in SqlSerializer.Deserialize<TKey, TEntry>( sqlEntries, _keyConverter ) )
+         foreach( var sqlEntry in sqlEntries )
          {
-            var id = entry.GetKey();
+            var id = _keyConverter.Convert( sqlEntry.Id );
+            var entry = SqlSerializer.Deserialize<TKey, TEntry>( sqlEntry );
+
             if( currentResult == null || !currentResult.Key.Equals( id ) )
             {
                currentResult = results[ id ];
@@ -397,7 +409,7 @@ namespace Vibrant.Tsdb.Sql
 
       private SegmentedReadResult<TKey, TEntry> CreateReadResult( TKey id, IEnumerable<SqlEntry> sqlEntries, int segmentSize, long skip )
       {
-         var entries = SqlSerializer.Deserialize<TKey, TEntry>( sqlEntries, _keyConverter );
+         var entries = SqlSerializer.Deserialize<TKey, TEntry>( sqlEntries );
          var continuationToken = new ContinuationToken( entries.Count == segmentSize, skip + segmentSize, segmentSize );
          return new SegmentedReadResult<TKey, TEntry>( id, Sort.Descending, continuationToken, entries, CreateDeleteFunction( id, continuationToken, entries ) );
       }

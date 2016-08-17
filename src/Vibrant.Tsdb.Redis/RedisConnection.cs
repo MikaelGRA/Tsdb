@@ -63,8 +63,8 @@ namespace Vibrant.Tsdb.Redis
          _connection.Dispose();
       }
 
-      public Task SubscribeAsync<TKey, TEntry>( string id, IKeyConverter<TKey> keyConverter, SubscriptionType subscribe, Action<List<TEntry>> onMessage )
-         where TEntry : IRedisEntry<TKey>, new()
+      public Task SubscribeAsync<TKey, TEntry>( string id, IKeyConverter<TKey> keyConverter, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> onMessage )
+         where TEntry : IRedisEntry, new()
       {
          var key = CreateSubscriptionKey( id, subscribe );
          return _redisSubscriber.SubscribeAsync( key, ( channel, data ) =>
@@ -81,7 +81,7 @@ namespace Vibrant.Tsdb.Redis
       }
 
       public Task PublishLatestAsync<TKey, TEntry>( string id, TEntry entry )
-         where TEntry : IRedisEntry<TKey>
+         where TEntry : IRedisEntry
       {
          if( _connection == null )
          {
@@ -89,7 +89,6 @@ namespace Vibrant.Tsdb.Redis
          }
 
          var data = RedisSerializer.Serialize<TKey, TEntry>( id, entry );
-
 
          var key = CreateSubscriptionKey( id, SubscriptionType.LatestPerCollection );
          var ticks = entry.GetTimestamp().Ticks;
@@ -99,7 +98,7 @@ namespace Vibrant.Tsdb.Redis
       }
 
       public Task PublishAllAsync<TKey, TEntry>( string id, IEnumerable<TEntry> entries )
-         where TEntry : IRedisEntry<TKey>
+         where TEntry : IRedisEntry
       {
          if( _connection == null )
          {

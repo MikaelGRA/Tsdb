@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Files
 {
-   public interface IFileEntry<TKey> : IEntry<TKey>
+   public interface IFileEntry : IEntry
    {
       void Write( BinaryWriter writer );
 

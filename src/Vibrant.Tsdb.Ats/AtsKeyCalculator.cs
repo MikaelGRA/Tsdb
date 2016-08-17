@@ -8,14 +8,7 @@ namespace Vibrant.Tsdb.Ats
 {
    internal static class AtsKeyCalculator
    {
-      private const string Seperator = "|";
-
-      public static string CalculatePartitionKey<TKey, TEntry>( TEntry entry, IKeyConverter<TKey> keyConverter, IPartitionProvider<TKey> provider )
-         where TEntry : IAtsEntry<TKey>
-      {
-         var key = entry.GetKey();
-         return CalculatePartitionKey( keyConverter.Convert( key ), key, entry.GetTimestamp(), provider );
-      }
+      private const char Seperator = '|';
 
       public static string CalculatePartitionKey( string id, string partitionRange )
       {

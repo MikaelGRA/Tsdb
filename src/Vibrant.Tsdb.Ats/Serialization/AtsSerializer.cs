@@ -24,24 +24,23 @@ namespace Vibrant.Tsdb.Ats.Serialization
       }
 
       public static void SerializeEntry<TKey, TEntry>( BinaryWriter writer, TEntry entry )
-         where TEntry : IAtsEntry<TKey>
+         where TEntry : IAtsEntry
       {
          writer.Write( entry.GetTimestamp().Ticks );
          entry.Write( writer );
       }
 
-      public static TEntry DeserializeEntry<TKey, TEntry>( BinaryReader reader, TKey id )
-         where TEntry : IAtsEntry<TKey>, new()
+      public static TEntry DeserializeEntry<TKey, TEntry>( BinaryReader reader )
+         where TEntry : IAtsEntry, new()
       {
          var entry = new TEntry();
-         entry.SetKey( id );
          entry.SetTimestamp( new DateTime( reader.ReadInt64(), DateTimeKind.Utc ) );
          entry.Read( reader );
          return entry;
       }
 
       public static List<AtsSerializationResult> Serialize<TKey, TEntry>( List<TEntry> entries, int maxByteArraySize )
-         where TEntry : IAtsEntry<TKey>
+         where TEntry : IAtsEntry
       {
          var results = new List<AtsSerializationResult>();
          var stream = new MemoryStream();
@@ -130,8 +129,8 @@ namespace Vibrant.Tsdb.Ats.Serialization
          return data;
       }
 
-      public static TEntry[] Deserialize<TKey, TEntry>( TKey id, byte[] bytes, Sort sort )
-         where TEntry : IAtsEntry<TKey>, new()
+      public static TEntry[] Deserialize<TKey, TEntry>( byte[] bytes, Sort sort )
+         where TEntry : IAtsEntry, new()
       {
          var stream = new MemoryStream( bytes );
          var reader = CreateReader( stream );
@@ -143,7 +142,7 @@ namespace Vibrant.Tsdb.Ats.Serialization
             int idx = count;
             while( stream.Length != stream.Position )
             {
-               var entry = DeserializeEntry<TKey, TEntry>( reader, id );
+               var entry = DeserializeEntry<TKey, TEntry>( reader );
                entries[ --idx ] = entry;
             }
          }
@@ -152,7 +151,7 @@ namespace Vibrant.Tsdb.Ats.Serialization
             int idx = 0;
             while( stream.Length != stream.Position )
             {
-               var entry = DeserializeEntry<TKey, TEntry>( reader, id );
+               var entry = DeserializeEntry<TKey, TEntry>( reader );
                entries[ idx++ ] = entry;
             }
          }

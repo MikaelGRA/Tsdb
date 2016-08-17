@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Ats.Helpers
 {
    internal class EntrySplitResult<TKey, TEntry>
-      where TEntry : IAtsEntry<TKey>
+      where TEntry : IAtsEntry
    {
       private HashSet<TEntry> _uniqueEntries;
       private List<TEntry> _entries;

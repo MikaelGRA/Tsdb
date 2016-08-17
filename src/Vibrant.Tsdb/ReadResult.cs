@@ -44,5 +44,20 @@ namespace Vibrant.Tsdb
 
          return this;
       }
+
+      public TKey GetKey()
+      {
+         return Key;
+      }
+
+      public ICollection<TEntry> GetEntries()
+      {
+         return Entries;
+      }
+
+      public void Insert( ISerie<TKey, TEntry> other )
+      {
+         Entries.AddRange( other.GetEntries() );
+      }
    }
 }

@@ -45,7 +45,7 @@ namespace Vibrant.Tsdb.Client
          WriteLoop( cancel );
       }
 
-      public Task Write( IEnumerable<TEntry> entries )
+      public Task Write( ISerie<TKey, TEntry> serie )
       {
          lock( _sync )
          {
@@ -53,13 +53,13 @@ namespace Vibrant.Tsdb.Client
             {
                _currentBatch = new BatchWrite<TKey, TEntry>();
             }
-            if( _currentBatch.Entries.Count + entries.Count() > _maxBatchSize )
+            if( _currentBatch.Count + serie.GetEntries().Count > _maxBatchSize )
             {
                _batches.Enqueue( _currentBatch );
                _currentBatch = new BatchWrite<TKey, TEntry>();
             }
 
-            _currentBatch.Add( entries );
+            _currentBatch.Add( serie );
 
             return _currentBatch.Task;
          }
@@ -92,7 +92,7 @@ namespace Vibrant.Tsdb.Client
             {
                try
                {
-                  await _client.WriteAsync( write.Entries, _publish ).ConfigureAwait( false );
+                  await _client.WriteAsync( write, _publish ).ConfigureAwait( false );
                   write.Complete();
                }
                catch( Exception e )

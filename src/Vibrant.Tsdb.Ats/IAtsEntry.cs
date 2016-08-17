@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public interface IAtsEntry<TKey> : IEntry<TKey>
+   public interface IAtsEntry : IEntry
    {
       void Write( BinaryWriter writer );
 

@@ -13,7 +13,7 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.Tests.Entries
 {
-   public class BasicEntry : IEntry<string>, IAtsEntry<string>, ISqlEntry<string>, IRedisEntry<string>, IInfluxEntry<string>, IFileEntry<string>
+   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, IInfluxEntry, IFileEntry
    {
       private static readonly KeyValuePair<string, string>[] _empty = new KeyValuePair<string, string>[ 0 ];
 
@@ -21,8 +21,6 @@ namespace Vibrant.Tsdb.Tests.Entries
       {
          Fields = new SortedDictionary<string, object>( StringComparer.Ordinal );
       }
-
-      public string Id { get; set; }
       
       public DateTime Timestamp { get; set; }
 
@@ -47,16 +45,6 @@ namespace Vibrant.Tsdb.Tests.Entries
 
       #region Interfaces
 
-      public string GetKey()
-      {
-         return Id;
-      }
-
-      public void SetKey( string id )
-      {
-         Id = id;
-      }
-
       public DateTime GetTimestamp()
       {
          return Timestamp;
@@ -67,11 +55,6 @@ namespace Vibrant.Tsdb.Tests.Entries
          Timestamp = timestamp;
       }
 
-      public ushort GetTypeCode()
-      {
-         return 1;
-      }
-
       public void Read( BinaryReader reader )
       {
          Value = reader.ReadDouble();
@@ -80,18 +63,6 @@ namespace Vibrant.Tsdb.Tests.Entries
       public void Write( BinaryWriter writer )
       {
          writer.Write( Value );
-      }
-      
-      string IHaveMeasurementName.MeasurementName
-      {
-         get
-         {
-            return Id;
-         }
-         set
-         {
-            Id = value;
-         }
       }
 
       void IInfluxRow.SetTimestamp( DateTime? value )

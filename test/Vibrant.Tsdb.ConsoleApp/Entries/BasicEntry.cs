@@ -10,25 +10,13 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.ConsoleApp.Entries
 {
-   public class BasicEntry : IEntry<BasicKey>, IAtsEntry<BasicKey>, ISqlEntry<BasicKey>, IRedisEntry<BasicKey>, IFileEntry<BasicKey>
+   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, IFileEntry
    {
       private KeyValuePair<string, string>[] _empty = new KeyValuePair<string, string>[ 0 ];
-
-      public BasicKey Id { get; set; }
 
       public DateTime Timestamp { get; set; }
 
       public double Value { get; set; }
-
-      public BasicKey GetKey()
-      {
-         return Id;
-      }
-
-      public void SetKey( BasicKey id )
-      {
-         Id = id;
-      }
 
       public DateTime GetTimestamp()
       {

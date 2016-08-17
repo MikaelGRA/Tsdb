@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Redis
 {
    public class RedisPublishSubscribe<TKey, TEntry> : DefaultPublishSubscribe<TKey, TEntry>, IDisposable
-      where TEntry : IRedisEntry<TKey>, new()
+      where TEntry : IRedisEntry, new()
    {
       private TaskCompletionSource<bool> _waitWhileDisconnected;
       private RedisConnection _connection;
@@ -68,24 +68,25 @@ namespace Vibrant.Tsdb.Redis
          return _waitWhileDisconnected.Task;
       }
 
-      protected override async Task OnPublished( IEnumerable<TEntry> entries, PublicationType publish )
+      protected override async Task OnPublished( IEnumerable<ISerie<TKey, TEntry>> series, PublicationType publish )
       {
          var tasks = new List<Task>();
          if( publish.HasFlag( PublicationType.LatestPerCollection ) )
          {
-            var latest = FindLatestForEachId( entries );
-            foreach( var entry in entries )
+            var latest = FindLatestForEachId( series );
+            foreach( var serie in latest )
             {
-               var id = entry.GetKey();
-               tasks.Add( _connection.PublishLatestAsync<TKey, TEntry>( _keyConverter.Convert( id ), entry ) );
+               var key = serie.GetKey();
+               var entry = serie.GetEntries().First();
+               tasks.Add( _connection.PublishLatestAsync<TKey, TEntry>( _keyConverter.Convert( key ), entry ) );
             }
          }
          if( publish.HasFlag( PublicationType.AllFromCollections ) )
          {
-            foreach( var entriesById in entries.GroupBy( x => x.GetKey() ) )
+            foreach( var serie in series )
             {
-               var id = entriesById.Key;
-               tasks.Add( _connection.PublishAllAsync<TKey, TEntry>( _keyConverter.Convert( id ), entriesById ) );
+               var key = serie.GetKey();
+               tasks.Add( _connection.PublishAllAsync<TKey, TEntry>( _keyConverter.Convert( key ), serie.GetEntries() ) );
             }
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );

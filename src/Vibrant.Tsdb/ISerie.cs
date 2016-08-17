@@ -8,8 +8,10 @@ namespace Vibrant.Tsdb
    public interface ISerie<TKey, TEntry>
      where TEntry : IEntry
    {
-      TKey Key { get; }
+      TKey GetKey();
 
-      List<TEntry> Entries { get; }
+      ICollection<TEntry> GetEntries();
+
+      void Insert( ISerie<TKey, TEntry> other );
    }
 }

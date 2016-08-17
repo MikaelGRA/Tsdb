@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Tests.Selectors
 {
    public class MyDynamicStorageSelector<TKey, TEntry> : DynamicStorageSelectorBase<TKey, TEntry>
-     where TEntry : IEntry<TKey>
+     where TEntry : IEntry
    {
       private StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>[] _selections;
 

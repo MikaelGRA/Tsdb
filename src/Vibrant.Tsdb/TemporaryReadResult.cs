@@ -11,13 +11,13 @@ namespace Vibrant.Tsdb
    {
       private Action _delete;
 
-      public TemporaryReadResult( List<ISerie<TKey, TEntry>> entries, Action delete )
+      public TemporaryReadResult( List<Serie<TKey, TEntry>> entries, Action delete )
       {
          Series = entries;
          _delete = delete;
       }
 
-      public List<ISerie<TKey, TEntry>> Series { get; private set; }
+      public List<Serie<TKey, TEntry>> Series { get; private set; }
 
       public void Delete()
       {

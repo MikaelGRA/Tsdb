@@ -12,7 +12,7 @@ using System.Threading;
 namespace Vibrant.Tsdb.InfluxDB
 {
    public class InfluxDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
-      where TEntry : IInfluxEntry<TKey>, new()
+      where TEntry : IInfluxEntry, new()
    {
       public const int DefaultReadParallelism = 20;
       public const int DefaultWriteParallelism = 5;
@@ -69,28 +69,41 @@ namespace Vibrant.Tsdb.InfluxDB
 
       }
 
-      public IDynamicStorage<TKey, TEntry> GetStorage( TKey id )
-      {
-         return this;
-      }
-
       public IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
       {
          return _defaultSelection;
       }
 
-      public IDynamicStorage<TKey, TEntry> GetStorage( TEntry entry )
+      public IDynamicStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
       {
          return this;
       }
 
-      public async Task WriteAsync( IEnumerable<TEntry> items )
+      public async Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> series )
       {
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
-            var uniqueEntries = Unique.Ensure<TKey, TEntry>( items, _comparer );
-            await _client.WriteAsync( _database, uniqueEntries ).ConfigureAwait( false );
+            await _client.WriteAsync( _database, Convert( series ) ).ConfigureAwait( false );
+         }
+      }
+
+      private IEnumerable<InfluxEntryAdapter<TEntry>> Convert( IEnumerable<ISerie<TKey, TEntry>> series )
+      {
+         var keys = new HashSet<EntryKey<TKey>>();
+         foreach( var serie in series )
+         {
+            var key = serie.GetKey();
+            var id = _keyConverter.Convert( key );
+            foreach( var entry in serie.GetEntries() )
+            {
+               var hashkey = new EntryKey<TKey>( key, ( (IEntry)entry ).GetTimestamp() );
+               if( !keys.Contains( hashkey ) )
+               {
+                  yield return new InfluxEntryAdapter<TEntry>( id, entry );
+                  keys.Add( hashkey );
+               }
+            }
          }
       }
 
@@ -283,7 +296,7 @@ namespace Vibrant.Tsdb.InfluxDB
          DateTime? to = null;
          if( entries.Count > 0 )
          {
-            to = ( (IEntry<TKey>)entries[ entries.Count - 1 ] ).GetTimestamp();
+            to = ( (IEntry)entries[ entries.Count - 1 ] ).GetTimestamp();
          }
          var continuationToken = new ContinuationToken( entries.Count == segmentSize, to );
 
@@ -298,8 +311,8 @@ namespace Vibrant.Tsdb.InfluxDB
          }
          else
          {
-            var to = ( (IEntry<TKey>)entries[ 0 ] ).GetTimestamp().AddTicks( 1 );
-            var from = ( (IEntry<TKey>)entries[ entries.Count - 1 ] ).GetTimestamp();
+            var to = ( (IEntry)entries[ 0 ] ).GetTimestamp().AddTicks( 1 );
+            var from = ( (IEntry)entries[ entries.Count - 1 ] ).GetTimestamp();
             return () => this.DeleteAsync( id, from, to );
          }
       }

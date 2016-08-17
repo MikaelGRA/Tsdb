@@ -25,14 +25,13 @@ namespace Vibrant.Tsdb.ConsoleApp
 
       public TimeSpan Interval { get; private set; }
 
-      public IEnumerable<BasicEntry> GetEntries( DateTime now )
+      public Serie<BasicKey, BasicEntry> GetEntries( DateTime now )
       {
-         List<BasicEntry> entries = new List<BasicEntry>();
+         var serie = new Serie<BasicKey, BasicEntry>( Id );
 
          for( var timestamp = _currentTimestamp ; timestamp < now ; timestamp += Interval )
          {
             var entry = new BasicEntry();
-            entry.Id = Id;
             entry.Timestamp = timestamp;
 
             _velocity = _rng.NextDouble() - 0.5;
@@ -40,11 +39,11 @@ namespace Vibrant.Tsdb.ConsoleApp
 
             entry.Value = _currentValue;
 
-            entries.Add( entry );
+            serie.Entries.Add( entry );
          }
          _currentTimestamp = now;
 
-         return entries;
+         return serie;
       }
    }
 }

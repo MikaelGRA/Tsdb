@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Vibrant.Tsdb.Tests.Selectors
 {
    public class MyVolumeStorageSelector<TKey, TEntry> : VolumeStorageSelectorBase<TKey, TEntry>
-     where TEntry : IEntry<TKey>
+     where TEntry : IEntry
    {
       private StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>[] _selections;
 

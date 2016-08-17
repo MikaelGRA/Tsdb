@@ -8,6 +8,12 @@ namespace Vibrant.Tsdb
    public class Serie<TKey, TEntry> : ISerie<TKey, TEntry>
      where TEntry : IEntry
    {
+      public Serie( TKey key, IEnumerable<TEntry> entries )
+      {
+         Key = key;
+         Entries = entries.ToList();
+      }
+
       public Serie( TKey key, List<TEntry> entries )
       {
          Key = key;
@@ -30,5 +36,20 @@ namespace Vibrant.Tsdb
       public TKey Key { get; private set; }
 
       public List<TEntry> Entries { get; private set; }
+
+      public TKey GetKey()
+      {
+         return Key;
+      }
+
+      public ICollection<TEntry> GetEntries()
+      {
+         return Entries;
+      }
+
+      public void Insert( ISerie<TKey, TEntry> other )
+      {
+         Entries.AddRange( other.GetEntries() );
+      }
    }
 }

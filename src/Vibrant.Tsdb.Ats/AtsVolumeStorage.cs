@@ -18,7 +18,7 @@ namespace Vibrant.Tsdb.Ats
    /// as its backend. 
    /// </summary>
    public class AtsVolumeStorage<TKey, TEntry> : IVolumeStorage<TKey, TEntry>, IVolumeStorageSelector<TKey, TEntry>, IDisposable
-      where TEntry : IAtsEntry<TKey>, new()
+      where TEntry : IAtsEntry, new()
    {
       public const int DefaultReadParallelism = 15;
       public const int DefaultWriteParallelism = 30;
@@ -68,7 +68,7 @@ namespace Vibrant.Tsdb.Ats
          return _defaultSelection;
       }
 
-      public IVolumeStorage<TKey, TEntry> GetStorage( TEntry entry )
+      public IVolumeStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
       {
          return this;
       }
@@ -78,12 +78,12 @@ namespace Vibrant.Tsdb.Ats
       /// </summary>
       /// <param name="items">The entries to be written.</param>
       /// <returns></returns>
-      public async Task WriteAsync( IEnumerable<TEntry> items )
+      public async Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> series )
       {
          List<Task> tasks = new List<Task>();
 
          // split all entries by their id
-         foreach( var entry in IterateByPartition( items ) )
+         foreach( var entry in IterateByPartition( series ) )
          {
             var id = entry.Key;
             var from = entry.From;
@@ -158,7 +158,7 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TKey, TEntry>(
             id,
             Sort.Descending,
-            results.SelectMany( x => x.GetEntries<TKey, TEntry>( id, Sort.Descending ) ).Take( 1 )
+            results.SelectMany( x => x.GetEntries<TKey, TEntry>( Sort.Descending ) ).Take( 1 )
                .ToList() );
       }
 
@@ -169,7 +169,7 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TKey, TEntry>(
             id,
             sort,
-            results.SelectMany( x => x.GetEntries<TKey, TEntry>( id, sort ) )
+            results.SelectMany( x => x.GetEntries<TKey, TEntry>( sort ) )
                .ToList() );
       }
 
@@ -180,7 +180,7 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TKey, TEntry>(
             id,
             sort,
-            results.SelectMany( x => x.GetEntries<TKey, TEntry>( id, sort ) )
+            results.SelectMany( x => x.GetEntries<TKey, TEntry>( sort ) )
                .Where( x => x.GetTimestamp() >= from && x.GetTimestamp() < to )
                .ToList() );
       }
@@ -190,7 +190,7 @@ namespace Vibrant.Tsdb.Ats
          var retrievals = await RetrieveRangeForId( id, from, to, Sort.Descending ).ConfigureAwait( false );
 
          var oldEntities = retrievals.ToDictionary( x => x.RowKey );
-         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TKey, TEntry>( id, Sort.Descending ) ).ToList();
+         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TKey, TEntry>( Sort.Descending ) ).ToList();
 
          // remove items between from and to
          int count = oldEntries.RemoveAll( x => x.GetTimestamp() >= from && x.GetTimestamp() < to );
@@ -210,7 +210,7 @@ namespace Vibrant.Tsdb.Ats
          var retrievals = await RetrieveAllForId( id, Sort.Descending ).ConfigureAwait( false );
 
          var oldEntities = retrievals.ToDictionary( x => x.RowKey );
-         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TKey, TEntry>( id, Sort.Descending ) ).ToList();
+         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TKey, TEntry>( Sort.Descending ) ).ToList();
 
          // remove items between from and to
          int count = oldEntries.Count;
@@ -233,7 +233,7 @@ namespace Vibrant.Tsdb.Ats
          var oldEntities = retrievals.ToDictionary( x => x.RowKey );
 
          // merge results
-         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TKey, TEntry>( id, Sort.Descending ) ).ToList();
+         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TKey, TEntry>( Sort.Descending ) ).ToList();
          var mergedEntries = MergeSort.Sort(
             collections: new IEnumerable<TEntry>[] { newEntries, oldEntries },
             comparer: EntryComparer.GetComparer<TKey, TEntry>( Sort.Descending ),
@@ -402,24 +402,28 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private IEnumerable<EntrySplitResult<TKey, TEntry>> IterateByPartition( IEnumerable<TEntry> entries )
+      private IEnumerable<EntrySplitResult<TKey, TEntry>> IterateByPartition( IEnumerable<ISerie<TKey, TEntry>> series )
       {
          Dictionary<string, EntrySplitResult<TKey, TEntry>> lookup = new Dictionary<string, EntrySplitResult<TKey, TEntry>>();
 
-         foreach( var entry in entries )
+         foreach( var serie in series )
          {
-            var key = entry.GetKey();
+            var key = serie.GetKey();
             var id = _keyConverter.Convert( key );
-            var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, entry.GetTimestamp(), _partitioningProvider );
 
-            EntrySplitResult<TKey, TEntry> items;
-            if( !lookup.TryGetValue( pk, out items ) )
+            foreach( var entry in serie.GetEntries() )
             {
-               items = new EntrySplitResult<TKey, TEntry>( key, id, pk );
-               lookup.Add( pk, items );
-            }
+               var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, entry.GetTimestamp(), _partitioningProvider );
 
-            items.Insert( entry );
+               EntrySplitResult<TKey, TEntry> items;
+               if( !lookup.TryGetValue( pk, out items ) )
+               {
+                  items = new EntrySplitResult<TKey, TEntry>( key, id, pk );
+                  lookup.Add( pk, items );
+               }
+
+               items.Insert( entry );
+            }
          }
 
          foreach( var result in lookup )
