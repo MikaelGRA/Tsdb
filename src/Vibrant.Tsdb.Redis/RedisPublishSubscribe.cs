@@ -76,17 +76,23 @@ namespace Vibrant.Tsdb.Redis
             var latest = FindLatestForEachId( series );
             foreach( var serie in latest )
             {
-               var key = serie.GetKey();
-               var entry = serie.GetEntries().First();
-               tasks.Add( _connection.PublishLatestAsync<TKey, TEntry>( _keyConverter.Convert( key ), entry ) );
+               if( serie.Entries.Count > 0 )
+               {
+                  var key = serie.GetKey();
+                  var entry = serie.GetEntries().First();
+                  tasks.Add( _connection.PublishLatestAsync<TKey, TEntry>( _keyConverter.Convert( key ), entry ) );
+               }
             }
          }
          if( publish.HasFlag( PublicationType.AllFromCollections ) )
          {
             foreach( var serie in series )
             {
-               var key = serie.GetKey();
-               tasks.Add( _connection.PublishAllAsync<TKey, TEntry>( _keyConverter.Convert( key ), serie.GetEntries() ) );
+               if( serie.GetEntries().Count > 0 )
+               {
+                  var key = serie.GetKey();
+                  tasks.Add( _connection.PublishAllAsync<TKey, TEntry>( _keyConverter.Convert( key ), serie.GetEntries() ) );
+               }
             }
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );

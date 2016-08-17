@@ -10,6 +10,7 @@ namespace Vibrant.Tsdb.InfluxDB
       where TEntry : IInfluxEntry
    {
       private TEntry _entry;
+      private string _measurementName;
 
       public InfluxEntryAdapter()
       {
@@ -18,11 +19,21 @@ namespace Vibrant.Tsdb.InfluxDB
 
       public InfluxEntryAdapter( string measurementName, TEntry entry )
       {
+         _measurementName = measurementName;
          _entry = entry;
-         MeasurementName = MeasurementName;
       }
 
-      public string MeasurementName { get; set; }
+      public string MeasurementName
+      {
+         get
+         {
+            return _measurementName;
+         }
+         set
+         {
+            _measurementName = value;
+         }
+      }
 
       public IEnumerable<KeyValuePair<string, object>> GetAllFields()
       {

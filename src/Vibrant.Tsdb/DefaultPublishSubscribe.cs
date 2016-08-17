@@ -313,58 +313,60 @@ namespace Vibrant.Tsdb
 
       private void PublishForLatest( IEnumerable<ISerie<TKey, TEntry>> series )
       {
-         PublishFor( series, _latestCallbacksForSingle, _latestCallbacksForAll );
+         PublishFor( series, _latestCallbacksForSingle, _latestCallbacksForAll, false );
       }
 
       private void PublishForAll( IEnumerable<ISerie<TKey, TEntry>> series )
       {
-         PublishFor( series, _allCallbacksForSingle, _allCallbacksForAll );
+         PublishFor( series, _allCallbacksForSingle, _allCallbacksForAll, true );
       }
 
-      private void PublishFor( IEnumerable<ISerie<TKey, TEntry>> series, IDictionary<TKey, HashSet<Action<Serie<TKey, TEntry>>>> single, IDictionary<Action<Serie<TKey, TEntry>>, byte> all )
+      private void PublishFor( IEnumerable<ISerie<TKey, TEntry>> series, IDictionary<TKey, HashSet<Action<Serie<TKey, TEntry>>>> single, IDictionary<Action<Serie<TKey, TEntry>>, byte> all, bool createNew )
       {
          // FIXME: Is this approach alright?
-         foreach( var serie in series.GroupBy( x => x.GetKey() ) )
+         foreach( var serie in series )
          {
-            var entries = serie.SelectMany( x => x.GetEntries() );
-            Serie<TKey, TEntry> data = null;
-
-            HashSet<Action<Serie<TKey, TEntry>>> subscribers;
-            if( single.TryGetValue( serie.Key, out subscribers ) )
+            if( serie.GetEntries().Count > 0 )
             {
-               if( data == null )
+               Serie<TKey, TEntry> data = null;
+
+               HashSet<Action<Serie<TKey, TEntry>>> subscribers;
+               if( single.TryGetValue( serie.GetKey(), out subscribers ) )
                {
-                  data = new Serie<TKey, TEntry>( serie.Key, entries.ToList() );
+                  if( data == null )
+                  {
+                     data = createNew ? new Serie<TKey, TEntry>( serie.GetKey(), serie.GetEntries() ) : (Serie<TKey, TEntry>)serie;
+                  }
+
+                  foreach( var callback in subscribers )
+                  {
+                     try
+                     {
+                        callback( data );
+                     }
+                     catch( Exception )
+                     {
+
+                     }
+                  }
                }
 
-               foreach( var callback in subscribers )
+               // then handle all
+               foreach( var callback in all )
                {
+                  if( data == null )
+                  {
+                     data = createNew ? new Serie<TKey, TEntry>( serie.GetKey(), serie.GetEntries() ) : (Serie<TKey, TEntry>)serie;
+                  }
+
                   try
                   {
-                     callback( data );
+                     callback.Key( data );
                   }
                   catch( Exception )
                   {
 
                   }
-               }
-            }
-
-            // then handle all
-            foreach( var callback in all )
-            {
-               if( data == null )
-               {
-                  data = new Serie<TKey, TEntry>( serie.Key, entries.ToList() );
-               }
-
-               try
-               {
-                  callback.Key( data );
-               }
-               catch( Exception )
-               {
-
                }
             }
          }
@@ -420,20 +422,22 @@ namespace Vibrant.Tsdb
 
       private void PublishToSingleForEntriesWithSameId( Serie<TKey, TEntry> serie, IDictionary<TKey, HashSet<Action<Serie<TKey, TEntry>>>> single, IDictionary<Action<Serie<TKey, TEntry>>, byte> all )
       {
-         var id = serie.GetKey();
-
-         HashSet<Action<Serie<TKey, TEntry>>> subscribers;
-         if( single.TryGetValue( id, out subscribers ) )
+         if( serie.GetEntries().Count > 0 )
          {
-            foreach( var callback in subscribers )
+            var id = serie.GetKey();
+            HashSet<Action<Serie<TKey, TEntry>>> subscribers;
+            if( single.TryGetValue( id, out subscribers ) )
             {
-               try
+               foreach( var callback in subscribers )
                {
-                  callback( serie );
-               }
-               catch( Exception )
-               {
+                  try
+                  {
+                     callback( serie );
+                  }
+                  catch( Exception )
+                  {
 
+                  }
                }
             }
          }
@@ -441,15 +445,18 @@ namespace Vibrant.Tsdb
 
       private void PublishToAllForEntriesWithSameId( Serie<TKey, TEntry> serie, IDictionary<TKey, HashSet<Action<Serie<TKey, TEntry>>>> single, IDictionary<Action<Serie<TKey, TEntry>>, byte> all )
       {
-         foreach( var callback in all )
+         if( serie.GetEntries().Count > 0 )
          {
-            try
+            foreach( var callback in all )
             {
-               callback.Key( serie );
-            }
-            catch( Exception )
-            {
+               try
+               {
+                  callback.Key( serie );
+               }
+               catch( Exception )
+               {
 
+               }
             }
          }
       }
@@ -481,8 +488,8 @@ namespace Vibrant.Tsdb
                {
                   if( timestamp > latest.Value )
                   {
-                     foundSeries.Add( key, new Serie<TKey, TEntry>( key, entry ) );
                      latest.Value = timestamp;
+                     existingSerie.Entries.Add( entry );
                   }
                }
                else

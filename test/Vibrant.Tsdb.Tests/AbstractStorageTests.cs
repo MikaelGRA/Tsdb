@@ -34,7 +34,7 @@ namespace Vibrant.Tsdb.Tests
             var id = Ids[ _rng.Next( Ids.Length ) ];
 
             Serie<string, BasicEntry> serie;
-            if( series.TryGetValue( id, out serie ) )
+            if( !series.TryGetValue( id, out serie ) )
             {
                serie = new Serie<string, BasicEntry>( id );
                series.Add( id, serie );

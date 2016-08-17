@@ -8,29 +8,25 @@ namespace Vibrant.Tsdb.Ats.Helpers
    internal class EntrySplitResult<TKey, TEntry>
       where TEntry : IAtsEntry
    {
-      private HashSet<TEntry> _uniqueEntries;
       private List<TEntry> _entries;
 
-      public EntrySplitResult( TKey key, string id, string partitionKey )
+      public EntrySplitResult( TKey key, string partitionKey )
       {
          Key = key;
-         _uniqueEntries = new HashSet<TEntry>( new EntryEqualityComparer<TKey, TEntry>() );
+         _entries = new List<TEntry>();
       }
 
       public TKey Key { get; set; }
-
-      public string Id { get; set; }
 
       public string PartitionKey { get; set; }
 
       public void Insert( TEntry entry )
       {
-         _uniqueEntries.Add( entry );
+         _entries.Add( entry );
       }
 
       public void Sort( Sort sort )
       {
-         _entries = new List<TEntry>( _uniqueEntries );
          _entries.Sort( EntryComparer.GetComparer<TKey, TEntry>( sort ) );
       }
 

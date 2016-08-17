@@ -596,10 +596,11 @@ namespace Vibrant.Tsdb.Ats
          return AtsSerializer.DeserializeEntry<TKey, TEntry>( reader );
       }
 
-      private IEnumerable<KeyValuePair<string, HashSet<TEntry>>> IterateByPartition( IEnumerable<ISerie<TKey, TEntry>> series )
+      private IEnumerable<KeyValuePair<string, List<TEntry>>> IterateByPartition( IEnumerable<ISerie<TKey, TEntry>> series )
       {
-         Dictionary<string, HashSet<TEntry>> lookup = new Dictionary<string, HashSet<TEntry>>();
+         Dictionary<string, List<TEntry>> lookup = new Dictionary<string, List<TEntry>>();
 
+         var hashkeys = new HashSet<EntryKey<TKey>>();
          foreach( var serie in series )
          {
             var key = serie.GetKey();
@@ -607,20 +608,26 @@ namespace Vibrant.Tsdb.Ats
 
             foreach( var entry in serie.GetEntries() )
             {
-               var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, entry.GetTimestamp(), _partitioningProvider );
+               var timestamp = entry.GetTimestamp();
+               var hashkey = new EntryKey<TKey>( key, timestamp );
 
-               HashSet<TEntry> items;
-               if( !lookup.TryGetValue( pk, out items ) )
+               if( !hashkeys.Contains( hashkey ) )
                {
-                  items = new HashSet<TEntry>( _comparer );
-                  lookup.Add( pk, items );
-               }
+                  var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, timestamp, _partitioningProvider );
+                  List<TEntry> items;
+                  if( !lookup.TryGetValue( pk, out items ) )
+                  {
+                     items = new List<TEntry>();
+                     lookup.Add( pk, items );
+                  }
+                  items.Add( entry );
+                  if( items.Count == 100 )
+                  {
+                     lookup.Remove( pk );
+                     yield return new KeyValuePair<string, List<TEntry>>( pk, items );
+                  }
 
-               items.Add( entry );
-               if( items.Count == 100 )
-               {
-                  lookup.Remove( pk );
-                  yield return new KeyValuePair<string, HashSet<TEntry>>( pk, items );
+                  hashkeys.Add( hashkey );
                }
             }
          }

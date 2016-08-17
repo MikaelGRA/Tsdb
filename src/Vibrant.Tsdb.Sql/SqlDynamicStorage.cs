@@ -137,7 +137,7 @@ namespace Vibrant.Tsdb.Sql
             {
                await connection.OpenAsync().ConfigureAwait( false );
                var keys = new HashSet<EntryKey<TKey>>();
-               
+
                List<SqlDataRecord> records = new List<SqlDataRecord>();
                foreach( var serie in series )
                {
@@ -160,21 +160,24 @@ namespace Vibrant.Tsdb.Sql
                   } );
                }
 
-               using( var tx = connection.BeginTransaction( IsolationLevel.ReadUncommitted ) )
+               if( records.Count > 0 )
                {
-                  using( var command = connection.CreateCommand() )
+                  using( var tx = connection.BeginTransaction( IsolationLevel.ReadUncommitted ) )
                   {
-                     command.CommandText = Sql.GetInsertProcedureName( _tableName );
-                     command.CommandType = CommandType.StoredProcedure;
-                     command.Transaction = tx;
-                     var parameter = command.Parameters.AddWithValue( "@Inserts", records );
-                     parameter.SqlDbType = SqlDbType.Structured;
-                     parameter.TypeName = Sql.GetInsertParameterType( _tableName );
+                     using( var command = connection.CreateCommand() )
+                     {
+                        command.CommandText = Sql.GetInsertProcedureName( _tableName );
+                        command.CommandType = CommandType.StoredProcedure;
+                        command.Transaction = tx;
+                        var parameter = command.Parameters.AddWithValue( "@Inserts", records );
+                        parameter.SqlDbType = SqlDbType.Structured;
+                        parameter.TypeName = Sql.GetInsertParameterType( _tableName );
 
-                     await command.ExecuteNonQueryAsync().ConfigureAwait( false );
+                        await command.ExecuteNonQueryAsync().ConfigureAwait( false );
+                     }
+
+                     tx.Commit();
                   }
-
-                  tx.Commit();
                }
             }
          }

@@ -406,6 +406,7 @@ namespace Vibrant.Tsdb.Ats
       {
          Dictionary<string, EntrySplitResult<TKey, TEntry>> lookup = new Dictionary<string, EntrySplitResult<TKey, TEntry>>();
 
+         var hashkeys = new HashSet<EntryKey<TKey>>();
          foreach( var serie in series )
          {
             var key = serie.GetKey();
@@ -413,16 +414,22 @@ namespace Vibrant.Tsdb.Ats
 
             foreach( var entry in serie.GetEntries() )
             {
-               var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, entry.GetTimestamp(), _partitioningProvider );
+               var timestamp = entry.GetTimestamp();
+               var hashkey = new EntryKey<TKey>( key, timestamp );
 
-               EntrySplitResult<TKey, TEntry> items;
-               if( !lookup.TryGetValue( pk, out items ) )
+               if( !hashkeys.Contains( hashkey ) )
                {
-                  items = new EntrySplitResult<TKey, TEntry>( key, id, pk );
-                  lookup.Add( pk, items );
-               }
+                  var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, timestamp, _partitioningProvider );
+                  EntrySplitResult<TKey, TEntry> items;
+                  if( !lookup.TryGetValue( pk, out items ) )
+                  {
+                     items = new EntrySplitResult<TKey, TEntry>( key, pk );
+                     lookup.Add( pk, items );
+                  }
+                  items.Insert( entry );
 
-               items.Insert( entry );
+                  hashkeys.Add( hashkey );
+               }
             }
          }
 
