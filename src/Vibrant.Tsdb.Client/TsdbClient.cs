@@ -230,7 +230,7 @@ namespace Vibrant.Tsdb.Client
       public async Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items, PublicationType publicationType, Publish publish, bool useTemporaryStorageOnFailure )
       {
          // ensure we only iterate the original collection once, if it is not a list or array
-         if( !( items is IList<ISerie<TKey, TEntry>> || items is Array ) )
+         if( !( items is ICollection<ISerie<TKey, TEntry>> || items is Array ) )
          {
             items = items.ToList();
          }
@@ -435,7 +435,7 @@ namespace Vibrant.Tsdb.Client
          foreach( var kvp in fr )
          {
             var key = kvp.Key.Storage;
-            if( current.Storage != key && !sr.TryGetValue( key, out current ) )
+            if( current?.Storage != key && !sr.TryGetValue( key, out current ) )
             {
                current = new VolumeStorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry>( kvp.Value.Storage );
                current.Lookups = new List<Serie<TKey, TEntry>>();
@@ -536,7 +536,7 @@ namespace Vibrant.Tsdb.Client
          foreach( var kvp in fr )
          {
             var key = kvp.Key.Storage;
-            if( current.Storage != key && !sr.TryGetValue( key, out current ) )
+            if( current?.Storage != key && !sr.TryGetValue( key, out current ) )
             {
                current = new DynamicStorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry>( kvp.Value.Storage );
                current.Lookups = new List<Serie<TKey, TEntry>>();

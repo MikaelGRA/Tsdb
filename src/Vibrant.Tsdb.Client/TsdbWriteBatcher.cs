@@ -92,11 +92,13 @@ namespace Vibrant.Tsdb.Client
             {
                try
                {
-                  await _client.WriteAsync( write, _publish ).ConfigureAwait( false );
+                  await _client.WriteAsync( write.GetBatch(), _publish ).ConfigureAwait( false );
                   write.Complete();
                }
                catch( Exception e )
                {
+                  _logger.Error( e, "An error ocurred while inserting batch of entries." );
+
                   write.Fail( e );
                }
             }

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Client
 {
-   internal class BatchWrite<TKey, TEntry> : IEnumerable<ISerie<TKey, TEntry>>
+   internal class BatchWrite<TKey, TEntry>
       where TEntry : IEntry
    {
       private TaskCompletionSource<bool> _tcs;
@@ -52,14 +52,9 @@ namespace Vibrant.Tsdb.Client
          }
       }
 
-      public IEnumerator<ISerie<TKey, TEntry>> GetEnumerator()
+      public ICollection<ISerie<TKey, TEntry>> GetBatch()
       {
-         return _series.Values.GetEnumerator();
-      }
-
-      IEnumerator IEnumerable.GetEnumerator()
-      {
-         return _series.Values.GetEnumerator();
+         return _series.Values;
       }
 
       public Task Task
