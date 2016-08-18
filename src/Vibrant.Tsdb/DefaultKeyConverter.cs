@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb
 {
@@ -74,8 +75,8 @@ namespace Vibrant.Tsdb
          }
          else if( type == typeof( Guid ) )
          {
-            _toString = key => ( (Guid)(object)key ).ToString();
-            _toKey = str => (TKey)(object)Guid.Parse( str );
+            _toString = key => ( (Guid)(object)key ).ToShortString();
+            _toKey = str => (TKey)(object)GuidHelper.ParseShortGuid( str );
          }
          else
          {

@@ -11,6 +11,7 @@ using Vibrant.Tsdb.Ats;
 using Vibrant.Tsdb.Client;
 using Vibrant.Tsdb.ConsoleApp.Entries;
 using Vibrant.Tsdb.Files;
+using Vibrant.Tsdb.Helpers;
 using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.ConsoleApp
@@ -45,38 +46,38 @@ namespace Vibrant.Tsdb.ConsoleApp
          var ats = config.GetSection( "AtsStorage" );
          var sql = config.GetSection( "SqlStorage" );
          var redis = config.GetSection( "RedisCache" );
-
+         
          var startTime = DateTime.UtcNow;
 
          _dataSources = new List<DataSource>();
-         for( int i = 0 ; i < 20 ; i++ )
+         for( int i = 0 ; i < 40 ; i++ )
          {
             _dataSources.Add( new DataSource( new BasicKey { Id = Guid.NewGuid(), Sampling = Sampling.Daily }, startTime, TimeSpan.FromMilliseconds( 10 ) ) );
          }
          
          var dats = new AtsDynamicStorage<BasicKey, BasicEntry>( 
-            "VatsTables", 
+            "VatsTables1", 
             ats.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( AtsDynamicStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsDynamicStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
             new YearlyPartitioningProvider<BasicKey>(), 
             this );
 
          var dsql = new SqlDynamicStorage<BasicKey, BasicEntry>(
-            "SqlTable",
+            "SqlTable2",
             sql.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( 5, 5 ),
             this );
 
-         var switchDate = new DateTime( 2016, 8, 18, 18, 25, 0, DateTimeKind.Utc );
+         var switchDate = new DateTime( 2016, 8, 14, 18, 25, 0, DateTimeKind.Utc );
 
          var selector = new TestDynamicStorageSelector( new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>[]
          {
-            new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>( dats, null, switchDate ),
             new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>( dsql, switchDate, null ),
+            new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>( dats, null, switchDate ),
          } );
 
          var vats = new AtsVolumeStorage<BasicKey, BasicEntry>( 
-            "DatsTables", 
+            "DatsTable1", 
             ats.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( AtsVolumeStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsVolumeStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
             new YearlyPartitioningProvider<BasicKey>(), 
@@ -204,7 +205,7 @@ namespace Vibrant.Tsdb.ConsoleApp
          var parts = key.Split( '|' ); // substring or string split???
          return new BasicKey
          {
-            Id = Guid.Parse( parts[ 0 ] ),
+            Id = GuidHelper.ParseShortGuid( parts[ 0 ] ),
             Sampling = (Sampling)Enum.Parse( typeof(Sampling), parts[ 1 ] ), // dictionary lookup or parse?
          };
       }
@@ -212,7 +213,7 @@ namespace Vibrant.Tsdb.ConsoleApp
       public string Convert( BasicKey key )
       {
          var sb = new StringBuilder();
-         sb.Append( key.Id.ToString( "N" ) ).Append( "|" ).Append( key.Sampling ); // string builder of string concat?
+         sb.Append( key.Id.ToShortString() ).Append( "|" ).Append( key.Sampling ); // string builder of string concat?
          return sb.ToString();
       }
    }

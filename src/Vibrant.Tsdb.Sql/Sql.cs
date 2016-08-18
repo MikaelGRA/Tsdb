@@ -14,7 +14,7 @@ namespace Vibrant.Tsdb.Sql
       static Sql()
       {
          InsertParameterMetadata = new SqlMetaData[ 3 ];
-         InsertParameterMetadata[ 0 ] = new SqlMetaData( "Id", SqlDbType.NVarChar, 128 );
+         InsertParameterMetadata[ 0 ] = new SqlMetaData( "Id", SqlDbType.VarChar, 128 );
          InsertParameterMetadata[ 1 ] = new SqlMetaData( "Timestamp", SqlDbType.DateTime2 );
          InsertParameterMetadata[ 2 ] = new SqlMetaData( "Data", SqlDbType.VarBinary, SqlMetaData.Max );
       }

@@ -28,7 +28,8 @@
             "define": [ "COREFX" ]
          },
          "dependencies": {
-            "System.IO": "4.1.0"
+            "System.IO": "4.1.0",
+            "System.IO.FileSystem": "4.0.1"
          }
       }
    },

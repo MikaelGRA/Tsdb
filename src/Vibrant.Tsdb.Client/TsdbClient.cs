@@ -118,8 +118,11 @@ namespace Vibrant.Tsdb.Client
             do
             {
                var segment = await dynamic.ReadSegmentedAsync( id, migration.From, migration.To, batchSize, token ).ConfigureAwait( false );
-               await volume.WriteAsync( segment ).ConfigureAwait( false );
-               await segment.DeleteAsync().ConfigureAwait( false );
+               if( segment.Entries.Count > 0 )
+               {
+                  await volume.WriteAsync( segment ).ConfigureAwait( false );
+                  await segment.DeleteAsync().ConfigureAwait( false );
+               }
                token = segment.ContinuationToken;
 
                _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
@@ -157,8 +160,11 @@ namespace Vibrant.Tsdb.Client
             do
             {
                var segment = await dynamic.ReadSegmentedAsync( id, migration.From, migration.To, batchSize, token ).ConfigureAwait( false );
-               await volume.WriteAsync( segment ).ConfigureAwait( false );
-               await segment.DeleteAsync().ConfigureAwait( false );
+               if( segment.Entries.Count > 0 )
+               {
+                  await volume.WriteAsync( segment ).ConfigureAwait( false );
+                  await segment.DeleteAsync().ConfigureAwait( false );
+               }
                token = segment.ContinuationToken;
 
                _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
