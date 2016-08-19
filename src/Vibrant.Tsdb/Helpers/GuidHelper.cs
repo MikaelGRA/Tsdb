@@ -47,7 +47,7 @@ namespace Vibrant.Tsdb.Helpers
       private static string Decode( string encoded )
       {
          var len = encoded.Length;
-         var builder = new StringBuilder( len );
+         var builder = new StringBuilder( len + 2 );
          for( int i = 0 ; i < len ; i++ )
          {
             var ch = encoded[ i ];
