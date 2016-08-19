@@ -50,7 +50,7 @@ namespace Vibrant.Tsdb.ConsoleApp
          var startTime = DateTime.UtcNow;
 
          _dataSources = new List<DataSource>();
-         for( int i = 0 ; i < 40 ; i++ )
+         for( int i = 0 ; i < 100 ; i++ )
          {
             _dataSources.Add( new DataSource( new BasicKey { Id = Guid.NewGuid(), Sampling = Sampling.Daily }, startTime, TimeSpan.FromMilliseconds( 10 ) ) );
          }
@@ -63,7 +63,7 @@ namespace Vibrant.Tsdb.ConsoleApp
             this );
 
          var dsql = new SqlDynamicStorage<BasicKey, BasicEntry>(
-            "SqlTable2",
+            "SqlTable3",
             sql.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( 5, 5 ),
             this );
@@ -146,7 +146,7 @@ namespace Vibrant.Tsdb.ConsoleApp
 
       public int GetDynamicMovalBatchSize()
       {
-         return 5000;
+         return 20000;
       }
 
       public void Debug( string message )

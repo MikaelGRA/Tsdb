@@ -130,13 +130,13 @@ END
          }
       }
 
-      public static Query GetSegmentedQuery( string tableName, string id, DateTime? from, DateTime? to, long skip, int take )
+      public static Query GetSegmentedQuery( string tableName, string id, DateTime? from, DateTime? to, long skip, int take, bool reverse )
       {
          if( from.HasValue && to.HasValue )
          {
             return new Query
             {
-               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] >= @From AND [Timestamp] < @To ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
+               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] >= @From AND [Timestamp] < @To ORDER BY [Timestamp] {( reverse ? "ASC" : "DESC" )} OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
                Args = new { Id = id, From = from.Value, To = to.Value, Skip = skip, Take = take }
             };
          }
@@ -144,7 +144,7 @@ END
          {
             return new Query
             {
-               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] < @To ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
+               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] < @To ORDER BY [Timestamp] {( reverse ? "ASC" : "DESC" )} OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
                Args = new { Id = id, To = to.Value, Skip = skip, Take = take }
             };
          }
@@ -152,7 +152,7 @@ END
          {
             return new Query
             {
-               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] >= @From ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
+               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] >= @From ORDER BY [Timestamp] {( reverse ? "ASC" : "DESC" )} OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
                Args = new { Id = id, From = from.Value, Skip = skip, Take = take }
             };
          }
@@ -160,7 +160,7 @@ END
          {
             return new Query
             {
-               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id ORDER BY [Timestamp] DESC OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
+               Sql = $"SELECT [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id ORDER BY [Timestamp] {( reverse ? "ASC" : "DESC" )} OFFSET @Skip ROWS FETCH NEXT @Take ROWS ONLY",
                Args = new { Id = id, Skip = skip, Take = take }
             };
          }

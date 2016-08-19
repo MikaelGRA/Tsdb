@@ -107,25 +107,30 @@ namespace Vibrant.Tsdb.Client
          }
 
 
-         foreach( var migration in _migrations.Provide( id, null, null ) )
+         foreach( var migration in _migrations.Provide( id, null, null ).Reverse() )
          {
             var dynamic = migration.Dynamic;
             var volume = migration.Volume;
+
+            var readSegmentedAsync = dynamic is IReversableDynamicStorage<TKey, TEntry>
+               ? ( (IReversableDynamicStorage<TKey, TEntry>)dynamic ).ReadReverseSegmentedAsync
+               : (Func<TKey, DateTime?, DateTime?, int, IContinuationToken, Task<SegmentedReadResult<TKey, TEntry>>>)dynamic.ReadSegmentedAsync;
 
             var sw = Stopwatch.StartNew();
 
             IContinuationToken token = null;
             do
             {
-               var segment = await dynamic.ReadSegmentedAsync( id, migration.From, migration.To, batchSize, token ).ConfigureAwait( false );
+               var segment = await readSegmentedAsync( id, migration.From, migration.To, batchSize, token ).ConfigureAwait( false );
                if( segment.Entries.Count > 0 )
                {
                   await volume.WriteAsync( segment ).ConfigureAwait( false );
                   await segment.DeleteAsync().ConfigureAwait( false );
+
+                  _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
                }
                token = segment.ContinuationToken;
 
-               _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
                sw.Restart();
             }
             while( token.HasMore );
@@ -140,7 +145,7 @@ namespace Vibrant.Tsdb.Client
          }
 
 
-         foreach( var migration in _migrations.Provide( id, null, to ) )
+         foreach( var migration in _migrations.Provide( id, null, to ).Reverse() )
          {
             // barrier, dont migrate items from stores that has not been in use for a while
             if( migration.To.HasValue )
@@ -154,20 +159,25 @@ namespace Vibrant.Tsdb.Client
             var dynamic = migration.Dynamic;
             var volume = migration.Volume;
 
+            var readSegmentedAsync = dynamic is IReversableDynamicStorage<TKey, TEntry>
+               ? ( (IReversableDynamicStorage<TKey, TEntry>)dynamic ).ReadReverseSegmentedAsync
+               : (Func<TKey, DateTime?, DateTime?, int, IContinuationToken, Task<SegmentedReadResult<TKey, TEntry>>>)dynamic.ReadSegmentedAsync;
+
             var sw = Stopwatch.StartNew();
 
             IContinuationToken token = null;
             do
             {
-               var segment = await dynamic.ReadSegmentedAsync( id, migration.From, migration.To, batchSize, token ).ConfigureAwait( false );
+               var segment = await readSegmentedAsync( id, migration.From, migration.To, batchSize, token ).ConfigureAwait( false );
                if( segment.Entries.Count > 0 )
                {
                   await volume.WriteAsync( segment ).ConfigureAwait( false );
                   await segment.DeleteAsync().ConfigureAwait( false );
+
+                  _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
                }
                token = segment.ContinuationToken;
 
-               _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
                sw.Restart();
             }
             while( token.HasMore );

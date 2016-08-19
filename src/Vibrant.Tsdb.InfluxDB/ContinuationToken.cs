@@ -16,7 +16,7 @@ namespace Vibrant.Tsdb.InfluxDB
          _to = to;
       }
 
-      public DateTime? To
+      public DateTime? At
       {
          get
          {

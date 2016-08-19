@@ -13,7 +13,7 @@ using Vibrant.Tsdb.Sql.Serialization;
 
 namespace Vibrant.Tsdb.Sql
 {
-   public class SqlDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
+   public class SqlDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IReversableDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
       where TEntry : ISqlEntry, new()
    {
       private const int DefaultReadParallelism = 5;
@@ -100,7 +100,12 @@ namespace Vibrant.Tsdb.Sql
 
       public Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedAsync( TKey id, DateTime? from, DateTime? to, int segmentSize, IContinuationToken continuationToken )
       {
-         return RetrieveForIdSegmented( id, from, to, segmentSize, (ContinuationToken)continuationToken );
+         return RetrieveForIdSegmented( id, from, to, segmentSize, false, (ContinuationToken)continuationToken );
+      }
+
+      public Task<SegmentedReadResult<TKey, TEntry>> ReadReverseSegmentedAsync( TKey id, DateTime? from, DateTime? to, int segmentSize, IContinuationToken continuationToken )
+      {
+         return RetrieveForIdSegmented( id, from, to, segmentSize, true, (ContinuationToken)continuationToken );
       }
 
       private async Task CreateTableLocked()
@@ -162,7 +167,7 @@ namespace Vibrant.Tsdb.Sql
 
                if( records.Count > 0 )
                {
-                  using( var tx = connection.BeginTransaction( IsolationLevel.ReadUncommitted ) )
+                  using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
                   {
                      using( var command = connection.CreateCommand() )
                      {
@@ -283,7 +288,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<SegmentedReadResult<TKey, TEntry>> RetrieveForIdSegmented( TKey key, DateTime? from, DateTime? to, int segmentSize, ContinuationToken continuationToken )
+      private async Task<SegmentedReadResult<TKey, TEntry>> RetrieveForIdSegmented( TKey key, DateTime? from, DateTime? to, int segmentSize, bool reverse, ContinuationToken continuationToken )
       {
          await CreateTable().ConfigureAwait( false );
          long skip = continuationToken?.Skip ?? 0;
@@ -296,7 +301,7 @@ namespace Vibrant.Tsdb.Sql
 
                using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
                {
-                  var query = Sql.GetSegmentedQuery( _tableName, _keyConverter.Convert( key ), from, to, skip, segmentSize );
+                  var query = Sql.GetSegmentedQuery( _tableName, _keyConverter.Convert( key ), from, to, skip, segmentSize, reverse );
 
                   var sqlEntries = await connection.QueryAsync<SqlEntry>(
                      sql: query.Sql,
@@ -319,7 +324,7 @@ namespace Vibrant.Tsdb.Sql
             {
                await connection.OpenAsync().ConfigureAwait( false );
 
-               using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+               using( var tx = connection.BeginTransaction() )
                {
                   var count = await connection.ExecuteAsync(
                      sql: Sql.GetRangedDeleteCommand( _tableName ),
@@ -344,7 +349,7 @@ namespace Vibrant.Tsdb.Sql
             {
                await connection.OpenAsync().ConfigureAwait( false );
 
-               using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+               using( var tx = connection.BeginTransaction() )
                {
                   var count = await connection.ExecuteAsync(
                      sql: Sql.GetBottomlessDeleteCommand( _tableName ),
@@ -369,7 +374,7 @@ namespace Vibrant.Tsdb.Sql
             {
                await connection.OpenAsync().ConfigureAwait( false );
 
-               using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+               using( var tx = connection.BeginTransaction() )
                {
                   var count = await connection.ExecuteAsync(
                      sql: Sql.GetDeleteCommand( _tableName ),
@@ -425,8 +430,24 @@ namespace Vibrant.Tsdb.Sql
          }
          else
          {
-            var to = entries[ 0 ].GetTimestamp().AddTicks( 1 );
-            var from = entries[ entries.Count - 1 ].GetTimestamp();
+            DateTime from;
+            DateTime to;
+
+            var ts1 = entries[ 0 ].GetTimestamp();
+            var ts2 = entries[ entries.Count - 1 ].GetTimestamp();
+            if( ts1 >= ts2 )
+            {
+               to = ts1;
+               from = ts2;
+            }
+            else
+            {
+               to = ts2;
+               from = ts1;
+            }
+
+            to = to.AddTicks( 1 );
+
             return async () =>
             {
                await this.DeleteAsync( id, from, to ).ConfigureAwait( false );

@@ -11,7 +11,7 @@ using System.Threading;
 
 namespace Vibrant.Tsdb.InfluxDB
 {
-   public class InfluxDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
+   public class InfluxDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IReversableDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
       where TEntry : IInfluxEntry, new()
    {
       public const int DefaultReadParallelism = 20;
@@ -180,8 +180,21 @@ namespace Vibrant.Tsdb.InfluxDB
          {
             await CreateDatabase().ConfigureAwait( false );
             var token = (ContinuationToken)continuationToken;
-            to = token?.To ?? to;
-            var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSegmentedSelectQuery( id, from, to, segmentSize ) ).ConfigureAwait( false );
+            to = token?.At ?? to;
+            var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSegmentedSelectQuery( id, from, to, segmentSize, false, token == null ) ).ConfigureAwait( false );
+            bool hasMore = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows.Count == segmentSize;
+            return Convert( id, resultSet, segmentSize );
+         }
+      }
+
+      public async Task<SegmentedReadResult<TKey, TEntry>> ReadReverseSegmentedAsync( TKey id, DateTime? from, DateTime? to, int segmentSize, IContinuationToken continuationToken )
+      {
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
+         {
+            await CreateDatabase().ConfigureAwait( false );
+            var token = (ContinuationToken)continuationToken;
+            from = token?.At ?? from;
+            var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSegmentedSelectQuery( id, from, to, segmentSize, true, token == null ) ).ConfigureAwait( false );
             bool hasMore = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows.Count == segmentSize;
             return Convert( id, resultSet, segmentSize );
          }
@@ -227,23 +240,45 @@ namespace Vibrant.Tsdb.InfluxDB
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
-      private string CreateSegmentedSelectQuery( TKey id, DateTime? from, DateTime? to, int take )
+      private string CreateSegmentedSelectQuery( TKey id, DateTime? from, DateTime? to, int take, bool reverse, bool isFirstSegment )
       {
-         if( from.HasValue && to.HasValue )
+         if( !reverse || isFirstSegment )
          {
-            return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.Value.ToIso8601()}' <= time AND time < '{to.Value.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
-         }
-         else if( !from.HasValue && to.HasValue )
-         {
-            return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{to.Value.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
-         }
-         else if( from.HasValue && !to.HasValue )
-         {
-            return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.Value.ToIso8601()}' <= time AND time < '{_maxTo.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
+            if( from.HasValue && to.HasValue )
+            {
+               return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.Value.ToIso8601()}' <= time AND time < '{to.Value.ToIso8601()}' ORDER BY time {( reverse ? "ASC" : "DESC")} LIMIT {take}";
+            }
+            else if( !from.HasValue && to.HasValue )
+            {
+               return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{to.Value.ToIso8601()}' ORDER BY time {( reverse ? "ASC" : "DESC" )} LIMIT {take}";
+            }
+            else if( from.HasValue && !to.HasValue )
+            {
+               return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.Value.ToIso8601()}' <= time AND time < '{_maxTo.ToIso8601()}' ORDER BY time {( reverse ? "ASC" : "DESC" )} LIMIT {take}";
+            }
+            else
+            {
+               return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxTo.ToIso8601()}' ORDER BY time {( reverse ? "ASC" : "DESC" )} LIMIT {take}";
+            }
          }
          else
          {
-            return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxTo.ToIso8601()}' ORDER BY time DESC LIMIT {take}";
+            if( from.HasValue && to.HasValue )
+            {
+               return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.Value.ToIso8601()}' < time AND time < '{to.Value.ToIso8601()}' ORDER BY time {( reverse ? "ASC" : "DESC" )} LIMIT {take}";
+            }
+            else if( !from.HasValue && to.HasValue )
+            {
+               return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{to.Value.ToIso8601()}' ORDER BY time {( reverse ? "ASC" : "DESC" )} LIMIT {take}";
+            }
+            else if( from.HasValue && !to.HasValue )
+            {
+               return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.Value.ToIso8601()}' < time AND time < '{_maxTo.ToIso8601()}' ORDER BY time {( reverse ? "ASC" : "DESC" )} LIMIT {take}";
+            }
+            else
+            {
+               return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxTo.ToIso8601()}' ORDER BY time {( reverse ? "ASC" : "DESC" )} LIMIT {take}";
+            }
          }
       }
 
@@ -311,8 +346,24 @@ namespace Vibrant.Tsdb.InfluxDB
          }
          else
          {
-            var to = ( (IEntry)entries[ 0 ] ).GetTimestamp().AddTicks( 1 );
-            var from = ( (IEntry)entries[ entries.Count - 1 ] ).GetTimestamp();
+            DateTime from;
+            DateTime to;
+
+            var ts1 = ( (IEntry)entries[ 0 ] ).GetTimestamp();
+            var ts2 = ( (IEntry)entries[ entries.Count - 1 ] ).GetTimestamp();
+            if( ts1 >= ts2 )
+            {
+               to = ts1;
+               from = ts2;
+            }
+            else
+            {
+               to = ts2;
+               from = ts1;
+            }
+
+            to = to.AddTicks( 1 );
+
             return () => this.DeleteAsync( id, from, to );
          }
       }
