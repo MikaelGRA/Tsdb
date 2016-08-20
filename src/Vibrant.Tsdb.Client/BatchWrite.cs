@@ -31,17 +31,32 @@ namespace Vibrant.Tsdb.Client
 
       public void Add( ISerie<TKey, TEntry> serie )
       {
+         var newEntries = serie.GetEntries();
+
          ISerie<TKey, TEntry> existing;
          if( _series.TryGetValue( serie.GetKey(), out existing ) )
          {
-            existing.Insert( serie );
+            var existingEntries = existing.GetEntries();
+
+            var list = existingEntries as List<TEntry>;
+            if( list != null )
+            {
+               list.AddRange( newEntries );
+            }
+            else
+            {
+               foreach( var entry in newEntries )
+               {
+                  existingEntries.Add( entry );
+               }
+            }
          }
          else
          {
             _series.Add( serie.GetKey(), serie );
          }
 
-         _count += serie.GetEntries().Count;
+         _count += newEntries.Count;
       }
 
       public int Count

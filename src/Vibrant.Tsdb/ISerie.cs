@@ -11,7 +11,5 @@ namespace Vibrant.Tsdb
       TKey GetKey();
 
       ICollection<TEntry> GetEntries();
-
-      void Insert( ISerie<TKey, TEntry> other );
    }
 }
