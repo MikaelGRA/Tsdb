@@ -506,20 +506,28 @@ namespace Vibrant.Tsdb.Ats
          return count;
       }
 
-      private async Task<int> DeleteInternalLocked( IEnumerable<TsdbTableEntity> entries )
+      private async Task<int> DeleteInternalLocked( List<TsdbTableEntity> entries )
       {
          int count = 0;
 
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
-            var operation = new TableBatchOperation();
-            foreach( var entity in entries )
-            {
-               count++;
-               operation.Delete( entity );
-            }
             var table = await GetTable().ConfigureAwait( false );
-            await table.ExecuteBatchAsync( operation ).ConfigureAwait( false );
+            if( entries.Count == 1 )
+            {
+               var operation = TableOperation.Delete( entries[ 0 ] );
+               await table.ExecuteAsync( operation ).ConfigureAwait( false );
+            }
+            else
+            {
+               var operation = new TableBatchOperation();
+               foreach( var entity in entries )
+               {
+                  count++;
+                  operation.Delete( entity );
+               }
+               await table.ExecuteBatchAsync( operation ).ConfigureAwait( false );
+            }
          }
 
          return count;
@@ -541,17 +549,25 @@ namespace Vibrant.Tsdb.Ats
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      private async Task WriteInternalLocked( string partitionKey, IEnumerable<TEntry> entries )
+      private async Task WriteInternalLocked( string partitionKey, List<TEntry> entries )
       {
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
-            var operation = new TableBatchOperation();
-            foreach( var entity in Convert( entries, partitionKey ) )
-            {
-               operation.InsertOrReplace( entity );
-            }
             var table = await GetTable().ConfigureAwait( false );
-            await table.ExecuteBatchAsync( operation ).ConfigureAwait( false );
+            if( entries.Count == 1 )
+            {
+               var operation = TableOperation.InsertOrReplace( Convert( entries, partitionKey ).First() );
+               await table.ExecuteAsync( operation ).ConfigureAwait( false );
+            }
+            else
+            {
+               var operation = new TableBatchOperation();
+               foreach( var entity in Convert( entries, partitionKey ) )
+               {
+                  operation.InsertOrReplace( entity );
+               }
+               await table.ExecuteBatchAsync( operation ).ConfigureAwait( false );
+            }
          }
       }
 

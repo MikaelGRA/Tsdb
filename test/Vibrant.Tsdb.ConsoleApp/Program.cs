@@ -50,9 +50,9 @@ namespace Vibrant.Tsdb.ConsoleApp
          var startTime = DateTime.UtcNow;
 
          _dataSources = new List<DataSource>();
-         for( int i = 0 ; i < 100 ; i++ )
+         for( int i = 0 ; i < 20 ; i++ )
          {
-            _dataSources.Add( new DataSource( new BasicKey { Id = Guid.NewGuid(), Sampling = Sampling.Daily }, startTime, TimeSpan.FromMilliseconds( 10 ) ) );
+            _dataSources.Add( new DataSource( new BasicKey { Id = Guid.NewGuid(), Sampling = Sampling.Daily }, startTime, TimeSpan.FromMilliseconds( 8000 ) ) );
          }
          
          var dats = new AtsDynamicStorage<BasicKey, BasicEntry>( 
@@ -68,7 +68,7 @@ namespace Vibrant.Tsdb.ConsoleApp
             new ConcurrencyControl( 5, 5 ),
             this );
 
-         var switchDate = new DateTime( 2016, 8, 14, 18, 25, 0, DateTimeKind.Utc );
+         var switchDate = new DateTime( 2016, 8, 23, 18, 25, 0, DateTimeKind.Utc );
 
          var selector = new TestDynamicStorageSelector( new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>[]
          {
@@ -111,7 +111,7 @@ namespace Vibrant.Tsdb.ConsoleApp
                batcher.Write( serie );
             }
 
-            Thread.Sleep( 1000 );
+            Thread.Sleep( 5000 );
          }
       }
 

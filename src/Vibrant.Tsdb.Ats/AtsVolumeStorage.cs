@@ -247,7 +247,7 @@ namespace Vibrant.Tsdb.Ats
          await ExecuteAtsOperatioons( operations ).ConfigureAwait( false );
       }
 
-      private IEnumerable<AtsOperation> CreateAtsOperations( IDictionary<string, TsdbTableEntity> newEntities, IDictionary<string, TsdbTableEntity> oldEntities )
+      private List<AtsOperation> CreateAtsOperations( IDictionary<string, TsdbTableEntity> newEntities, IDictionary<string, TsdbTableEntity> oldEntities )
       {
          List<AtsOperation> operations = new List<AtsOperation>();
          foreach( var createdTableEntity in newEntities )
@@ -274,45 +274,72 @@ namespace Vibrant.Tsdb.Ats
          return operations;
       }
 
-      private async Task ExecuteAtsOperatioons( IEnumerable<AtsOperation> operations )
+      private async Task ExecuteAtsOperatioons( List<AtsOperation> operations )
       {
-         List<Task> tasks = new List<Task>();
-
-         foreach( var partitionOperations in operations.GroupBy( x => x.Row.PartitionKey ) )
+         if( operations.Count == 1 )
          {
-            var batch = new TableBatchOperation();
-            foreach( var operation in partitionOperations )
+            var ats = operations[ 0 ];
+            TableOperation operation = null;
+            switch( ats.OperationType )
             {
-               switch( operation.OperationType )
-               {
-                  case AtsOperationType.Insert:
-                     batch.InsertOrReplace( operation.Row );
-                     break;
-                  case AtsOperationType.Replace:
-                     batch.InsertOrReplace( operation.Row );
-                     break;
-                  case AtsOperationType.Delete:
-                     batch.Delete( operation.Row );
-                     break;
-                  default:
-                     break;
-               }
-
-               // only 40, because the request itself can actually become too big... :)
-               if( batch.Count == 40 )
-               {
-                  tasks.Add( ExecuteBatchOperation( batch ) );
-
-                  batch = new TableBatchOperation();
-               }
+               case AtsOperationType.Insert:
+                  operation = TableOperation.InsertOrReplace( ats.Row );
+                  break;
+               case AtsOperationType.Replace:
+                  operation = TableOperation.InsertOrReplace( ats.Row );
+                  break;
+               case AtsOperationType.Delete:
+                  operation = TableOperation.Delete( ats.Row );
+                  break;
+               default:
+                  break;
             }
-            if( batch.Count != 0 )
+
+            if( operation != null )
             {
-               tasks.Add( ExecuteBatchOperation( batch ) );
+               await ExecuteOperation( operation ).ConfigureAwait( false );
             }
          }
+         else
+         {
+            List<Task> tasks = new List<Task>();
 
-         await Task.WhenAll( tasks ).ConfigureAwait( false );
+            foreach( var partitionOperations in operations.GroupBy( x => x.Row.PartitionKey ) )
+            {
+               var batch = new TableBatchOperation();
+               foreach( var operation in partitionOperations )
+               {
+                  switch( operation.OperationType )
+                  {
+                     case AtsOperationType.Insert:
+                        batch.InsertOrReplace( operation.Row );
+                        break;
+                     case AtsOperationType.Replace:
+                        batch.InsertOrReplace( operation.Row );
+                        break;
+                     case AtsOperationType.Delete:
+                        batch.Delete( operation.Row );
+                        break;
+                     default:
+                        break;
+                  }
+
+                  // only 40, because the request itself can actually become too big... :)
+                  if( batch.Count == 40 )
+                  {
+                     tasks.Add( ExecuteBatchOperation( batch ) );
+
+                     batch = new TableBatchOperation();
+                  }
+               }
+               if( batch.Count != 0 )
+               {
+                  tasks.Add( ExecuteBatchOperation( batch ) );
+               }
+            }
+
+            await Task.WhenAll( tasks ).ConfigureAwait( false );
+         }
       }
 
       private async Task ExecuteBatchOperation( TableBatchOperation operation )
@@ -321,6 +348,15 @@ namespace Vibrant.Tsdb.Ats
          {
             var table = await GetTable();
             await table.ExecuteBatchAsync( operation ).ConfigureAwait( false );
+         }
+      }
+
+      private async Task ExecuteOperation( TableOperation operation )
+      {
+         using( await _cc.WriteAsync().ConfigureAwait( false ) )
+         {
+            var table = await GetTable();
+            await table.ExecuteAsync( operation ).ConfigureAwait( false );
          }
       }
 
