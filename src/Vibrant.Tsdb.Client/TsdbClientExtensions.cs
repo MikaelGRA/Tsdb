@@ -48,7 +48,7 @@ namespace Vibrant.Tsdb
          return client.WriteDirectlyToVolumeStorageAsync( new[] { items } );
       }
 
-      public static Task SubscribeLocallyAsync<TKey, TEntry>( this TsdbClient<TKey, TEntry> client, TKey id, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback )
+      public static Task<Func<Task>> SubscribeLocallyAsync<TKey, TEntry>( this TsdbClient<TKey, TEntry> client, TKey id, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback )
          where TEntry : IEntry
       {
          return client.SubscribeLocallyAsync( new[] { id }, subscribe, callback );
