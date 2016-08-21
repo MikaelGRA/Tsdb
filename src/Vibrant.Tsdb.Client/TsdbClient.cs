@@ -75,30 +75,6 @@ namespace Vibrant.Tsdb.Client
       {
       }
 
-      public async Task MoveToVolumeStorageAsync( IEnumerable<TKey> ids, int batchSize )
-      {
-         if( _volumeStorageSelector == null )
-         {
-            throw new InvalidOperationException( "No volume storage has been provided for this TsdbClient." );
-         }
-
-         var tasks = new List<Task>();
-         tasks.AddRange( ids.Select( id => MoveToVolumeStorageAsync( id, batchSize ) ) );
-         await Task.WhenAll( tasks ).ConfigureAwait( false );
-      }
-
-      public async Task MoveToVolumeStorageAsync( IEnumerable<TKey> ids, int batchSize, DateTime to, TimeSpan storageExpiration )
-      {
-         if( _volumeStorageSelector == null )
-         {
-            throw new InvalidOperationException( "No volume storage has been provided for this TsdbClient." );
-         }
-
-         var tasks = new List<Task>();
-         tasks.AddRange( ids.Select( id => MoveToVolumeStorageAsync( id, batchSize, to, storageExpiration ) ) );
-         await Task.WhenAll( tasks ).ConfigureAwait( false );
-      }
-
       public async Task MoveToVolumeStorageAsync( TKey id, int batchSize )
       {
          if( _volumeStorageSelector == null )
