@@ -20,33 +20,17 @@ namespace Vibrant.Tsdb
       private List<Action<Serie<TKey, TEntry>>> _allCallbacksForAll;
       private IDictionary<TKey, DateTimeRef> _latest;
       private readonly TaskFactory _taskFactory;
-      private bool _continueOnCapturedSynchronizationContext;
+      private bool _publishOnBackgroundThread;
 
-      public DefaultPublishSubscribe( bool continueOnCapturedSynchronizationContext )
+      public DefaultPublishSubscribe( bool publishOnBackgroundThread )
       {
          _latestCallbacksForSingle = new ConcurrentDictionary<TKey, List<Action<Serie<TKey, TEntry>>>>();
          _latestCallbacksForAll = new List<Action<Serie<TKey, TEntry>>>();
          _allCallbacksForSingle = new ConcurrentDictionary<TKey, List<Action<Serie<TKey, TEntry>>>>();
          _allCallbacksForAll = new List<Action<Serie<TKey, TEntry>>>();
          _latest = new ConcurrentDictionary<TKey, DateTimeRef>();
-
-         if( continueOnCapturedSynchronizationContext )
-         {
-            if( SynchronizationContext.Current == null )
-            {
-               _taskFactory = new TaskFactory( TaskScheduler.Default );
-            }
-            else
-            {
-               var scheduler = TaskScheduler.FromCurrentSynchronizationContext();
-               _taskFactory = new TaskFactory( scheduler );
-               _continueOnCapturedSynchronizationContext = true;
-            }
-         }
-         else
-         {
-            _taskFactory = new TaskFactory( TaskScheduler.Default );
-         }
+         _taskFactory = new TaskFactory( TaskScheduler.Default );
+         _publishOnBackgroundThread = publishOnBackgroundThread;
       }
 
       public virtual Task WaitWhileDisconnectedAsync()
@@ -174,7 +158,7 @@ namespace Vibrant.Tsdb
          return () => UnsubscribeFromAll( callback, subscribe );
       }
 
-      public async Task UnsubscribeFromAll( Action<Serie<TKey, TEntry>> callback, SubscriptionType subscribe )
+      private async Task UnsubscribeFromAll( Action<Serie<TKey, TEntry>> callback, SubscriptionType subscribe )
       {
          List<Action<Serie<TKey, TEntry>>> all;
          switch( subscribe )
@@ -296,7 +280,21 @@ namespace Vibrant.Tsdb
             latest = FindLatestForEachId( series );
          }
 
-         _taskFactory.StartNew( () =>
+         if( _publishOnBackgroundThread )
+         {
+            _taskFactory.StartNew( () =>
+            {
+               if( publish.HasFlag( PublicationType.LatestPerCollection ) )
+               {
+                  PublishForLatest( latest );
+               }
+               if( publish.HasFlag( PublicationType.AllFromCollections ) )
+               {
+                  PublishForAll( series );
+               }
+            } );
+         }
+         else
          {
             if( publish.HasFlag( PublicationType.LatestPerCollection ) )
             {
@@ -306,7 +304,7 @@ namespace Vibrant.Tsdb
             {
                PublishForAll( series );
             }
-         } );
+         }
 
          return _completed;
       }
@@ -323,7 +321,6 @@ namespace Vibrant.Tsdb
 
       private void PublishFor( IEnumerable<ISerie<TKey, TEntry>> series, IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> single, List<Action<Serie<TKey, TEntry>>> all, bool createNew )
       {
-         // FIXME: Is this approach alright?
          foreach( var serie in series )
          {
             if( serie.GetEntries().Count > 0 )
@@ -377,50 +374,22 @@ namespace Vibrant.Tsdb
 
       protected void PublishToSingleForLatestEntriesWithSameId( Serie<TKey, TEntry> serie )
       {
-         if( _continueOnCapturedSynchronizationContext )
-         {
-            _taskFactory.StartNew( () => PublishToSingleForEntriesWithSameId( serie, _latestCallbacksForSingle, _latestCallbacksForAll ) );
-         }
-         else
-         {
-            PublishToSingleForEntriesWithSameId( serie, _latestCallbacksForSingle, _latestCallbacksForAll );
-         }
+         PublishToSingleForEntriesWithSameId( serie, _latestCallbacksForSingle, _latestCallbacksForAll );
       }
 
       protected void PublishToSingleForAllEntriesWithSameId( Serie<TKey, TEntry> serie )
       {
-         if( _continueOnCapturedSynchronizationContext )
-         {
-            _taskFactory.StartNew( () => PublishToSingleForEntriesWithSameId( serie, _allCallbacksForSingle, _allCallbacksForAll ) );
-         }
-         else
-         {
-            PublishToSingleForEntriesWithSameId( serie, _allCallbacksForSingle, _allCallbacksForAll );
-         }
+         PublishToSingleForEntriesWithSameId( serie, _allCallbacksForSingle, _allCallbacksForAll );
       }
 
       protected void PublishToAllForLatestEntriesWithSameId( Serie<TKey, TEntry> serie )
       {
-         if( _continueOnCapturedSynchronizationContext )
-         {
-            _taskFactory.StartNew( () => PublishToAllForEntriesWithSameId( serie, _latestCallbacksForSingle, _latestCallbacksForAll ) );
-         }
-         else
-         {
-            PublishToAllForEntriesWithSameId( serie, _latestCallbacksForSingle, _latestCallbacksForAll );
-         }
+         PublishToAllForEntriesWithSameId( serie, _latestCallbacksForSingle, _latestCallbacksForAll );
       }
 
       protected void PublishToAllForAllEntriesWithSameId( Serie<TKey, TEntry> serie )
       {
-         if( _continueOnCapturedSynchronizationContext )
-         {
-            _taskFactory.StartNew( () => PublishToAllForEntriesWithSameId( serie, _allCallbacksForSingle, _allCallbacksForAll ) );
-         }
-         else
-         {
-            PublishToAllForEntriesWithSameId( serie, _allCallbacksForSingle, _allCallbacksForAll );
-         }
+         PublishToAllForEntriesWithSameId( serie, _allCallbacksForSingle, _allCallbacksForAll );
       }
 
       private void PublishToSingleForEntriesWithSameId( Serie<TKey, TEntry> serie, IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> single, List<Action<Serie<TKey, TEntry>>> all )

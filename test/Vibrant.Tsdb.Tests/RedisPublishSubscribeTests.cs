@@ -25,7 +25,7 @@ namespace Vibrant.Tsdb.Tests
 
       public override RedisPublishSubscribe<string, BasicEntry> CreatePublishSubscribe()
       {
-         return new RedisPublishSubscribe<string, BasicEntry>( ConnectionString, false );
+         return new RedisPublishSubscribe<string, BasicEntry>( ConnectionString );
       }
    }
 }

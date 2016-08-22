@@ -15,8 +15,8 @@ namespace Vibrant.Tsdb.Redis
       private int _state;
       private IKeyConverter<TKey> _keyConverter;
 
-      public RedisPublishSubscribe( string connectionString, bool continueOnCapturedSynchronizationContext, IKeyConverter<TKey> keyConverter )
-         : base( continueOnCapturedSynchronizationContext )
+      public RedisPublishSubscribe( string connectionString, IKeyConverter<TKey> keyConverter )
+         : base( false )
       {
          _connectionString = connectionString;
          _connection = new RedisConnection();
@@ -31,8 +31,8 @@ namespace Vibrant.Tsdb.Redis
          } );
       }
 
-      public RedisPublishSubscribe( string connectionString, bool continueOnCapturedSynchronizationContext )
-         : this( connectionString, continueOnCapturedSynchronizationContext, DefaultKeyConverter<TKey>.Current )
+      public RedisPublishSubscribe( string connectionString )
+         : this( connectionString, DefaultKeyConverter<TKey>.Current )
       {
       }
 
