@@ -391,28 +391,30 @@ namespace Vibrant.Tsdb.Sql
 
       private MultiReadResult<TKey, TEntry> CreateReadResult( IEnumerable<SqlEntry> sqlEntries, IEnumerable<TKey> requiredIds, Sort sort )
       {
-         IDictionary<TKey, ReadResult<TKey, TEntry>> results = new Dictionary<TKey, ReadResult<TKey, TEntry>>();
+         IDictionary<string, ReadResult<TKey, TEntry>> results = new Dictionary<string, ReadResult<TKey, TEntry>>();
          foreach( var id in requiredIds )
          {
-            results[ id ] = new ReadResult<TKey, TEntry>( id, sort );
+            results[ _keyConverter.Convert( id ) ] = new ReadResult<TKey, TEntry>( id, sort );
          }
 
          ReadResult<TKey, TEntry> currentResult = null;
+         string currentId = null;
 
          foreach( var sqlEntry in sqlEntries )
          {
-            var id = _keyConverter.Convert( sqlEntry.Id );
+            var id = sqlEntry.Id;
             var entry = SqlSerializer.Deserialize<TKey, TEntry>( sqlEntry );
 
-            if( currentResult == null || !currentResult.Key.Equals( id ) )
+            if( currentId == null || !currentId.Equals( id ) )
             {
                currentResult = results[ id ];
+               currentId = id;
             }
 
             currentResult.Entries.Add( entry );
          }
 
-         return new MultiReadResult<TKey, TEntry>( results );
+         return new MultiReadResult<TKey, TEntry>( results.Values.ToDictionary( x => x.Key ) );
       }
 
       private SegmentedReadResult<TKey, TEntry> CreateReadResult( TKey id, IEnumerable<SqlEntry> sqlEntries, int segmentSize, long skip )

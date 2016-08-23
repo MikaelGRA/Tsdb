@@ -246,7 +246,7 @@ namespace Vibrant.Tsdb.InfluxDB
          {
             if( from.HasValue && to.HasValue )
             {
-               return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.Value.ToIso8601()}' <= time AND time < '{to.Value.ToIso8601()}' ORDER BY time {( reverse ? "ASC" : "DESC")} LIMIT {take}";
+               return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.Value.ToIso8601()}' <= time AND time < '{to.Value.ToIso8601()}' ORDER BY time {( reverse ? "ASC" : "DESC" )} LIMIT {take}";
             }
             else if( !from.HasValue && to.HasValue )
             {
@@ -370,10 +370,10 @@ namespace Vibrant.Tsdb.InfluxDB
 
       private MultiReadResult<TKey, TEntry> Convert( IEnumerable<TKey> requiredIds, InfluxResultSet<TEntry> resultSet, Sort sort )
       {
-         MultiReadResult<TKey, TEntry> mr = new MultiReadResult<TKey, TEntry>();
+         IDictionary<string, ReadResult<TKey, TEntry>> results = new Dictionary<string, ReadResult<TKey, TEntry>>();
          foreach( var id in requiredIds )
          {
-            mr.AddOrMerge( new ReadResult<TKey, TEntry>( id, sort ) );
+            results[ _keyConverter.Convert( id ) ] = new ReadResult<TKey, TEntry>( id, sort );
          }
 
          foreach( var result in resultSet.Results )
@@ -381,11 +381,15 @@ namespace Vibrant.Tsdb.InfluxDB
             var serie = result.Series.FirstOrDefault();
             if( serie != null )
             {
-               mr.AddOrMerge( new ReadResult<TKey, TEntry>( _keyConverter.Convert( serie.Name ), sort, (List<TEntry>)serie.Rows ) );
+               ReadResult<TKey, TEntry> r;
+               if( results.TryGetValue( serie.Name, out r ) )
+               {
+                  results[ serie.Name ] = new ReadResult<TKey, TEntry>( r.Key, sort, (List<TEntry>)serie.Rows );
+               }
             }
          }
 
-         return mr;
+         return new MultiReadResult<TKey, TEntry>( results.Values.ToDictionary( x => x.Key ) );
       }
 
       private Task CreateDatabase()
