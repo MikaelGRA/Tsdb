@@ -13,7 +13,7 @@ namespace Vibrant.Tsdb
 
       Task DeleteAsync( IEnumerable<TKey> ids );
 
-      Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids );
+      Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids, int count );
 
       Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending );
 

@@ -96,9 +96,9 @@ namespace Vibrant.Tsdb.Ats
          return ReadRangeInternal( ids, from, to, sort );
       }
 
-      public Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids )
+      public Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids, int count )
       {
-         return ReadLatestInternal( ids );
+         return ReadLatestInternal( ids, count );
       }
 
       public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> series )
@@ -177,25 +177,24 @@ namespace Vibrant.Tsdb.Ats
          return count;
       }
 
-      private async Task<MultiReadResult<TKey, TEntry>> ReadLatestInternal( IEnumerable<TKey> ids )
+      private async Task<MultiReadResult<TKey, TEntry>> ReadLatestInternal( IEnumerable<TKey> ids, int count )
       {
          var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
          foreach( var id in ids )
          {
-            tasks.Add( ReadLatestInternal( id, Sort.Descending ) );
+            tasks.Add( ReadLatestInternal( id, Sort.Descending, count ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
          return new MultiReadResult<TKey, TEntry>( tasks.Select( x => x.Result ) );
       }
 
-      private async Task<ReadResult<TKey, TEntry>> ReadLatestInternal( TKey id, Sort sort )
+      private async Task<ReadResult<TKey, TEntry>> ReadLatestInternal( TKey id, Sort sort, int count )
       {
          var fullQuery = new TableQuery<TsdbTableEntity>()
-            .Where( CreatePartitionFilter( id ) )
-            .Take( 1 );
+            .Where( CreatePartitionFilter( id ) );
 
-         var entries = await ReadInternal( id, fullQuery, false, sort ).ConfigureAwait( false );
+         var entries = await ReadInternal( id, fullQuery, sort, count ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
@@ -217,7 +216,7 @@ namespace Vibrant.Tsdb.Ats
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreatePartitionFilter( id ) );
 
-         var entries = await ReadInternal( id, fullQuery, true, sort ).ConfigureAwait( false );
+         var entries = await ReadInternal( id, fullQuery, sort, null ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
@@ -239,7 +238,7 @@ namespace Vibrant.Tsdb.Ats
          var query = new TableQuery<TsdbTableEntity>()
             .Where( CreateBeforeFilter( id, to ) );
 
-         var entries = await ReadInternal( id, query, true, sort ).ConfigureAwait( false );
+         var entries = await ReadInternal( id, query, sort, null ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
@@ -272,7 +271,7 @@ namespace Vibrant.Tsdb.Ats
                var specificQuery = new TableQuery<TsdbTableEntity>()
                   .Where( CreateSpecificPartitionFilter( id, from, to, partitionRange ) );
 
-               tasks.Add( ReadInternal( id, specificQuery, true, sort ) );
+               tasks.Add( ReadInternal( id, specificQuery, sort, null ) );
             }
 
             await Task.WhenAll( tasks ).ConfigureAwait( false );
@@ -292,7 +291,7 @@ namespace Vibrant.Tsdb.Ats
             var generalQuery = new TableQuery<TsdbTableEntity>()
                .Where( CreateGeneralFilter( id, from, to ) );
 
-            var entries = await ReadInternal( id, generalQuery, true, sort ).ConfigureAwait( false );
+            var entries = await ReadInternal( id, generalQuery, sort, null ).ConfigureAwait( false );
 
             return new ReadResult<TKey, TEntry>( id, sort, entries );
          }
@@ -346,24 +345,34 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private async Task<List<TEntry>> ReadInternal( TKey id, TableQuery<TsdbTableEntity> query, bool takeAll, Sort sort )
+      private async Task<List<TEntry>> ReadInternal( TKey id, TableQuery<TsdbTableEntity> query, Sort sort, int? take )
       {
          var table = await GetTable().ConfigureAwait( false );
 
          List<TEntry> results = new List<TEntry>();
 
+         int taken = 0;
          TableContinuationToken token = null;
          do
          {
             using( await _cc.ReadAsync().ConfigureAwait( false ) )
             {
-               var rows = await table.ExecuteQuerySegmentedAsync( query, takeAll ? token : null ).ConfigureAwait( false );
+               var filteredQuery = query;
+               if( take.HasValue )
+               {
+                  int toTake = take.Value - taken;
+                  filteredQuery = filteredQuery.Take( toTake );
+               }
+
+               var rows = await table.ExecuteQuerySegmentedAsync( filteredQuery, token ).ConfigureAwait( false );
                var entries = Convert( rows );
                results.AddRange( entries );
                token = rows.ContinuationToken;
+
+               taken += rows.Results.Count;
             }
          }
-         while( token != null && takeAll );
+         while( token != null && ( !take.HasValue || taken < take ) );
 
          if( sort == Sort.Ascending )
          {

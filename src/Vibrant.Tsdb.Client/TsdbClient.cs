@@ -300,21 +300,21 @@ namespace Vibrant.Tsdb.Client
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      public async Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids )
+      public async Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids, int count )
       {
          var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
-         tasks.AddRange( ids.Select( x => ReadLatestInternal( x ) ) );
+         tasks.AddRange( ids.Select( x => ReadLatestInternal( x, count ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
          return tasks.Select( x => x.Result ).Combine();
       }
 
-      private async Task<ReadResult<TKey, TEntry>> ReadLatestInternal( TKey key )
+      private async Task<ReadResult<TKey, TEntry>> ReadLatestInternal( TKey key, int count )
       {
          var dynamics = _dynamicStorageSelector.GetStorage( key, null, null );
          foreach( var dynamic in dynamics )
          {
-            var rr = await dynamic.Storage.ReadLatestAsync( key );
+            var rr = await dynamic.Storage.ReadLatestAsync( key, count );
             if( rr.Entries.Count > 0 )
             {
                return rr;
@@ -326,7 +326,7 @@ namespace Vibrant.Tsdb.Client
             var volumes = _volumeStorageSelector.GetStorage( key, null, null );
             foreach( var volume in volumes )
             {
-               var rr = await volume.Storage.ReadLatestAsync( key );
+               var rr = await volume.Storage.ReadLatestAsync( key, count );
                if( rr.Entries.Count > 0 )
                {
                   return rr;

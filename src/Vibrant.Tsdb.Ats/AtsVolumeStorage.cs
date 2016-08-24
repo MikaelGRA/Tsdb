@@ -116,12 +116,12 @@ namespace Vibrant.Tsdb.Ats
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      public async Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids )
+      public async Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids, int count )
       {
          var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
          foreach( var id in ids )
          {
-            tasks.Add( ReadLatestForId( id ) );
+            tasks.Add( ReadLatestForId( id, count ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();
@@ -151,15 +151,9 @@ namespace Vibrant.Tsdb.Ats
 
       #endregion
 
-      private async Task<ReadResult<TKey, TEntry>> ReadLatestForId( TKey id )
+      private Task<ReadResult<TKey, TEntry>> ReadLatestForId( TKey id, int count )
       {
-         var results = await RetrieveLatestForId( id ).ConfigureAwait( false );
-
-         return new ReadResult<TKey, TEntry>(
-            id,
-            Sort.Descending,
-            results.SelectMany( x => x.GetEntries<TKey, TEntry>( Sort.Descending ) ).Take( 1 )
-               .ToList() );
+         return RetrieveLatestForId( id, count );
       }
 
       private async Task<ReadResult<TKey, TEntry>> ReadForId( TKey id, Sort sort )
@@ -397,7 +391,7 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private async Task<List<TsdbTableEntity>> RetrieveLatestForId( TKey id )
+      private async Task<ReadResult<TKey, TEntry>> RetrieveLatestForId( TKey id, int count )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -405,9 +399,9 @@ namespace Vibrant.Tsdb.Ats
                .Where( CreatePartitionFilter( id ) )
                .Take( 1 );
 
-            var query = await PerformQuery( fullQuery, false, Sort.Descending ).ConfigureAwait( false );
+            var entries = await PerformLatestQuery( fullQuery, Sort.Descending, count ).ConfigureAwait( false );
 
-            return query;
+            return new ReadResult<TKey, TEntry>( id, Sort.Descending, entries );
          }
       }
 
@@ -474,6 +468,36 @@ namespace Vibrant.Tsdb.Ats
             result.Value.Sort( Sort.Descending );
             yield return result.Value;
          }
+      }
+
+      private async Task<List<TEntry>> PerformLatestQuery( TableQuery<TsdbTableEntity> query, Sort sort, int take )
+      {
+         List<TEntry> results = new List<TEntry>();
+
+         int taken = 0;
+         TableContinuationToken token = null;
+         do
+         {
+            var table = await GetTable().ConfigureAwait( false );
+            var rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
+            var entries = rows.FirstOrDefault()?.GetEntries<TKey, TEntry>( sort );
+            if( entries != null )
+            {
+               var leftToTake = take - taken;
+               int toTake = entries.Length > leftToTake ? leftToTake : entries.Length;
+               results.AddRange( entries.Take( toTake ) );
+               taken += toTake;
+            }
+            else
+            {
+               break; // fail safe, should not be needed
+            }
+            
+            token = rows.ContinuationToken;
+         }
+         while( token != null && taken < take );
+
+         return results;
       }
 
       private async Task<List<TsdbTableEntity>> PerformQuery( TableQuery<TsdbTableEntity> query, bool takeAll, Sort sort )

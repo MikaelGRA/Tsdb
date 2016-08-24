@@ -134,12 +134,12 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids )
+      public async Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids, int count )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
-            var resultSet = await _client.ReadAsync<TEntry>( _database, CreateLatestSelectQuery( ids ) ).ConfigureAwait( false );
+            var resultSet = await _client.ReadAsync<TEntry>( _database, CreateLatestSelectQuery( ids, count ) ).ConfigureAwait( false );
             return Convert( ids, resultSet, Sort.Descending );
          }
       }
@@ -302,12 +302,12 @@ namespace Vibrant.Tsdb.InfluxDB
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
-      private string CreateLatestSelectQuery( IEnumerable<TKey> ids )
+      private string CreateLatestSelectQuery( IEnumerable<TKey> ids, int count )
       {
          StringBuilder sb = new StringBuilder();
          foreach( var id in ids )
          {
-            sb.Append( $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxTo.ToIso8601()}' ORDER BY time DESC LIMIT 1;" );
+            sb.Append( $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxTo.ToIso8601()}' ORDER BY time DESC LIMIT {count};" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }

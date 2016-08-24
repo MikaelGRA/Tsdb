@@ -88,9 +88,20 @@ namespace Vibrant.Tsdb.Tests
          var series = CreateRows( from, count );
          await store.WriteAsync( series.Values );
          var read = await store.ReadAsync( Ids, from, to, sort );
-         var latest = await store.ReadLatestAsync( Ids );
+         var latest = await store.ReadLatestAsync( Ids, 1 );
+         var latest2 = await store.ReadLatestAsync( Ids, 1500 );
 
          await store.DeleteAsync( Ids, from, to );
+
+         foreach( var item in latest )
+         {
+            Assert.Equal( 1, item.Entries.Count );
+         }
+
+         foreach( var item in latest2 )
+         {
+            Assert.Equal( 1500, item.Entries.Count );
+         }
 
          foreach( var readResult in read )
          {
@@ -192,6 +203,31 @@ namespace Vibrant.Tsdb.Tests
          await store.DeleteAsync( Ids );
 
          Assert.Equal( 1, read.Sum( x => x.Entries.Count ) );
+      }
+
+      [Fact]
+      public async Task Should_Read_Two_Latest()
+      {
+         var store = GetStorage( "Table10" );
+
+         var from = new DateTime( 2016, 12, 31, 0, 0, 0, DateTimeKind.Utc );
+
+         var serie = new Serie<string, BasicEntry>( "row5", new[]
+         {
+            new BasicEntry { Timestamp = from.AddMilliseconds( 20 ), Value = 13.37 },
+            new BasicEntry { Timestamp = from.AddMilliseconds( 10 ), Value = 37.13 },
+            new BasicEntry { Timestamp = from, Value = 153.10 },
+         } );
+
+         await store.WriteAsync( serie );
+
+         var read = await store.ReadLatestAsync( "row5", 2 );
+
+         Assert.Equal( 2, read.Entries.Count );
+         Assert.Equal( serie.Entries[ 0 ].Value, read.Entries[ 0 ].Value );
+         Assert.Equal( serie.Entries[ 1 ].Value, read.Entries[ 1 ].Value );
+
+         await store.DeleteAsync( "row5" );
       }
    }
 }

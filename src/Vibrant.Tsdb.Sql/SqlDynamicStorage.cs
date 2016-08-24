@@ -78,9 +78,9 @@ namespace Vibrant.Tsdb.Sql
          return DeleteForIds( ids );
       }
 
-      public Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids )
+      public Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids, int count )
       {
-         return RetrieveLatestForIds( ids );
+         return RetrieveLatestForIds( ids, count );
       }
 
       public Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
@@ -257,7 +257,7 @@ namespace Vibrant.Tsdb.Sql
          }
       }
 
-      private async Task<MultiReadResult<TKey, TEntry>> RetrieveLatestForIds( IEnumerable<TKey> ids )
+      private async Task<MultiReadResult<TKey, TEntry>> RetrieveLatestForIds( IEnumerable<TKey> ids, int count )
       {
          await CreateTable().ConfigureAwait( false );
 
@@ -275,7 +275,7 @@ namespace Vibrant.Tsdb.Sql
                   foreach( var id in ids )
                   {
                      tasks.Add( connection.QueryAsync<SqlEntry>(
-                        sql: Sql.GetLatestQuery( _tableName ),
+                        sql: Sql.GetLatestQuery( _tableName, count ),
                         param: new { Id = _keyConverter.Convert( id ) },
                         transaction: tx ) );
                   }

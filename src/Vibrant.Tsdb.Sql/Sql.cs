@@ -190,9 +190,9 @@ END
          }
       }
 
-      public static string GetLatestQuery( string tableName )
+      public static string GetLatestQuery( string tableName, int count )
       {
-         return $"SELECT TOP 1 [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id ORDER BY [Id] ASC, [Timestamp] DESC";
+         return $"SELECT TOP {count} [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id ORDER BY [Id] ASC, [Timestamp] DESC";
       }
    }
 }

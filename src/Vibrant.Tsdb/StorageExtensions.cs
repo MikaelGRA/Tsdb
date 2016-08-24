@@ -31,10 +31,10 @@ namespace Vibrant.Tsdb
          return storage.DeleteAsync( new[] { id } );
       }
 
-      public async static Task<ReadResult<TKey, TEntry>> ReadLatestAsync<TKey, TEntry>( this IStorage<TKey, TEntry> storage, TKey id )
+      public async static Task<ReadResult<TKey, TEntry>> ReadLatestAsync<TKey, TEntry>( this IStorage<TKey, TEntry> storage, TKey id, int count )
          where TEntry : IEntry
       {
-         var mr = await storage.ReadLatestAsync( new[] { id } ).ConfigureAwait( false );
+         var mr = await storage.ReadLatestAsync( new[] { id }, count ).ConfigureAwait( false );
          return mr.FindResult( id );
       }
 
