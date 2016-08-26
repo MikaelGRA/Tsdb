@@ -11,19 +11,17 @@ namespace Vibrant.Tsdb.Redis
    {
       private TaskCompletionSource<bool> _waitWhileDisconnected;
       private RedisConnection _connection;
-      private string _connectionString;
       private int _state;
       private IKeyConverter<TKey> _keyConverter;
+      private ITsdbLogger _logger;
 
-      public RedisPublishSubscribe( string connectionString, IKeyConverter<TKey> keyConverter )
+      public RedisPublishSubscribe( string connectionString, string prefix, ITsdbLogger logger, IKeyConverter<TKey> keyConverter )
          : base( false )
       {
-         _connectionString = connectionString;
-         _connection = new RedisConnection();
+         _connection = new RedisConnection( connectionString, prefix, logger );
          _waitWhileDisconnected = new TaskCompletionSource<bool>();
          _keyConverter = keyConverter;
-
-         ReconnectDelay = TimeSpan.FromSeconds( 2 );
+         _logger = logger;
 
          ThreadPool.QueueUserWorkItem( _ =>
          {
@@ -31,36 +29,14 @@ namespace Vibrant.Tsdb.Redis
          } );
       }
 
-      public RedisPublishSubscribe( string connectionString )
-         : this( connectionString, DefaultKeyConverter<TKey>.Current )
+      public RedisPublishSubscribe( string connectionString, string prefix, ITsdbLogger logger )
+         : this( connectionString, prefix, logger, DefaultKeyConverter<TKey>.Current )
       {
       }
 
-      public TimeSpan ReconnectDelay { get; set; }
-
-      private void Shutdown()
+      public RedisPublishSubscribe( string connectionString, string prefix )
+         : this( connectionString, prefix, new NullTsdbLogger(), DefaultKeyConverter<TKey>.Current )
       {
-         if( _connection != null )
-         {
-            _connection.Close( allowCommandsToComplete: false );
-         }
-
-         Interlocked.Exchange( ref _state, State.Disposed );
-      }
-
-      private void OnConnectionFailed( Exception ex )
-      {
-         Interlocked.Exchange( ref _state, State.Closed );
-      }
-
-      private void OnConnectionRestored( Exception ex )
-      {
-         Interlocked.Exchange( ref _state, State.Connected );
-      }
-
-      private void OnConnectionError( Exception ex )
-      {
-         // simply log
       }
 
       public override Task WaitWhileDisconnectedAsync()
@@ -154,9 +130,11 @@ namespace Vibrant.Tsdb.Redis
             {
                await ConnectToRedisAsync().ConfigureAwait( false );
 
-               var oldState = Interlocked.CompareExchange( ref _state, State.Connected, State.Closed );
 
-               if( oldState == State.Closed )
+               //  at this point, I know we are connected
+               var oldState = Interlocked.CompareExchange( ref _state, RedisConnectionState.Connected, RedisConnectionState.Closed );
+
+               if( oldState == RedisConnectionState.Closed )
                {
                   _waitWhileDisconnected.SetResult( true );
                }
@@ -167,41 +145,49 @@ namespace Vibrant.Tsdb.Redis
 
                break;
             }
-            catch( Exception )
+            catch( Exception e )
             {
-               // Error connecting to redis
+               _logger.Error( e, "An error ocurred while connecting to redis." );
             }
 
-            if( _state == State.Disposing )
+            if( _state == RedisConnectionState.Disposing )
             {
                Shutdown();
                break;
             }
 
-            await Task.Delay( ReconnectDelay ).ConfigureAwait( false );
+            await Task.Delay( TimeSpan.FromSeconds( 2 ) ).ConfigureAwait( false );
          }
       }
 
       private async Task ConnectToRedisAsync()
       {
-         if( _connection != null )
-         {
-            _connection.ErrorMessage -= OnConnectionError;
-            _connection.ConnectionFailed -= OnConnectionFailed;
-         }
+         _connection.ErrorMessage -= OnConnectionError;
+         _connection.ConnectionFailed -= OnConnectionFailed;
 
-         await _connection.ConnectAsync( _connectionString ).ConfigureAwait( false );
+         await _connection.ConnectAsync().ConfigureAwait( false );
 
          _connection.ErrorMessage += OnConnectionError;
          _connection.ConnectionFailed += OnConnectionFailed;
       }
 
-      internal static class State
+      private void Shutdown()
       {
-         public const int Closed = 0;
-         public const int Connected = 1;
-         public const int Disposing = 2;
-         public const int Disposed = 3;
+         _connection.Close( allowCommandsToComplete: false );
+
+         Interlocked.Exchange( ref _state, RedisConnectionState.Disposed );
+      }
+
+      private void OnConnectionFailed( Exception ex )
+      {
+         _logger.Error( ex, "The connection failed in RedisPublishSubscribe." );
+
+         Interlocked.Exchange( ref _state, RedisConnectionState.Closed );
+      }
+
+      private void OnConnectionError( Exception ex )
+      {
+         _logger.Error( ex, "An error ocurred in RedisPublishSubscribe." );
       }
 
       #region IDisposable Support
@@ -214,20 +200,18 @@ namespace Vibrant.Tsdb.Redis
          {
             if( disposing )
             {
-               var oldState = Interlocked.Exchange( ref _state, State.Disposing );
+               var oldState = Interlocked.Exchange( ref _state, RedisConnectionState.Disposing );
 
                switch( oldState )
                {
-                  case State.Connected:
+                  case RedisConnectionState.Connected:
                      Shutdown();
                      break;
-                  case State.Closed:
-                  case State.Disposing:
-                     // No-op
+                  case RedisConnectionState.Disposed:
+                     Interlocked.Exchange( ref _state, RedisConnectionState.Disposed );
                      break;
-                  case State.Disposed:
-                     Interlocked.Exchange( ref _state, State.Disposed );
-                     break;
+                  case RedisConnectionState.Closed:
+                  case RedisConnectionState.Disposing:
                   default:
                      break;
                }

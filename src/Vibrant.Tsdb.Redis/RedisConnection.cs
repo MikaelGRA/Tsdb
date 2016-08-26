@@ -14,14 +14,23 @@ namespace Vibrant.Tsdb.Redis
       public event Action<Exception> ConnectionFailed;
       public event Action<Exception> ErrorMessage;
 
+      private ITsdbLogger _logger;
       private LoadedLuaScript _publishLatestScript;
       private ISubscriber _redisSubscriber;
       private ConnectionMultiplexer _connection;
+      private string _prefix;
+      private string _connectionString;
 
-      public async Task ConnectAsync( string connectionString )
+      public RedisConnection( string connectionString, string prefix, ITsdbLogger logger )
       {
-         _connection = await ConnectionMultiplexer.ConnectAsync( connectionString ).ConfigureAwait( false );
+         _connectionString = connectionString;
+         _prefix = prefix;
+         _logger = logger;
+      }
 
+      public async Task ConnectAsync()
+      {
+         _connection = await ConnectionMultiplexer.ConnectAsync( _connectionString ).ConfigureAwait( false );
          _connection.ConnectionFailed += OnConnectionFailed;
          _connection.ConnectionRestored += OnConnectionRestored;
          _connection.ErrorMessage += OnError;
@@ -48,34 +57,36 @@ namespace Vibrant.Tsdb.Redis
          return endpoint?.ToString() ?? "";
       }
 
-      public void Close( bool allowCommandsToComplete = true )
-      {
-         if( _redisSubscriber != null )
-         {
-            _redisSubscriber.UnsubscribeAll();
-         }
-
-         if( _connection != null )
-         {
-            _connection.Close( allowCommandsToComplete );
-         }
-
-         _connection.Dispose();
-      }
-
       public Task SubscribeAsync<TKey, TEntry>( string id, IKeyConverter<TKey> keyConverter, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> onMessage )
          where TEntry : IRedisEntry, new()
       {
+         if( _redisSubscriber == null )
+         {
+            throw new InvalidOperationException( "The redis connection has not been started." );
+         }
+
          var key = CreateSubscriptionKey( id, subscribe );
          return _redisSubscriber.SubscribeAsync( key, ( channel, data ) =>
          {
-            var entries = RedisSerializer.Deserialize<TKey, TEntry>( data, keyConverter );
-            onMessage( entries );
+            try
+            {
+               var entries = RedisSerializer.Deserialize<TKey, TEntry>( data, keyConverter );
+               onMessage( entries );
+            }
+            catch( Exception e )
+            {
+               _logger.Error( e, "An error ocurred while deserializing subscription message." );
+            }
          } );
       }
 
       public Task UnsubscribeAsync( string id, SubscriptionType subscribe )
       {
+         if( _redisSubscriber == null )
+         {
+            throw new InvalidOperationException( "The redis connection has not been started." );
+         }
+
          var key = CreateSubscriptionKey( id, subscribe );
          return _redisSubscriber.UnsubscribeAsync( key );
       }
@@ -115,7 +126,23 @@ namespace Vibrant.Tsdb.Redis
          return Task.WhenAll( tasks );
       }
 
-      public async Task CreateScriptsOnAllServers()
+      public void Close( bool allowCommandsToComplete = true )
+      {
+         if( _redisSubscriber != null )
+         {
+            _redisSubscriber.UnsubscribeAll();
+            _redisSubscriber = null;
+         }
+
+         if( _connection != null )
+         {
+            _connection.Close( allowCommandsToComplete );
+            _connection.Dispose();
+            _connection = null;
+         }
+      }
+
+      private async Task CreateScriptsOnAllServers()
       {
          var luaScript = LuaScript.Prepare( Lua.PublishLatest );
          foreach( var endpoint in _connection.GetEndPoints() )
@@ -130,11 +157,11 @@ namespace Vibrant.Tsdb.Redis
       {
          if( subscribe == SubscriptionType.AllFromCollections )
          {
-            return id + "|A";
+            return _prefix + "." + id + "|A";
          }
          else if( subscribe == SubscriptionType.LatestPerCollection )
          {
-            return id + "|L";
+            return _prefix + "." + id + "|L";
          }
          else
          {
@@ -142,16 +169,10 @@ namespace Vibrant.Tsdb.Redis
          }
       }
 
-      private void OnConnectionFailed( object sender, ConnectionFailedEventArgs args )
-      {
-         var handler = ConnectionFailed;
-         handler( args.Exception );
-      }
-
       private async void OnConnectionRestored( object sender, ConnectionFailedEventArgs args )
       {
          // Workaround for StackExchange.Redis/issues/61 that sometimes Redis connection is not connected in ConnectionRestored event 
-         while( !_connection.GetDatabase( 0 ).IsConnected( "someKey" ) )
+         while( !_connection.GetDatabase( 0 ).IsConnected( _prefix + ".someKey" ) )
          {
             await Task.Delay( 200 ).ConfigureAwait( false );
          }
@@ -159,18 +180,19 @@ namespace Vibrant.Tsdb.Redis
          await CreateScriptsOnAllServers().ConfigureAwait( false );
       }
 
+      private void OnConnectionFailed( object sender, ConnectionFailedEventArgs args )
+      {
+         ConnectionFailed?.Invoke( args.Exception );
+      }
+
       private void OnError( object sender, RedisErrorEventArgs args )
       {
-         var handler = ErrorMessage;
-         handler( new InvalidOperationException( args.Message ) );
+         ErrorMessage?.Invoke( new InvalidOperationException( args.Message ) );
       }
 
       public void Dispose()
       {
-         if( _connection != null )
-         {
-            _connection.Dispose();
-         }
+         Close();
       }
    }
 }
