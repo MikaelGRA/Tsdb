@@ -589,6 +589,7 @@ namespace Vibrant.Tsdb.Client
                   }
 
                   existingStorage = new DynamicStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, from, to );
+                  existingStorage.Lookups = new List<TKey>();
                   result.Add( storage, existingStorage );
                }
 
