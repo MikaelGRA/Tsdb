@@ -328,22 +328,25 @@ namespace Vibrant.Tsdb
                Serie<TKey, TEntry> data = null;
 
                List<Action<Serie<TKey, TEntry>>> subscribers;
-               if( single.TryGetValue( serie.GetKey(), out subscribers ) )
+               lock( single )
                {
-                  if( data == null )
+                  if( single.TryGetValue( serie.GetKey(), out subscribers ) )
                   {
-                     data = createNew ? new Serie<TKey, TEntry>( serie.GetKey(), serie.GetEntries() ) : (Serie<TKey, TEntry>)serie;
-                  }
-
-                  foreach( var callback in subscribers )
-                  {
-                     try
+                     if( data == null )
                      {
-                        callback( data );
+                        data = createNew ? new Serie<TKey, TEntry>( serie.GetKey(), serie.GetEntries() ) : (Serie<TKey, TEntry>)serie;
                      }
-                     catch( Exception )
-                     {
 
+                     foreach( var callback in subscribers )
+                     {
+                        try
+                        {
+                           callback( data );
+                        }
+                        catch( Exception )
+                        {
+
+                        }
                      }
                   }
                }
@@ -398,17 +401,20 @@ namespace Vibrant.Tsdb
          {
             var id = serie.GetKey();
             List<Action<Serie<TKey, TEntry>>> subscribers;
-            if( single.TryGetValue( id, out subscribers ) )
+            lock( single )
             {
-               foreach( var callback in subscribers )
+               if( single.TryGetValue( id, out subscribers ) )
                {
-                  try
+                  foreach( var callback in subscribers )
                   {
-                     callback( serie );
-                  }
-                  catch( Exception )
-                  {
+                     try
+                     {
+                        callback( serie );
+                     }
+                     catch( Exception )
+                     {
 
+                     }
                   }
                }
             }
