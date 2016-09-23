@@ -328,22 +328,25 @@ namespace Vibrant.Tsdb
                Serie<TKey, TEntry> data = null;
 
                List<Action<Serie<TKey, TEntry>>> subscribers;
-               if( single.TryGetValue( serie.GetKey(), out subscribers ) )
+               lock( single )
                {
-                  if( data == null )
+                  if( single.TryGetValue( serie.GetKey(), out subscribers ) )
                   {
-                     data = createNew ? new Serie<TKey, TEntry>( serie.GetKey(), serie.GetEntries() ) : (Serie<TKey, TEntry>)serie;
-                  }
-
-                  foreach( var callback in subscribers )
-                  {
-                     try
+                     if( data == null )
                      {
-                        callback( data );
+                        data = createNew ? new Serie<TKey, TEntry>( serie.GetKey(), serie.GetEntries() ) : (Serie<TKey, TEntry>)serie;
                      }
-                     catch( Exception )
-                     {
 
+                     for( int i = subscribers.Count - 1 ; 0 <= i ; i-- )
+                     {
+                        try
+                        {
+                           subscribers[ i ]( data );
+                        }
+                        catch( Exception )
+                        {
+
+                        }
                      }
                   }
                }
@@ -351,7 +354,7 @@ namespace Vibrant.Tsdb
                // then handle all
                lock( all )
                {
-                  foreach( var callback in all )
+                  for( int i = all.Count - 1 ; 0 <= i ; i-- )
                   {
                      if( data == null )
                      {
@@ -360,7 +363,7 @@ namespace Vibrant.Tsdb
 
                      try
                      {
-                        callback( data );
+                        all[ i ]( data );
                      }
                      catch( Exception )
                      {
@@ -374,58 +377,61 @@ namespace Vibrant.Tsdb
 
       protected void PublishToSingleForLatestEntriesWithSameId( Serie<TKey, TEntry> serie )
       {
-         PublishToSingleForEntriesWithSameId( serie, _latestCallbacksForSingle, _latestCallbacksForAll );
+         PublishToSingleForEntriesWithSameId( serie, _latestCallbacksForSingle );
       }
 
       protected void PublishToSingleForAllEntriesWithSameId( Serie<TKey, TEntry> serie )
       {
-         PublishToSingleForEntriesWithSameId( serie, _allCallbacksForSingle, _allCallbacksForAll );
+         PublishToSingleForEntriesWithSameId( serie, _allCallbacksForSingle );
       }
 
       protected void PublishToAllForLatestEntriesWithSameId( Serie<TKey, TEntry> serie )
       {
-         PublishToAllForEntriesWithSameId( serie, _latestCallbacksForSingle, _latestCallbacksForAll );
+         PublishToAllForEntriesWithSameId( serie, _latestCallbacksForAll );
       }
 
       protected void PublishToAllForAllEntriesWithSameId( Serie<TKey, TEntry> serie )
       {
-         PublishToAllForEntriesWithSameId( serie, _allCallbacksForSingle, _allCallbacksForAll );
+         PublishToAllForEntriesWithSameId( serie, _allCallbacksForAll );
       }
 
-      private void PublishToSingleForEntriesWithSameId( Serie<TKey, TEntry> serie, IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> single, List<Action<Serie<TKey, TEntry>>> all )
+      private void PublishToSingleForEntriesWithSameId( Serie<TKey, TEntry> serie, IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> single )
       {
          if( serie.GetEntries().Count > 0 )
          {
             var id = serie.GetKey();
             List<Action<Serie<TKey, TEntry>>> subscribers;
-            if( single.TryGetValue( id, out subscribers ) )
+            lock( single )
             {
-               foreach( var callback in subscribers )
+               if( single.TryGetValue( id, out subscribers ) )
                {
-                  try
+                  for( int i = subscribers.Count - 1 ; 0 <= i ; i-- )
                   {
-                     callback( serie );
-                  }
-                  catch( Exception )
-                  {
+                     try
+                     {
+                        subscribers[ i ]( serie );
+                     }
+                     catch( Exception )
+                     {
 
+                     }
                   }
                }
             }
          }
       }
 
-      private void PublishToAllForEntriesWithSameId( Serie<TKey, TEntry> serie, IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> single, List<Action<Serie<TKey, TEntry>>> all )
+      private void PublishToAllForEntriesWithSameId( Serie<TKey, TEntry> serie, List<Action<Serie<TKey, TEntry>>> all )
       {
          if( serie.GetEntries().Count > 0 )
          {
             lock( all )
             {
-               foreach( var callback in all )
+               for( int i = all.Count - 1 ; 0 <= i ; i-- )
                {
                   try
                   {
-                     callback( serie );
+                     all[ i ]( serie );
                   }
                   catch( Exception )
                   {
