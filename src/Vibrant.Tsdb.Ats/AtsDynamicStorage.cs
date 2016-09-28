@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
+using Vibrant.Tsdb.Ats.Helpers;
 using Vibrant.Tsdb.Ats.Serialization;
 
 namespace Vibrant.Tsdb.Ats
@@ -19,40 +20,43 @@ namespace Vibrant.Tsdb.Ats
       private readonly StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>[] _defaultSelection;
       private object _sync = new object();
       private string _tableName;
+      private Dictionary<string, CloudTable> _tables;
       private CloudStorageAccount _account;
       private CloudTableClient _client;
-      private Task<CloudTable> _table;
       private IPartitionProvider<TKey> _partitioningProvider;
+      private ITableProvider _tableProvider;
       private IKeyConverter<TKey> _keyConverter;
       private IConcurrencyControl _cc;
       private EntryEqualityComparer<TKey, TEntry> _comparer;
 
-      public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, IKeyConverter<TKey> keyConverter )
+      public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider tableProvider, IKeyConverter<TKey> keyConverter )
       {
          _cc = concurrency;
          _tableName = tableName;
          _account = CloudStorageAccount.Parse( connectionString );
          _client = _account.CreateCloudTableClient();
          _partitioningProvider = partitioningProvider;
+         _tableProvider = tableProvider;
          _comparer = new EntryEqualityComparer<TKey, TEntry>();
          _keyConverter = keyConverter;
          _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
+         _tables = new Dictionary<string, CloudTable>();
 
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
 
-      public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider )
-         : this( tableName, connectionString, concurrency, partitioningProvider, DefaultKeyConverter<TKey>.Current )
+      public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider tableProvider )
+         : this( tableName, connectionString, concurrency, partitioningProvider, tableProvider, DefaultKeyConverter<TKey>.Current )
       {
       }
 
       public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency )
-         : this( tableName, connectionString, concurrency, new YearlyPartitioningProvider<TKey>() )
+         : this( tableName, connectionString, concurrency, new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider() )
       {
       }
 
       public AtsDynamicStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), new YearlyPartitioningProvider<TKey>() )
+         : this( tableName, connectionString, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider() )
       {
       }
 
@@ -128,7 +132,7 @@ namespace Vibrant.Tsdb.Ats
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreatePartitionFilter( id ) );
 
-         var count = await DeleteInternal( id, fullQuery ).ConfigureAwait( false );
+         var count = await DeleteInternal( id, fullQuery, DateTime.UtcNow ).ConfigureAwait( false );
 
          return count;
       }
@@ -150,7 +154,7 @@ namespace Vibrant.Tsdb.Ats
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreateBeforeFilter( id, to ) );
 
-         var count = await DeleteInternal( id, fullQuery ).ConfigureAwait( false );
+         var count = await DeleteInternal( id, fullQuery, to ).ConfigureAwait( false );
 
          return count;
       }
@@ -172,7 +176,7 @@ namespace Vibrant.Tsdb.Ats
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreateGeneralFilter( id, from, to ) );
 
-         var count = await DeleteInternal( id, fullQuery ).ConfigureAwait( false );
+         var count = await DeleteInternal( id, fullQuery, from, to ).ConfigureAwait( false );
 
          return count;
       }
@@ -194,9 +198,61 @@ namespace Vibrant.Tsdb.Ats
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreatePartitionFilter( id ) );
 
-         var entries = await ReadInternal( id, fullQuery, sort, count ).ConfigureAwait( false );
+         var currentTable = _tableProvider.GetTable( DateTime.UtcNow );
+         var entries = await ReadWithUnknownEnd( fullQuery, currentTable, sort, count ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
+      }
+
+      private async Task<List<TEntry>> ReadWithUnknownEnd( TableQuery<TsdbTableEntity> query, string currentTable, Sort sort, int? count )
+      {
+         List<List<TEntry>> entries = new List<List<TEntry>>();
+
+         bool isFirstTable = true;
+         bool queryMoreTables = true;
+         while( queryMoreTables )
+         {
+            var foundEntries = await ReadInternal( query, currentTable, sort, count ).ConfigureAwait( false );
+            entries.Add( foundEntries );
+
+            // if we have not found everything
+            if( !count.HasValue || entries.Sum( x => x.Count ) < count )
+            {
+               // determine if we should try more
+               if( foundEntries.Count > 0 )
+               {
+                  // we want to keep trying as we found something in this table (likely there MAY be more in previous table)
+                  currentTable = _tableProvider.GetPreviousTable( currentTable );
+               }
+               else
+               {
+                  // we did NOT find anything in this table
+                  if( isFirstTable )
+                  {
+                     // ONLY look in previous table if this was our FIRST iteration
+                     currentTable = _tableProvider.GetPreviousTable( currentTable );
+                  }
+                  else
+                  {
+                     queryMoreTables = false;
+                  }
+               }
+            }
+            else
+            {
+               // if we have found everything
+               queryMoreTables = false;
+            }
+
+            isFirstTable = false;
+         }
+
+         if( sort == Sort.Ascending )
+         {
+            entries.Reverse();
+         }
+
+         return entries.SelectMany( x => x ).ToList();
       }
 
       private async Task<MultiReadResult<TKey, TEntry>> ReadAllInternal( IEnumerable<TKey> ids, Sort sort )
@@ -216,7 +272,8 @@ namespace Vibrant.Tsdb.Ats
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreatePartitionFilter( id ) );
 
-         var entries = await ReadInternal( id, fullQuery, sort, null ).ConfigureAwait( false );
+         var currentTable = _tableProvider.GetTable( DateTime.UtcNow );
+         var entries = await ReadWithUnknownEnd( fullQuery, currentTable, sort, null ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
@@ -238,7 +295,8 @@ namespace Vibrant.Tsdb.Ats
          var query = new TableQuery<TsdbTableEntity>()
             .Where( CreateBeforeFilter( id, to ) );
 
-         var entries = await ReadInternal( id, query, sort, null ).ConfigureAwait( false );
+         var currentTable = _tableProvider.GetTable( to );
+         var entries = await ReadWithUnknownEnd( query, currentTable, sort, null ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
@@ -266,12 +324,15 @@ namespace Vibrant.Tsdb.Ats
             // use method 1 (Super fast)
             var tasks = new List<Task<List<TEntry>>>();
             var iterable = (IIterablePartitionProvider<TKey>)_partitioningProvider;
-            foreach( var partitionRange in iterable.IteratePartitions( id, from, to ) )
+            foreach( var table in _tableProvider.IterateTables( from, to ) )
             {
-               var specificQuery = new TableQuery<TsdbTableEntity>()
-                  .Where( CreateSpecificPartitionFilter( id, from, to, partitionRange ) );
+               foreach( var partitionRange in iterable.IteratePartitions( id, from, to ) )
+               {
+                  var specificQuery = new TableQuery<TsdbTableEntity>()
+                     .Where( CreateSpecificPartitionFilter( id, from, to, partitionRange ) );
 
-               tasks.Add( ReadInternal( id, specificQuery, sort, null ) );
+                  tasks.Add( ReadInternal( specificQuery, table, sort, null ) );
+               }
             }
 
             await Task.WhenAll( tasks ).ConfigureAwait( false );
@@ -291,9 +352,21 @@ namespace Vibrant.Tsdb.Ats
             var generalQuery = new TableQuery<TsdbTableEntity>()
                .Where( CreateGeneralFilter( id, from, to ) );
 
-            var entries = await ReadInternal( id, generalQuery, sort, null ).ConfigureAwait( false );
+            var tasks = new List<Task<List<TEntry>>>();
+            foreach( var table in _tableProvider.IterateTables( from, to ) )
+            {
+               tasks.Add( ReadInternal( generalQuery, table, sort, null ) );
+            }
 
-            return new ReadResult<TKey, TEntry>( id, sort, entries );
+            await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+            var queryResults = tasks.Select( x => x.Result );
+            if( sort == Sort.Ascending )
+            {
+               queryResults = queryResults.Reverse();
+            }
+
+            return new ReadResult<TKey, TEntry>( id, sort, queryResults.SelectMany( x => x ).ToList() );
          }
       }
 
@@ -322,32 +395,23 @@ namespace Vibrant.Tsdb.Ats
          var generalQuery = new TableQuery<TsdbTableEntity>()
             .Where( filter );
 
-         return ReadSegmentedInternal( id, generalQuery, segmentSize );
-      }
-
-      private Task<SegmentedReadResult<TKey, TEntry>> ReadRangeSegmentedInternal( TKey id, int segmentSize, ContinuationToken continuationToken )
-      {
-         DateTime? to = continuationToken?.To;
-
-         if( to.HasValue )
+         if( from.HasValue && to.HasValue )
          {
-            var generalQuery = new TableQuery<TsdbTableEntity>()
-               .Where( CreateBeforeFilter( id, to.Value ) );
-
-            return ReadSegmentedInternal( id, generalQuery, segmentSize );
+            return ReadSegmentedInternal( id, generalQuery, from.Value, to.Value, segmentSize );
+         }
+         else if( to.HasValue )
+         {
+            return ReadSegmentedInternal( id, generalQuery, to.Value, segmentSize );
          }
          else
          {
-            var generalQuery = new TableQuery<TsdbTableEntity>()
-               .Where( CreatePartitionFilter( id ) );
-
-            return ReadSegmentedInternal( id, generalQuery, segmentSize );
+            return ReadSegmentedInternal( id, generalQuery, DateTime.UtcNow, segmentSize );
          }
       }
 
-      private async Task<List<TEntry>> ReadInternal( TKey id, TableQuery<TsdbTableEntity> query, Sort sort, int? take )
+      private async Task<List<TEntry>> ReadInternal( TableQuery<TsdbTableEntity> query, string suffix, Sort sort, int? take )
       {
-         var table = await GetTable().ConfigureAwait( false );
+         var table = GetTable( suffix );
 
          List<TEntry> results = new List<TEntry>();
 
@@ -382,129 +446,193 @@ namespace Vibrant.Tsdb.Ats
          return results;
       }
 
-      private async Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedInternal( TKey id, TableQuery<TsdbTableEntity> query, int segmentSize )
+      private async Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedInternal( TKey id, TableQuery<TsdbTableEntity> query, DateTime from, DateTime to, int segmentSize )
       {
-         var table = await GetTable().ConfigureAwait( false );
-
          List<TEntry> results = new List<TEntry>( segmentSize );
-         List<TsdbTableEntity> allRows = new List<TsdbTableEntity>( segmentSize );
+         Dictionary<CloudTable, List<TsdbTableEntity>> allRows = new Dictionary<CloudTable, List<TsdbTableEntity>>();
 
-         bool isLastFull = true;
-         TableContinuationToken token = null;
-         DateTime? to = null;
-         int read = 0;
-         do
+         bool lastHasSome = true;
+
+         foreach( var currentTable in _tableProvider.IterateTables( from, to ) )
          {
-            using( await _cc.ReadAsync().ConfigureAwait( false ) )
+            var table = GetTable( currentTable );
+
+            TableContinuationToken token = null;
+            int read = 0;
+            do
             {
-               var rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
-               var entries = Convert( rows );
-
-               isLastFull = rows.Results.Count == 1000;
-
-               // add required items, and no more
-               if( segmentSize >= read + rows.Results.Count )
+               using( await _cc.ReadAsync().ConfigureAwait( false ) )
                {
-                  read += rows.Results.Count;
-                  results.AddRange( entries );
-                  allRows.AddRange( rows );
-               }
-               else
-               {
-                  var take = segmentSize - read;
+                  var rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
+                  var entries = Convert( rows );
 
-                  foreach( var entry in entries.Take( take ) )
+                  lastHasSome = rows.Results.Count > 0;
+
+                  // add required items, and no more
+                  if( segmentSize >= read + rows.Results.Count )
                   {
-                     read++;
-                     results.Add( entry );
+                     read += rows.Results.Count;
+                     results.AddRange( entries );
+                     allRows.AddRange( table, rows );
                   }
-                  foreach( var row in rows.Take( take ) )
+                  else
                   {
-                     allRows.Add( row );
-                  }
-               }
+                     var take = segmentSize - read;
 
-               token = rows.ContinuationToken;
-               if( read == segmentSize ) // short circuit
-               {
-                  token = null;
+                     foreach( var entry in entries.Take( take ) )
+                     {
+                        read++;
+                        results.Add( entry );
+                     }
+
+                     allRows.AddRange( table, rows.Take( take ) );
+                  }
+
+                  token = rows.ContinuationToken;
+                  if( read == segmentSize ) // short circuit
+                  {
+                     token = null;
+                  }
                }
             }
+            while( token != null );
          }
-         while( token != null );
+
 
          // calculate continuation token
-         if( isLastFull )
+         DateTime? continueTo = null;
+         if( lastHasSome )
          {
-            to = results[ results.Count - 1 ].GetTimestamp();
+            continueTo = results[ results.Count - 1 ].GetTimestamp();
          }
          else
          {
-            to = null;
+            continueTo = null;
          }
 
-         return new SegmentedReadResult<TKey, TEntry>( id, Sort.Descending, new ContinuationToken( isLastFull, to ), results, () => DeleteInternal( id, allRows ) );
+         return new SegmentedReadResult<TKey, TEntry>( id, Sort.Descending, new ContinuationToken( lastHasSome, continueTo ), results, () => DeleteInternal( id, allRows ) );
       }
 
-      private async Task<int> DeleteInternal( TKey id, List<TsdbTableEntity> entities )
+      private async Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedInternal( TKey id, TableQuery<TsdbTableEntity> query, DateTime to, int segmentSize )
       {
-         var table = await GetTable().ConfigureAwait( false );
+         List<TEntry> results = new List<TEntry>( segmentSize );
+         Dictionary<CloudTable, List<TsdbTableEntity>> allRows = new Dictionary<CloudTable, List<TsdbTableEntity>>();
 
-         int count = 0;
+         bool lastHasSome = true;
+         int read = 0;
 
-         TableContinuationToken token = null;
-         do
+         var currentTable = _tableProvider.GetTable( to );
+
+         bool isFirstTable = true;
+         bool queryMoreTables = true;
+         while( queryMoreTables )
          {
-            // iterate by partition and 100s
-            var tasks = new List<Task<int>>();
-            foreach( var kvp in IterateByPartition( entities ) )
+            var table = GetTable( currentTable );
+            int foundInTable = 0;
+
+            TableContinuationToken token = null;
+            do
             {
-               var partitionKey = kvp.Key;
-               var items = kvp.Value;
-
-               // schedule parallel execution
-               tasks.Add( DeleteInternalLocked( items ) );
-            }
-            await Task.WhenAll( tasks ).ConfigureAwait( false );
-
-            count += tasks.Sum( x => x.Result );
-         }
-         while( token != null );
-
-         return count;
-      }
-
-      private async Task<int> DeleteInternal( TKey id, TableQuery<TsdbTableEntity> query )
-      {
-         var table = await GetTable().ConfigureAwait( false );
-
-         int count = 0;
-
-         TableContinuationToken token = null;
-         do
-         {
-            TableQuerySegment<TsdbTableEntity> rows;
-
-            using( await _cc.ReadAsync().ConfigureAwait( false ) )
-            {
-               rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
-               foreach( var row in rows )
+               using( await _cc.ReadAsync().ConfigureAwait( false ) )
                {
-                  row.ETag = "*";
+                  var rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
+                  var entries = Convert( rows );
+
+                  lastHasSome = rows.Results.Count > 0;
+
+                  // add required items, and no more
+                  if( segmentSize >= read + rows.Results.Count )
+                  {
+                     foundInTable += rows.Results.Count;
+                     read += rows.Results.Count;
+                     results.AddRange( entries );
+                     allRows.AddRange( table, rows );
+                  }
+                  else
+                  {
+                     // calculate amount to take
+                     int take = Math.Min( segmentSize - read, rows.Results.Count );
+
+                     foundInTable += take;
+                     read += take;
+                     results.AddRange( entries.Take( take ) );
+                     allRows.AddRange( table, rows.Take( take ) );
+                  }
+
+                  token = rows.ContinuationToken;
+                  if( read == segmentSize ) // short circuit
+                  {
+                     token = null;
+                  }
                }
-               token = rows.ContinuationToken;
+            }
+            while( token != null );
+
+            if( read == segmentSize )
+            {
+               queryMoreTables = false;
+            }
+            else
+            {
+               // if we found SOMETHING (in this table), but not enough
+               if( foundInTable > 0 )
+               {
+                  currentTable = _tableProvider.GetPreviousTable( currentTable );
+               }
+               else
+               {
+                  // found nothing in this table
+                  if( isFirstTable )
+                  {
+                     currentTable = _tableProvider.GetPreviousTable( currentTable );
+                  }
+                  else
+                  {
+                     queryMoreTables = false;
+                  }
+               }
             }
 
+            isFirstTable = false;
+         }
+
+
+         // calculate continuation token
+         DateTime? continueTo = null;
+         if( lastHasSome )
+         {
+            continueTo = results[ results.Count - 1 ].GetTimestamp();
+         }
+         else
+         {
+            continueTo = null;
+         }
+
+         return new SegmentedReadResult<TKey, TEntry>( id, Sort.Descending, new ContinuationToken( lastHasSome, continueTo ), results, () => DeleteInternal( id, allRows ) );
+      }
+
+      private async Task<int> DeleteInternal( TKey id, Dictionary<CloudTable, List<TsdbTableEntity>> map )
+      {
+         int count = 0;
+
+         TableContinuationToken token = null;
+         do
+         {
             // iterate by partition and 100s
-
             var tasks = new List<Task<int>>();
-            foreach( var kvp in IterateByPartition( rows ) )
+            foreach( var tableEntities in map )
             {
-               var partitionKey = kvp.Key;
-               var items = kvp.Value;
+               var table = tableEntities.Key;
+               var entities = tableEntities.Value;
 
-               // schedule parallel execution
-               tasks.Add( DeleteInternalLocked( items ) );
+               foreach( var kvp in IterateByPartition( entities ) )
+               {
+                  var partitionKey = kvp.Key;
+                  var items = kvp.Value;
+
+                  // schedule parallel execution
+                  tasks.Add( DeleteInternalLocked( table, items ) );
+               }
             }
             await Task.WhenAll( tasks ).ConfigureAwait( false );
 
@@ -515,13 +643,128 @@ namespace Vibrant.Tsdb.Ats
          return count;
       }
 
-      private async Task<int> DeleteInternalLocked( List<TsdbTableEntity> entries )
+      private async Task<int> DeleteInternal( TKey id, TableQuery<TsdbTableEntity> query, DateTime from, DateTime to )
+      {
+         int count = 0;
+
+         foreach( var suffix in _tableProvider.IterateTables( from, to ) )
+         {
+            var table = GetTable( suffix );
+
+            TableContinuationToken token = null;
+            do
+            {
+               TableQuerySegment<TsdbTableEntity> rows;
+
+               using( await _cc.ReadAsync().ConfigureAwait( false ) )
+               {
+                  rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
+                  foreach( var row in rows )
+                  {
+                     row.ETag = "*";
+                  }
+                  token = rows.ContinuationToken;
+               }
+
+               // iterate by partition and 100s
+
+               var tasks = new List<Task<int>>();
+               foreach( var kvp in IterateByPartition( rows ) )
+               {
+                  var partitionKey = kvp.Key;
+                  var items = kvp.Value;
+
+                  // schedule parallel execution
+                  tasks.Add( DeleteInternalLocked( table, items ) );
+               }
+               await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+               count += tasks.Sum( x => x.Result );
+            }
+            while( token != null );
+         }
+
+         return count;
+      }
+
+      private async Task<int> DeleteInternal( TKey id, TableQuery<TsdbTableEntity> query, DateTime to )
+      {
+         int count = 0;
+
+         string currentTable = _tableProvider.GetTable( to );
+
+         bool isFirstTable = true;
+         bool queryMoreTables = true;
+         while( queryMoreTables )
+         {
+            var table = GetTable( currentTable );
+
+            int deletedFromTable = 0;
+            TableContinuationToken token = null;
+            do
+            {
+               TableQuerySegment<TsdbTableEntity> rows;
+
+               using( await _cc.ReadAsync().ConfigureAwait( false ) )
+               {
+                  rows = await table.ExecuteQuerySegmentedAsync( query, token ).ConfigureAwait( false );
+                  foreach( var row in rows )
+                  {
+                     row.ETag = "*";
+                  }
+                  token = rows.ContinuationToken;
+               }
+
+               // iterate by partition and 100s
+
+               var tasks = new List<Task<int>>();
+               foreach( var kvp in IterateByPartition( rows ) )
+               {
+                  var partitionKey = kvp.Key;
+                  var items = kvp.Value;
+
+                  // schedule parallel execution
+                  tasks.Add( DeleteInternalLocked( table, items ) );
+               }
+               await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+               deletedFromTable += tasks.Sum( x => x.Result );
+            }
+            while( token != null );
+
+            count += deletedFromTable;
+
+            // if we have found something
+            if( deletedFromTable > 0 )
+            {
+               currentTable = _tableProvider.GetPreviousTable( currentTable );
+            }
+            else
+            {
+               // we did NOT find anything in this table
+               if( isFirstTable )
+               {
+                  // ONLY look in previous table if this was our FIRST iteration
+                  currentTable = _tableProvider.GetPreviousTable( currentTable );
+               }
+               else
+               {
+                  queryMoreTables = false;
+               }
+            }
+
+            isFirstTable = false;
+         }
+
+         return count;
+      }
+
+      private async Task<int> DeleteInternalLocked( CloudTable table, List<TsdbTableEntity> entries )
       {
          int count = 0;
 
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
-            var table = await GetTable().ConfigureAwait( false );
             if( entries.Count == 1 )
             {
                var operation = TableOperation.Delete( entries[ 0 ] );
@@ -548,21 +791,21 @@ namespace Vibrant.Tsdb.Ats
 
          foreach( var kvp in IterateByPartition( series ) )
          {
-            var partitionKey = kvp.Key;
+            var key = kvp.Key;
             var items = kvp.Value;
 
             // schedule parallel execution
-            tasks.Add( WriteInternalLocked( partitionKey, items ) );
+            tasks.Add( WriteInternalLocked( key.Table, key.PartitionKey, items ) );
          }
 
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      private async Task WriteInternalLocked( string partitionKey, List<TEntry> entries )
+      private async Task WriteInternalLocked( string suffix, string partitionKey, List<TEntry> entries )
       {
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
-            var table = await GetTable().ConfigureAwait( false );
+            var table = GetTable( suffix );
             if( entries.Count == 1 )
             {
                var operation = TableOperation.InsertOrReplace( Convert( entries, partitionKey ).First() );
@@ -621,9 +864,9 @@ namespace Vibrant.Tsdb.Ats
          return AtsSerializer.DeserializeEntry<TKey, TEntry>( reader );
       }
 
-      private IEnumerable<KeyValuePair<string, List<TEntry>>> IterateByPartition( IEnumerable<ISerie<TKey, TEntry>> series )
+      private IEnumerable<KeyValuePair<AtsTablePartition, List<TEntry>>> IterateByPartition( IEnumerable<ISerie<TKey, TEntry>> series )
       {
-         Dictionary<string, List<TEntry>> lookup = new Dictionary<string, List<TEntry>>();
+         Dictionary<AtsTablePartition, List<TEntry>> lookup = new Dictionary<AtsTablePartition, List<TEntry>>();
 
          var hashkeys = new HashSet<EntryKey<TKey>>();
          foreach( var serie in series )
@@ -638,18 +881,21 @@ namespace Vibrant.Tsdb.Ats
 
                if( !hashkeys.Contains( hashkey ) )
                {
+                  var table = _tableProvider.GetTable( timestamp );
                   var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, timestamp, _partitioningProvider );
+                  var tpk = new AtsTablePartition( table, pk );
+
                   List<TEntry> items;
-                  if( !lookup.TryGetValue( pk, out items ) )
+                  if( !lookup.TryGetValue( tpk, out items ) )
                   {
                      items = new List<TEntry>();
-                     lookup.Add( pk, items );
+                     lookup.Add( tpk, items );
                   }
                   items.Add( entry );
                   if( items.Count == 100 )
                   {
-                     lookup.Remove( pk );
-                     yield return new KeyValuePair<string, List<TEntry>>( pk, items );
+                     lookup.Remove( tpk );
+                     yield return new KeyValuePair<AtsTablePartition, List<TEntry>>( tpk, items );
                   }
 
                   hashkeys.Add( hashkey );
@@ -692,22 +938,26 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private async Task<CloudTable> GetTableLocked()
-      {
-         var table = _client.GetTableReference( _tableName );
-         await table.CreateIfNotExistsAsync().ConfigureAwait( false );
-         return table;
-      }
-
-      private Task<CloudTable> GetTable()
+      private CloudTable GetTable( string suffix )
       {
          lock( _sync )
          {
-            if( _table == null || _table.IsFaulted || _table.IsCanceled )
+            string fullTableName = _tableName + suffix;
+
+            CloudTable table;
+            if( _tables.TryGetValue( fullTableName, out table ) )
             {
-               _table = GetTableLocked();
+               return table;
             }
-            return _table;
+            else
+            {
+
+               table = _client.GetTableReference( fullTableName );
+               table.CreateIfNotExistsAsync().Wait();
+
+               _tables.Add( fullTableName, table );
+               return table;
+            }
          }
       }
 

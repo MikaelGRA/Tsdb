@@ -29,7 +29,7 @@ namespace Vibrant.Tsdb.Tests
          do
          {
             round++;
-            var segment = await store.ReadSegmentedAsync( "rowlol2", null, new DateTime( 2018, 12, 31, 0, 0, 0 ), 10000, token );
+            var segment = await store.ReadSegmentedAsync( "rowlol2", null, new DateTime( 2016, 12, 31, 0, 0, 0 ), 10000, token );
 
             if( round == 5 )
             {
@@ -105,7 +105,7 @@ namespace Vibrant.Tsdb.Tests
          do
          {
             round++;
-            var segment = await store.ReadSegmentedAsync( "rowlol2", null, new DateTime( 2018, 12, 31, 0, 0, 0 ), 10000, token );
+            var segment = await store.ReadSegmentedAsync( "rowlol2", null, new DateTime( 2016, 12, 31, 0, 0, 0 ), 10000, token );
 
             if( round == 5 )
             {

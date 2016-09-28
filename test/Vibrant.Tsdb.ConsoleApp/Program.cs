@@ -60,6 +60,7 @@ namespace Vibrant.Tsdb.ConsoleApp
             ats.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( AtsDynamicStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsDynamicStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
             new YearlyPartitioningProvider<BasicKey>(), 
+            new YearlyTableProvider(),
             this );
 
          var dsql = new SqlDynamicStorage<BasicKey, BasicEntry>(

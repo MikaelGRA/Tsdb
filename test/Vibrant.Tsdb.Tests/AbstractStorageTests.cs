@@ -82,7 +82,7 @@ namespace Vibrant.Tsdb.Tests
 
          int count = 50000;
 
-         var from = new DateTime( 2016, 12, 31, 0, 0, 0, DateTimeKind.Utc );
+         var from = new DateTime( 2015, 12, 31, 0, 0, 0, DateTimeKind.Utc );
          var to = from.AddSeconds( count );
 
          var series = CreateRows( from, count );
@@ -141,7 +141,7 @@ namespace Vibrant.Tsdb.Tests
 
          int count = 50000;
 
-         var from = new DateTime( 2016, 12, 31, 0, 0, 0, DateTimeKind.Utc );
+         var from = new DateTime( 2015, 12, 31, 0, 0, 0, DateTimeKind.Utc );
          var to = from.AddSeconds( count );
 
          var written = CreateRows( from, count );
@@ -164,11 +164,11 @@ namespace Vibrant.Tsdb.Tests
 
          int count = 1000;
 
-         var from1 = new DateTime( 2012, 12, 26, 0, 0, 0, DateTimeKind.Utc );
+         var from1 = new DateTime( 2014, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var written1 = CreateRows( from1, count );
          await store.WriteAsync( written1.Values );
 
-         var from2 = new DateTime( 2013, 12, 26, 0, 0, 0, DateTimeKind.Utc );
+         var from2 = new DateTime( 2015, 12, 26, 0, 0, 0, DateTimeKind.Utc );
          var written2 = CreateRows( from2, count );
          await store.WriteAsync( written2.Values );
 
@@ -188,7 +188,7 @@ namespace Vibrant.Tsdb.Tests
       {
          var store = GetStorage( "Table9" );
 
-         var from = new DateTime( 2016, 12, 31, 0, 0, 0, DateTimeKind.Utc );
+         var from = new DateTime( 2015, 12, 31, 0, 0, 0, DateTimeKind.Utc );
 
          var serie = new Serie<string, BasicEntry>( "row1", new[]
          {
@@ -210,7 +210,7 @@ namespace Vibrant.Tsdb.Tests
       {
          var store = GetStorage( "Table10" );
 
-         var from = new DateTime( 2016, 12, 31, 0, 0, 0, DateTimeKind.Utc );
+         var from = new DateTime( 2015, 12, 31, 0, 0, 0, DateTimeKind.Utc );
 
          var serie = new Serie<string, BasicEntry>( "row5", new[]
          {
