@@ -1,5 +1,5 @@
 {
-   "version": "5.0.0-*",
+   "version": "5.1.0-*",
    "title": "ATS storage for TSDB client",
    "description": "An easy-to-use timeseries database client that allows storing of masses of simple of data structures identified by a string id and a timestamp.",
    "authors": [ "MikaelGRA" ],
