@@ -69,7 +69,7 @@ namespace Vibrant.Tsdb.ConsoleApp
             new ConcurrencyControl( 5, 5 ),
             this );
 
-         var switchDate = new DateTime( 2016, 8, 20, 18, 25, 0, DateTimeKind.Utc );
+         var switchDate = new DateTime( 2016, 10, 20, 18, 25, 0, DateTimeKind.Utc );
 
          var selector = new TestDynamicStorageSelector( new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>[]
          {
@@ -98,8 +98,8 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          ThreadPool.QueueUserWorkItem( obj => batcher.Handle() );
 
-         var engine = new TsdbEngine<BasicKey, BasicEntry>( this, client );
-         engine.StartAsync().Wait();
+         //var engine = new TsdbEngine<BasicKey, BasicEntry>( this, client );
+         //engine.StartAsync().Wait();
 
          Console.WriteLine( $"Info: Writing entries..." );
          while( true )
