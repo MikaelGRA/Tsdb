@@ -21,7 +21,7 @@ namespace Vibrant.Tsdb.Ats
       {
          get
          {
-            return new DateTime( _year, 0, 0, 0, 0, 0, DateTimeKind.Utc );
+            return new DateTime( _year, 1, 1, 0, 0, 0, DateTimeKind.Utc );
          }
       }
 
@@ -29,7 +29,7 @@ namespace Vibrant.Tsdb.Ats
       {
          get
          {
-            return new DateTime( _year + 1, 0, 0, 0, 0, 0, DateTimeKind.Utc );
+            return new DateTime( _year + 1, 1, 1, 0, 0, 0, DateTimeKind.Utc );
          }
       }
 
