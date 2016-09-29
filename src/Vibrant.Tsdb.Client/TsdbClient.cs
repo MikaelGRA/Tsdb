@@ -38,6 +38,15 @@ namespace Vibrant.Tsdb.Client
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
          IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
          IPublishSubscribe<TKey, TEntry> remotePublishSubscribe,
+         ITsdbLogger logger )
+         : this( dynamicStorageSelector, volumeStorageSelector, remotePublishSubscribe, null, logger )
+      {
+      }
+
+      public TsdbClient(
+         IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
+         IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         IPublishSubscribe<TKey, TEntry> remotePublishSubscribe,
          ITemporaryStorage<TKey, TEntry> temporaryStorage )
          : this( dynamicStorageSelector, volumeStorageSelector, remotePublishSubscribe, temporaryStorage, NullTsdbLogger.Default )
       {
@@ -162,6 +171,11 @@ namespace Vibrant.Tsdb.Client
 
       public async Task MoveFromTemporaryStorageAsync( int batchSize )
       {
+         if( _temporaryStorage == null )
+         {
+            throw new InvalidOperationException( "No temporary storage has been provided." );
+         }
+
          var sw = Stopwatch.StartNew();
          int read = 0;
          do
@@ -262,6 +276,11 @@ namespace Vibrant.Tsdb.Client
          {
             if( useTemporaryStorageOnFailure )
             {
+               if( _temporaryStorage == null )
+               {
+                  throw new InvalidOperationException( "No temporary storage has been provided." );
+               }
+
                try
                {
                   _temporaryStorage.Write( series );
