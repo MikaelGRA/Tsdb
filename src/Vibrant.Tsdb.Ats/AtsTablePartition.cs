@@ -7,13 +7,13 @@ namespace Vibrant.Tsdb.Ats
 {
    public struct AtsTablePartition : IEquatable<AtsTablePartition>
    {
-      public AtsTablePartition( string table, string partitionKey )
+      public AtsTablePartition( ITable table, string partitionKey )
       {
          Table = table;
          PartitionKey = partitionKey;
       }
 
-      public string Table { get; private set; }
+      public ITable Table { get; private set; }
 
       public string PartitionKey { get; private set; }
 

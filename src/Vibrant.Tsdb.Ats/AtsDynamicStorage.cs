@@ -204,7 +204,7 @@ namespace Vibrant.Tsdb.Ats
          return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
 
-      private async Task<List<TEntry>> ReadWithUnknownEnd( TableQuery<TsdbTableEntity> query, string currentTable, Sort sort, int? count )
+      private async Task<List<TEntry>> ReadWithUnknownEnd( TableQuery<TsdbTableEntity> query, ITable currentTable, Sort sort, int? count )
       {
          List<List<TEntry>> entries = new List<List<TEntry>>();
 
@@ -326,10 +326,13 @@ namespace Vibrant.Tsdb.Ats
             var iterable = (IIterablePartitionProvider<TKey>)_partitioningProvider;
             foreach( var table in _tableProvider.IterateTables( from, to ) )
             {
-               foreach( var partitionRange in iterable.IteratePartitions( id, from, to ) )
+               var computedFrom = table.ComputeFrom( from );
+               var computedTo = table.ComputeTo( to );
+
+               foreach( var partitionRange in iterable.IteratePartitions( id, computedFrom, computedTo ) )
                {
                   var specificQuery = new TableQuery<TsdbTableEntity>()
-                     .Where( CreateSpecificPartitionFilter( id, from, to, partitionRange ) );
+                     .Where( CreateSpecificPartitionFilter( id, computedFrom, computedTo, partitionRange ) );
 
                   tasks.Add( ReadInternal( specificQuery, table, sort, null ) );
                }
@@ -409,7 +412,7 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private async Task<List<TEntry>> ReadInternal( TableQuery<TsdbTableEntity> query, string suffix, Sort sort, int? take )
+      private async Task<List<TEntry>> ReadInternal( TableQuery<TsdbTableEntity> query, ITable suffix, Sort sort, int? take )
       {
          var table = GetTable( suffix );
 
@@ -691,7 +694,7 @@ namespace Vibrant.Tsdb.Ats
       {
          int count = 0;
 
-         string currentTable = _tableProvider.GetTable( to );
+         var currentTable = _tableProvider.GetTable( to );
 
          bool isFirstTable = true;
          bool queryMoreTables = true;
@@ -801,7 +804,7 @@ namespace Vibrant.Tsdb.Ats
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      private async Task WriteInternalLocked( string suffix, string partitionKey, List<TEntry> entries )
+      private async Task WriteInternalLocked( ITable suffix, string partitionKey, List<TEntry> entries )
       {
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
@@ -938,11 +941,11 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private CloudTable GetTable( string suffix )
+      private CloudTable GetTable( ITable tableRef )
       {
          lock( _sync )
          {
-            string fullTableName = _tableName + suffix;
+            string fullTableName = _tableName + tableRef.Suffix;
 
             CloudTable table;
             if( _tables.TryGetValue( fullTableName, out table ) )

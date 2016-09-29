@@ -8,23 +8,23 @@ namespace Vibrant.Tsdb.Ats
 {
    public class YearlyTableProvider : ITableProvider
    {
-      public string GetPreviousTable( string currentTable )
+      public ITable GetPreviousTable( ITable currentTable )
       {
-         return ( int.Parse( currentTable, CultureInfo.InvariantCulture ) - 1 ).ToString( CultureInfo.InvariantCulture );
+         return ( (YearlyTable)currentTable ).GetPrevious();
       }
 
-      public string GetTable( DateTime timestamp )
+      public ITable GetTable( DateTime timestamp )
       {
-         return timestamp.Year.ToString( CultureInfo.InvariantCulture );
+         return new YearlyTable( timestamp.Year );
       }
 
-      public IEnumerable<string> IterateTables( DateTime from, DateTime to )
+      public IEnumerable<ITable> IterateTables( DateTime from, DateTime to )
       {
          var fromYear = from.Year;
          var toYear = to.Year;
          for( int current = toYear ; current >= fromYear ; current-- )
          {
-            yield return current.ToString( CultureInfo.InvariantCulture );
+            yield return new YearlyTable( current );
          }
       }
    }
