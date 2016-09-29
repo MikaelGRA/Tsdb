@@ -19,7 +19,7 @@ namespace Vibrant.Tsdb.Ats
 
       public bool Equals( AtsTablePartition other )
       {
-         return Table == other.Table && PartitionKey == other.PartitionKey;
+         return Table.Equals( other.Table ) && PartitionKey == other.PartitionKey;
       }
 
       // override object.Equals
