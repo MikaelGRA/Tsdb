@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Vibrant.Tsdb;
 using Vibrant.Tsdb.Exceptions;
@@ -15,8 +16,9 @@ namespace Vibrant.Tsdb.Files
       public const int DefaultMaxFileSize = 1 * 1024 * 1024;
       public const long DefaultMaxStorageSize = 10L * 1024L * 1024L * 1024L;
       private static readonly string FileTemplate = "{0}.dat";
-
-      private object _sync = new object();
+      private static readonly Task _completed = Task.FromResult( true );
+      
+      private SemaphoreSlim _sem;
       private DirectoryInfo _directory;
       private FileInfo _currentFile;
       private int _maxFileSize;
@@ -30,6 +32,7 @@ namespace Vibrant.Tsdb.Files
          _maxFileSize = maxFileSize;
          _maxStorageSize = maxStorageSize;
          _keyConverter = keyConverter;
+         _sem = new SemaphoreSlim( 1, 1 );
 
          CalculateDirectorySize();
       }
@@ -44,9 +47,10 @@ namespace Vibrant.Tsdb.Files
       {
       }
 
-      public TemporaryReadResult<TKey, TEntry> Read( int count )
+      public async Task<TemporaryReadResult<TKey, TEntry>> ReadAsync( int count )
       {
-         lock( _sync )
+         await _sem.WaitAsync().ConfigureAwait( false );
+         try
          {
             int read = 0;
             Dictionary<string, Serie<TKey, TEntry>> series = new Dictionary<string, Serie<TKey, TEntry>>();
@@ -64,7 +68,8 @@ namespace Vibrant.Tsdb.Files
                      Serie<TKey, TEntry> serie;
                      if( !series.TryGetValue( id, out serie ) )
                      {
-                        serie = new Serie<TKey, TEntry>( _keyConverter.Convert( id ) );
+                        var key = await _keyConverter.ConvertAsync( id ).ConfigureAwait( false );
+                        serie = new Serie<TKey, TEntry>( key );
                         series.Add( id, serie );
                      }
 
@@ -86,13 +91,18 @@ namespace Vibrant.Tsdb.Files
                }
             }
 
-            return new TemporaryReadResult<TKey, TEntry>( series.Values.ToList(), () => Delete( modifications ) );
+            return new TemporaryReadResult<TKey, TEntry>( series.Values.ToList(), () => DeleteAsync( modifications ) );
+         }
+         finally
+         {
+            _sem.Release();
          }
       }
 
-      public void Write( IEnumerable<ISerie<TKey, TEntry>> series )
+      public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> series )
       {
-         lock( _sync )
+         _sem.Wait();
+         try
          {
             if( _currentSize > _maxStorageSize )
             {
@@ -174,11 +184,18 @@ namespace Vibrant.Tsdb.Files
             writer.Dispose();
             fileStream.Dispose();
          }
+         finally
+         {
+            _sem.Release();
+         }
+
+         return _completed;
       }
 
-      public void Delete()
+      public Task DeleteAsync()
       {
-         lock( _sync )
+         _sem.Wait();
+         try
          {
             foreach( var fi in _directory.EnumerateFiles( "*.dat" ) )
             {
@@ -186,11 +203,17 @@ namespace Vibrant.Tsdb.Files
                fi.Delete();
             }
          }
+         finally
+         {
+            _sem.Release();
+         }
+         return _completed;
       }
 
-      private void Delete( List<FileModificationRef> modifications )
+      private Task DeleteAsync( List<FileModificationRef> modifications )
       {
-         lock( _sync )
+         _sem.Wait();
+         try
          {
             foreach( var mod in modifications )
             {
@@ -198,6 +221,11 @@ namespace Vibrant.Tsdb.Files
                mod.PerformModification();
             }
          }
+         finally
+         {
+            _sem.Release();
+         }
+         return _completed;
       }
 
       private void CalculateDirectorySize()

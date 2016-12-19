@@ -125,14 +125,14 @@ namespace Vibrant.Tsdb.Ats.Serialization
          return data;
       }
 
-      public static Serie<TKey, TEntry> Deserialize<TKey, TEntry>( byte[] bytes, IKeyConverter<TKey> keyConverter )
+      public static async Task<Serie<TKey, TEntry>> Deserialize<TKey, TEntry>( byte[] bytes, IKeyConverter<TKey> keyConverter )
          where TEntry : IRedisEntry, new()
       {
          var stream = new MemoryStream( bytes );
          var reader = CreateReader( stream );
 
          var id = reader.ReadString();
-         var key = keyConverter.Convert( id );
+         var key = await keyConverter.ConvertAsync( id ).ConfigureAwait( false );
          var serie = new Serie<TKey, TEntry>( key );
 
          while( stream.Length != stream.Position )

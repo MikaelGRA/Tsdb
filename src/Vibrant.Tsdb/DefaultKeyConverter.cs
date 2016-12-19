@@ -89,9 +89,9 @@ namespace Vibrant.Tsdb
          return _toString( key );
       }
 
-      public TKey Convert( string key )
+      public Task<TKey> ConvertAsync( string key )
       {
-         return _toKey( key );
+         return Task.FromResult( _toKey( key ) );
       }
    }
 }

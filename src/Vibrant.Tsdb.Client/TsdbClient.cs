@@ -181,7 +181,7 @@ namespace Vibrant.Tsdb.Client
          do
          {
             // read
-            var batch = _temporaryStorage.Read( batchSize );
+            var batch = await _temporaryStorage.ReadAsync( batchSize ).ConfigureAwait( false );
 
             // set read count
             read = batch.Sum( x => x.GetEntries().Count );
@@ -194,7 +194,7 @@ namespace Vibrant.Tsdb.Client
                await Task.WhenAll( tasks ).ConfigureAwait( false );
 
                // delete
-               batch.Delete();
+               await batch.DeleteAsync().ConfigureAwait( false );
 
                _logger.Info( $"Moved {read} from temporary to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
                sw.Restart();
@@ -283,7 +283,7 @@ namespace Vibrant.Tsdb.Client
 
                try
                {
-                  _temporaryStorage.Write( series );
+                  _temporaryStorage.WriteAsync( series );
                }
                catch( Exception e2 )
                {

@@ -9,9 +9,9 @@ namespace Vibrant.Tsdb
    public class TemporaryReadResult<TKey, TEntry> : IEnumerable<ISerie<TKey, TEntry>>
       where TEntry : IEntry
    {
-      private Action _delete;
+      private Func<Task> _delete;
 
-      public TemporaryReadResult( List<Serie<TKey, TEntry>> entries, Action delete )
+      public TemporaryReadResult( List<Serie<TKey, TEntry>> entries, Func<Task> delete )
       {
          Series = entries;
          _delete = delete;
@@ -19,9 +19,9 @@ namespace Vibrant.Tsdb
 
       public List<Serie<TKey, TEntry>> Series { get; private set; }
 
-      public void Delete()
+      public Task DeleteAsync()
       {
-         _delete();
+         return _delete();
       }
 
       public IEnumerator<ISerie<TKey, TEntry>> GetEnumerator()

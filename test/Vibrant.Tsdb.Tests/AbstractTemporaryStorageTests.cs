@@ -56,7 +56,7 @@ namespace Vibrant.Tsdb.Tests
       public abstract TStorage GetStorage();
 
       [Fact]
-      public void Should_Write_And_Read_Basic_Rows()
+      public async Task Should_Write_And_Read_Basic_Rows()
       {
          var store = GetStorage();
          int count = 50000;
@@ -64,13 +64,13 @@ namespace Vibrant.Tsdb.Tests
          var to = from.AddSeconds( count );
 
          var written = CreateRows( from, count );
-         store.Write( written.Values );
+         await store.WriteAsync( written.Values );
 
          int i = 0;
          int seriesCount = 0;
          do
          {
-            var segment = store.Read( 533 );
+            var segment = await store.ReadAsync( 533 );
             foreach( var serie in segment.Series )
             {
                foreach( var entry in serie.Entries )
@@ -79,7 +79,7 @@ namespace Vibrant.Tsdb.Tests
                }
             }
 
-            segment.Delete();
+            await segment.DeleteAsync();
 
             seriesCount = segment.Series.Count;
          }

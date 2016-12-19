@@ -7,7 +7,7 @@ namespace Vibrant.Tsdb
 {
    public interface IKeyConverter<TKey>
    {
-      TKey Convert( string key );
+      Task<TKey> ConvertAsync( string key );
 
       string Convert( TKey key );
    }

@@ -201,7 +201,7 @@ namespace Vibrant.Tsdb.ConsoleApp
       }
 
       // requires optimal implementation
-      public BasicKey Convert( string key )
+      public async Task<BasicKey> ConvertAsync( string key )
       {
          var parts = key.Split( '|' ); // substring or string split???
          return new BasicKey

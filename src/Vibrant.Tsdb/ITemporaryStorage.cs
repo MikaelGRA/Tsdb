@@ -8,10 +8,10 @@ namespace Vibrant.Tsdb
    public interface ITemporaryStorage<TKey, TEntry>
       where TEntry : IEntry
    {
-      void Write( IEnumerable<ISerie<TKey, TEntry>> entries );
+      Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> entries );
 
-      TemporaryReadResult<TKey, TEntry> Read( int count );
+      Task<TemporaryReadResult<TKey, TEntry>> ReadAsync( int count );
 
-      void Delete();
+      Task DeleteAsync();
    }
 }

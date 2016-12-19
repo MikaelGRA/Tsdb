@@ -66,11 +66,11 @@ namespace Vibrant.Tsdb.Redis
          }
 
          var key = CreateSubscriptionKey( id, subscribe );
-         return _redisSubscriber.SubscribeAsync( key, ( channel, data ) =>
+         return _redisSubscriber.SubscribeAsync( key, async ( channel, data ) =>
          {
             try
             {
-               var entries = RedisSerializer.Deserialize<TKey, TEntry>( data, keyConverter );
+               var entries = await RedisSerializer.Deserialize<TKey, TEntry>( data, keyConverter ).ConfigureAwait( false );
                onMessage( entries );
             }
             catch( Exception e )
