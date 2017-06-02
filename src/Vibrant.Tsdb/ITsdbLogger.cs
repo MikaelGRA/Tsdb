@@ -7,6 +7,8 @@ namespace Vibrant.Tsdb
 {
    public interface ITsdbLogger
    {
+      void Trace( string message );
+
       void Debug( string message );
 
       void Info( string message );
@@ -16,6 +18,8 @@ namespace Vibrant.Tsdb
       void Error( string message );
 
       void Fatal( string message );
+
+      void Trace( Exception e, string message );
 
       void Debug( Exception e, string message );
 

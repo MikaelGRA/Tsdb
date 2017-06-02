@@ -217,5 +217,15 @@ namespace Vibrant.Tsdb.ConsoleApp
          sb.Append( key.Id.ToShortString() ).Append( "|" ).Append( key.Sampling ); // string builder of string concat?
          return sb.ToString();
       }
+
+      public void Trace(string message)
+      {
+         Console.WriteLine( "Trace: " + message );
+      }
+
+      public void Trace(Exception e, string message)
+      {
+         Console.WriteLine( "Trace: " + message + "(" + e.GetType().Name + ")" );
+      }
    }
 }

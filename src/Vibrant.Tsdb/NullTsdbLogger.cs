@@ -48,5 +48,13 @@ namespace Vibrant.Tsdb
       public void Warn( Exception e, string message )
       {
       }
+
+      public void Trace(string message)
+      {
+      }
+
+      public void Trace(Exception e, string message)
+      {
+      }
    }
 }

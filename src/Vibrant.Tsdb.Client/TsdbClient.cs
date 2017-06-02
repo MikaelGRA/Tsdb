@@ -112,7 +112,7 @@ namespace Vibrant.Tsdb.Client
                   await volume.WriteAsync( segment ).ConfigureAwait( false );
                   await segment.DeleteAsync().ConfigureAwait( false );
 
-                  _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+                  _logger.Trace( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
                }
                token = segment.ContinuationToken;
 
@@ -159,7 +159,7 @@ namespace Vibrant.Tsdb.Client
                   await volume.WriteAsync( segment ).ConfigureAwait( false );
                   await segment.DeleteAsync().ConfigureAwait( false );
 
-                  _logger.Info( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+                  _logger.Trace( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
                }
                token = segment.ContinuationToken;
 
@@ -196,7 +196,7 @@ namespace Vibrant.Tsdb.Client
                // delete
                await batch.DeleteAsync().ConfigureAwait( false );
 
-               _logger.Info( $"Moved {read} from temporary to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+               _logger.Trace( $"Moved {read} from temporary to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
                sw.Restart();
             }
          }
@@ -215,7 +215,7 @@ namespace Vibrant.Tsdb.Client
          tasks.AddRange( LookupVolumeStorages( items ).Select( c => c.Storage.WriteAsync( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         _logger.Info( $"Wrote {items.Count()} directly to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+         _logger.Trace( $"Wrote {items.Count()} directly to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
       }
 
       public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items )
@@ -269,7 +269,7 @@ namespace Vibrant.Tsdb.Client
          try
          {
             await storage.WriteAsync( series ).ConfigureAwait( false );
-            _logger.Info( $"Wrote {series.Sum( x => x.GetEntries().Count )} to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+            _logger.Trace( $"Wrote {series.Sum( x => x.GetEntries().Count )} to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
             return series;
          }
          catch( Exception e1 )
