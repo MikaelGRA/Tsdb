@@ -14,6 +14,7 @@ namespace Vibrant.Tsdb.Client
       private IVolumeStorageSelector<TKey, TEntry> _volumeStorageSelector;
       private IPublishSubscribe<TKey, TEntry> _remotePublishSubscribe;
       private ITemporaryStorage<TKey, TEntry> _temporaryStorage;
+      private ITaggableKeyStorage<TKey> _taggableKeyStorage;
       private ITsdbLogger _logger;
       private DefaultPublishSubscribe<TKey, TEntry> _localPublishSubscribe;
       private MigrationProvider<TKey, TEntry> _migrations;
@@ -21,6 +22,7 @@ namespace Vibrant.Tsdb.Client
       public TsdbClient(
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
          IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         ITaggableKeyStorage<TKey> taggableKeyStorage,
          IPublishSubscribe<TKey, TEntry> remotePublishSubscribe,
          ITemporaryStorage<TKey, TEntry> temporaryStorage,
          ITsdbLogger logger )
@@ -29,6 +31,7 @@ namespace Vibrant.Tsdb.Client
          _volumeStorageSelector = volumeStorageSelector;
          _remotePublishSubscribe = remotePublishSubscribe;
          _temporaryStorage = temporaryStorage;
+         _taggableKeyStorage = taggableKeyStorage;
          _localPublishSubscribe = new DefaultPublishSubscribe<TKey, TEntry>( false );
          _logger = logger;
          _migrations = new MigrationProvider<TKey, TEntry>( _dynamicStorageSelector, _volumeStorageSelector );
@@ -37,50 +40,56 @@ namespace Vibrant.Tsdb.Client
       public TsdbClient(
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
          IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         ITaggableKeyStorage<TKey> taggableKeyStorage,
          IPublishSubscribe<TKey, TEntry> remotePublishSubscribe,
          ITsdbLogger logger )
-         : this( dynamicStorageSelector, volumeStorageSelector, remotePublishSubscribe, null, logger )
+         : this( dynamicStorageSelector, volumeStorageSelector, taggableKeyStorage, remotePublishSubscribe, null, logger )
       {
       }
 
       public TsdbClient(
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
          IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         ITaggableKeyStorage<TKey> taggableKeyStorage,
          IPublishSubscribe<TKey, TEntry> remotePublishSubscribe,
          ITemporaryStorage<TKey, TEntry> temporaryStorage )
-         : this( dynamicStorageSelector, volumeStorageSelector, remotePublishSubscribe, temporaryStorage, NullTsdbLogger.Default )
+         : this( dynamicStorageSelector, volumeStorageSelector, taggableKeyStorage, remotePublishSubscribe, temporaryStorage, NullTsdbLogger.Default )
       {
       }
 
       public TsdbClient(
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
          IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         ITaggableKeyStorage<TKey> taggableKeyStorage,
          ITemporaryStorage<TKey, TEntry> temporaryStorage )
-         : this( dynamicStorageSelector, volumeStorageSelector, null, temporaryStorage, NullTsdbLogger.Default )
+         : this( dynamicStorageSelector, volumeStorageSelector, taggableKeyStorage, null, temporaryStorage, NullTsdbLogger.Default )
       {
       }
 
       public TsdbClient(
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
+         ITaggableKeyStorage<TKey> taggableKeyStorage,
          ITemporaryStorage<TKey, TEntry> temporaryStorage )
-         : this( dynamicStorageSelector, null, null, temporaryStorage, NullTsdbLogger.Default )
+         : this( dynamicStorageSelector, null, taggableKeyStorage, null, temporaryStorage, NullTsdbLogger.Default )
       {
       }
 
       public TsdbClient(
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
          IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         ITaggableKeyStorage<TKey> taggableKeyStorage,
          ITemporaryStorage<TKey, TEntry> temporaryStorage,
          ITsdbLogger logger )
-         : this( dynamicStorageSelector, volumeStorageSelector, null, temporaryStorage, logger )
+         : this( dynamicStorageSelector, volumeStorageSelector, taggableKeyStorage, null, temporaryStorage, logger )
       {
       }
 
       public TsdbClient(
          IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
+         ITaggableKeyStorage<TKey> taggableKeyStorage,
          ITemporaryStorage<TKey, TEntry> temporaryStorage,
          ITsdbLogger logger )
-         : this( dynamicStorageSelector, null, null, temporaryStorage, logger )
+         : this( dynamicStorageSelector, null, taggableKeyStorage, null, temporaryStorage, logger )
       {
       }
 
@@ -356,6 +365,15 @@ namespace Vibrant.Tsdb.Client
          return new ReadResult<TKey, TEntry>( key, Sort.Descending );
       }
 
+      public async Task ReadByTagsAsync( string measureTypeName, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<KeyValuePair<string, string>> groupedTags, object compositionStrategy )
+      {
+         // IF specific store does not support tags? But how do I know before having the keys?
+         var keys = await _taggableKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTags, groupedTags ).ConfigureAwait( false );
+
+
+
+      }
+
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
@@ -558,6 +576,54 @@ namespace Vibrant.Tsdb.Client
 
          return sr.Values;
       }
+
+      //private IEnumerable<DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>> LookupDynamicStorages( IEnumerable<ITaggedKey<TKey>> taggedIds )
+      //{
+      //   var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>>();
+
+      //   foreach( var id in taggedIds )
+      //   {
+      //      var storages = _dynamicStorageSelector.GetStorage( id.Key, null, null );
+      //      foreach( var storage in storages )
+      //      {
+      //         DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry> existingStorage;
+      //         if( !result.TryGetValue( storage, out existingStorage ) )
+      //         {
+      //            existingStorage = new DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>( storage.Storage );
+      //            existingStorage.Lookups = new List<ITaggedKey<TKey>>();
+      //            result.Add( storage, existingStorage );
+      //         }
+
+      //         existingStorage.Lookups.Add( id );
+      //      }
+      //   }
+
+      //   return result.Values;
+      //}
+
+      //private IEnumerable<DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>> LookupDynamicStorages( IEnumerable<ITaggedKey<TKey>> taggedIds, DateTime from, DateTime to )
+      //{
+      //   var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>>();
+
+      //   foreach( var id in taggedIds )
+      //   {
+      //      var storages = _dynamicStorageSelector.GetStorage( id.Key, null, null );
+      //      foreach( var storage in storages )
+      //      {
+      //         DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry> existingStorage;
+      //         if( !result.TryGetValue( storage, out existingStorage ) )
+      //         {
+      //            existingStorage = new DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>( storage.Storage, from, to );
+      //            existingStorage.Lookups = new List<ITaggedKey<TKey>>();
+      //            result.Add( storage, existingStorage );
+      //         }
+
+      //         existingStorage.Lookups.Add( id );
+      //      }
+      //   }
+
+      //   return result.Values;
+      //}
 
       private IEnumerable<DynamicStorageLookupResult<TKey, List<TKey>, TEntry>> LookupDynamicStorages( IEnumerable<TKey> ids )
       {
