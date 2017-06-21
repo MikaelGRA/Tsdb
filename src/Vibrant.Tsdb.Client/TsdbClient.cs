@@ -365,13 +365,70 @@ namespace Vibrant.Tsdb.Client
          return new ReadResult<TKey, TEntry>( key, Sort.Descending );
       }
 
-      public async Task ReadByTagsAsync( string measureTypeName, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<KeyValuePair<string, string>> groupedTags, object compositionStrategy )
+      public async Task ReadByGroupsAsync( string measureTypeName, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, GroupMethod groupMethod, Sort sort = Sort.Descending )
       {
+         var groupByTagsList = groupByTags.ToList(); // only iterate once
+         var requiredTagsDictionary = requiredTags.ToDictionary( x => x.Key, x => x.Value );
+
          // IF specific store does not support tags? But how do I know before having the keys?
-         var keys = await _taggableKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTags, groupedTags ).ConfigureAwait( false );
+         var taggedKeys = await _taggableKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTagsDictionary ).ConfigureAwait( false );
 
+         LookupDynamicStorages( taggedKeys ).Select( c => ReadThroughTagsAsync( c.Storage, c.Lookups, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) );
+         // query keys, then map back to tagged keys, then merge
 
+      }
 
+      private async Task ReadThroughTagsAsync( IStorage<TKey, TEntry> storage, IEnumerable<ITaggedKey<TKey>> taggedKeys, Dictionary<string, string> requiredTags, List<string> groupByTags, GroupMethod groupMethod, Sort sort )
+      {
+         if( false )
+         {
+            // if tag supporting storage (we need additional arameters!)
+         }
+         else
+         {
+            var lookups = taggedKeys.ToDictionary( x => x.Key );
+            var keys = lookups.Keys.ToList();
+
+            var result = await storage.ReadAsync( keys, sort );
+
+            // change into result with tagged keys
+            var taggedResults = result.WithTags( lookups );
+
+            // perform grouping
+            var groupedResults = new Dictionary<TagCollectionKey, List<TaggedReadResult<TKey, TEntry>>>();
+            int expectedSize = 32;
+            foreach( var taggedResult in taggedResults )
+            {
+               // construct key
+               var key = new TagCollectionKey( expectedSize );
+               foreach( var name in groupByTags )
+               {
+                  var value = taggedResult.TaggedKey.GetTagValue( name );
+                  key.Add( name, value );
+
+                  // FIXME: value MIGHT BE NULL??????????
+               }
+
+               key.Finish();
+               var actualSize = key.Size();
+               if( actualSize > expectedSize )
+               {
+                  expectedSize = actualSize;
+               }
+
+               List<TaggedReadResult<TKey, TEntry>> existingList;
+               if( !groupedResults.TryGetValue( key, out existingList ) )
+               {
+                  existingList = new List<TaggedReadResult<TKey, TEntry>>();
+                  groupedResults.Add( key, existingList );
+               }
+
+               existingList.Add( taggedResult );
+            }
+
+            // contruct GroupReadResults
+            // Needs: 'Group', 'MeasureTypeName', 'Entries', private 'Weight', 'Keys'?
+         }
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
@@ -577,53 +634,53 @@ namespace Vibrant.Tsdb.Client
          return sr.Values;
       }
 
-      //private IEnumerable<DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>> LookupDynamicStorages( IEnumerable<ITaggedKey<TKey>> taggedIds )
-      //{
-      //   var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>>();
+      private IEnumerable<DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>> LookupDynamicStorages( IEnumerable<ITaggedKey<TKey>> taggedIds )
+      {
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>>();
 
-      //   foreach( var id in taggedIds )
-      //   {
-      //      var storages = _dynamicStorageSelector.GetStorage( id.Key, null, null );
-      //      foreach( var storage in storages )
-      //      {
-      //         DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry> existingStorage;
-      //         if( !result.TryGetValue( storage, out existingStorage ) )
-      //         {
-      //            existingStorage = new DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>( storage.Storage );
-      //            existingStorage.Lookups = new List<ITaggedKey<TKey>>();
-      //            result.Add( storage, existingStorage );
-      //         }
+         foreach( var id in taggedIds )
+         {
+            var storages = _dynamicStorageSelector.GetStorage( id.Key, null, null );
+            foreach( var storage in storages )
+            {
+               DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  existingStorage = new DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>( storage.Storage );
+                  existingStorage.Lookups = new List<ITaggedKey<TKey>>();
+                  result.Add( storage, existingStorage );
+               }
 
-      //         existingStorage.Lookups.Add( id );
-      //      }
-      //   }
+               existingStorage.Lookups.Add( id );
+            }
+         }
 
-      //   return result.Values;
-      //}
+         return result.Values;
+      }
 
-      //private IEnumerable<DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>> LookupDynamicStorages( IEnumerable<ITaggedKey<TKey>> taggedIds, DateTime from, DateTime to )
-      //{
-      //   var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>>();
+      private IEnumerable<DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>> LookupDynamicStorages( IEnumerable<ITaggedKey<TKey>> taggedIds, DateTime from, DateTime to )
+      {
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>>();
 
-      //   foreach( var id in taggedIds )
-      //   {
-      //      var storages = _dynamicStorageSelector.GetStorage( id.Key, null, null );
-      //      foreach( var storage in storages )
-      //      {
-      //         DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry> existingStorage;
-      //         if( !result.TryGetValue( storage, out existingStorage ) )
-      //         {
-      //            existingStorage = new DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>( storage.Storage, from, to );
-      //            existingStorage.Lookups = new List<ITaggedKey<TKey>>();
-      //            result.Add( storage, existingStorage );
-      //         }
+         foreach( var id in taggedIds )
+         {
+            var storages = _dynamicStorageSelector.GetStorage( id.Key, null, null );
+            foreach( var storage in storages )
+            {
+               DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  existingStorage = new DynamicStorageLookupResult<TKey, List<ITaggedKey<TKey>>, TEntry>( storage.Storage, from, to );
+                  existingStorage.Lookups = new List<ITaggedKey<TKey>>();
+                  result.Add( storage, existingStorage );
+               }
 
-      //         existingStorage.Lookups.Add( id );
-      //      }
-      //   }
+               existingStorage.Lookups.Add( id );
+            }
+         }
 
-      //   return result.Values;
-      //}
+         return result.Values;
+      }
 
       private IEnumerable<DynamicStorageLookupResult<TKey, List<TKey>, TEntry>> LookupDynamicStorages( IEnumerable<TKey> ids )
       {

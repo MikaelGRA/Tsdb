@@ -29,12 +29,6 @@ namespace Vibrant.Tsdb
 
       public List<TEntry> Entries { get; private set; }
 
-      public ReadResult<TKey, TOutputEntry> As<TOutputEntry>()
-         where TOutputEntry : IEntry
-      {
-         return new ReadResult<TKey, TOutputEntry>( Key, Sort, Entries.Cast<TOutputEntry>().ToList() );
-      }
-
       public ReadResult<TKey, TEntry> MergeWith( ReadResult<TKey, TEntry> other )
       {
          Entries = MergeSort.Sort(
@@ -55,9 +49,9 @@ namespace Vibrant.Tsdb
          return Entries;
       }
 
-      public void Insert( ISerie<TKey, TEntry> other )
+      internal TaggedReadResult<TKey, TEntry> AsTaggedResult( ITaggedKey<TKey> taggedKey )
       {
-         Entries.AddRange( other.GetEntries() );
+         return new TaggedReadResult<TKey, TEntry>( taggedKey, Sort, Entries );
       }
    }
 }

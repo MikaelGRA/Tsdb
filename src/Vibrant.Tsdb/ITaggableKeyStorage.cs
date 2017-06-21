@@ -7,6 +7,8 @@ namespace Vibrant.Tsdb
 {
    public interface ITaggableKeyStorage<TKey>
    {
-      Task<IEnumerable<ITaggedKey<TKey>>> GetTaggedKeysAsync( string measureTypeName, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<KeyValuePair<string, string>> tagsToDecorate );
+      Task<IEnumerable<ITaggedKey<TKey>>> GetTaggedKeysAsync( string measureTypeName, IEnumerable<KeyValuePair<string, string>> requiredTags );
+
+      Task<IEnumerable<ITaggedKey<TKey>>> GetTaggedKeysAsync( IEnumerable<TKey> keys );
    }
 }
