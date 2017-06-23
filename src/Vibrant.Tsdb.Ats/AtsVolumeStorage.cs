@@ -138,6 +138,17 @@ namespace Vibrant.Tsdb.Ats
          return new MultiReadResult<TKey, TEntry>( tasks.ToDictionary( x => x.Result.Key, x => x.Result ) );
       }
 
+      public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
+      {
+         var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
+         foreach( var id in ids )
+         {
+            tasks.Add( ReadForId( id, to, sort ) );
+         }
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+         return new MultiReadResult<TKey, TEntry>( tasks.ToDictionary( x => x.Result.Key, x => x.Result ) );
+      }
+
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
@@ -176,6 +187,18 @@ namespace Vibrant.Tsdb.Ats
             sort,
             results.SelectMany( x => x.GetEntries<TKey, TEntry>( sort ) )
                .Where( x => x.GetTimestamp() >= from && x.GetTimestamp() < to )
+               .ToList() );
+      }
+
+      private async Task<ReadResult<TKey, TEntry>> ReadForId( TKey id, DateTime to, Sort sort )
+      {
+         var results = await RetrieveBeforeForId( id, to, sort ).ConfigureAwait( false );
+
+         return new ReadResult<TKey, TEntry>(
+            id,
+            sort,
+            results.SelectMany( x => x.GetEntries<TKey, TEntry>( sort ) )
+               .Where( x => x.GetTimestamp() < to )
                .ToList() );
       }
 
@@ -432,6 +455,24 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
+      private async Task<List<TsdbTableEntity>> RetrieveBeforeForId( TKey id, DateTime to, Sort sort )
+      {
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
+         {
+            var generalQuery = new TableQuery<TsdbTableEntity>()
+               .Where( CreateBeforeFilter( id, to ) );
+
+            var generalQueryResult = await PerformQuery( generalQuery, true, sort );
+            
+            if( sort == Sort.Ascending )
+            {
+               generalQueryResult.Reverse();
+            }
+
+            return generalQueryResult;
+         }
+      }
+
       private IEnumerable<EntrySplitResult<TKey, TEntry>> IterateByPartition( IEnumerable<ISerie<TKey, TEntry>> series )
       {
          Dictionary<string, EntrySplitResult<TKey, TEntry>> lookup = new Dictionary<string, EntrySplitResult<TKey, TEntry>>();
@@ -554,6 +595,22 @@ namespace Vibrant.Tsdb.Ats
                   TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.LessThanOrEqual, fromRowKey ),
                   TableOperators.And,
                   TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.GreaterThan, toRowKey ) ) );
+      }
+
+      private string CreateBeforeFilter( TKey key, DateTime to )
+      {
+         var id = _keyConverter.Convert( key );
+         var toRowKey = AtsKeyCalculator.CalculateRowKey( to );
+         var toPartitionKey = AtsKeyCalculator.CalculatePartitionKey( id, key, to, _partitioningProvider ); // 7125
+         var fromPartitionKey = AtsKeyCalculator.CalculateMinPartitionKey( id, key, _partitioningProvider ); // 9999
+
+         return TableQuery.CombineFilters(
+               TableQuery.CombineFilters(
+                  TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.LessThanOrEqual, fromPartitionKey ),
+                  TableOperators.And,
+                  TableQuery.GenerateFilterCondition( "PartitionKey", QueryComparisons.GreaterThanOrEqual, toPartitionKey ) ),
+            TableOperators.And,
+               TableQuery.GenerateFilterCondition( "RowKey", QueryComparisons.GreaterThan, toRowKey ) );
       }
 
       private string CreateFirstFilter( TKey key, DateTime from )

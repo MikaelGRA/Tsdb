@@ -5,11 +5,8 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public enum GroupMethod
+   public interface IMeasureType
    {
-      Average,
-      Sum,
-      Min,
-      Max
+      string GetName();
    }
 }

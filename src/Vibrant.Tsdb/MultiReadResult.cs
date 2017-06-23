@@ -87,16 +87,17 @@ namespace Vibrant.Tsdb
          return this;
       }
 
-      public MultiTaggedReadResult<TKey, TEntry> WithTags( IDictionary<TKey, ITaggedKey<TKey>> conversions )
+      public MultiTypedReadResult<TKey, TEntry, TMeasureType> WithTags<TMeasureType>( IDictionary<TKey, ITypedKey<TKey, TMeasureType>> conversions )
+         where TMeasureType : IMeasureType
       {
-         var convertedResults = new Dictionary<TKey, TaggedReadResult<TKey, TEntry>>();
+         var convertedResults = new Dictionary<TKey, TypedReadResult<TKey, TEntry, TMeasureType>>();
          foreach( var result in _results.Values )
          {
             var newKey = conversions[ result.Key ];
             var newResult = result.AsTaggedResult( newKey );
             convertedResults.Add( result.Key, newResult );
          }
-         return new MultiTaggedReadResult<TKey, TEntry>( convertedResults );
+         return new MultiTypedReadResult<TKey, TEntry, TMeasureType>( convertedResults );
       }
    }
 }

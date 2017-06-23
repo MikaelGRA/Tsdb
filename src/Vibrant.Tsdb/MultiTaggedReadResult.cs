@@ -6,58 +6,38 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public class MultiTaggedReadResult<TKey, TEntry> : IEnumerable<TaggedReadResult<TKey, TEntry>>
-     where TEntry : IEntry
+   public class MultiTaggedReadResult<TEntry, TMeasureType> : IEnumerable<TaggedReadResult<TEntry, TMeasureType>>
+      where TEntry : IEntry
+      where TMeasureType : IMeasureType
    {
-      private IDictionary<TKey, TaggedReadResult<TKey, TEntry>> _results;
+      private IDictionary<TagCollection, TaggedReadResult<TEntry, TMeasureType>> _results;
 
-      public MultiTaggedReadResult( IDictionary<TKey, TaggedReadResult<TKey, TEntry>> results )
+      public MultiTaggedReadResult( IDictionary<TagCollection, TaggedReadResult<TEntry, TMeasureType>> results )
       {
          _results = results;
       }
 
-      public MultiTaggedReadResult( IEnumerable<TaggedReadResult<TKey, TEntry>> results )
+      public TaggedReadResult<TEntry, TMeasureType> FindResult( TagCollection tags )
       {
-         _results = results.ToDictionary( x => x.Key );
+         return _results[ tags ];
       }
 
-      public MultiTaggedReadResult()
+      public TaggedReadResult<TEntry, TMeasureType> FindResult( IEnumerable<KeyValuePair<string, string>> tags )
       {
-         _results = new Dictionary<TKey, TaggedReadResult<TKey, TEntry>>();
+         return _results[ new TagCollection( tags ) ];
       }
 
-      public TaggedReadResult<TKey, TEntry> FindResult( TKey id )
+      public bool TryFindResult( TagCollection tags, out TaggedReadResult<TEntry, TMeasureType> readResult )
       {
-         return _results[ id ];
+         return _results.TryGetValue( tags, out readResult );
       }
 
-      public bool TryFindResult( TKey id, out TaggedReadResult<TKey, TEntry> readResult )
+      public bool TryFindResult( IEnumerable<KeyValuePair<string, string>> tags, out TaggedReadResult<TEntry, TMeasureType> readResult )
       {
-         return _results.TryGetValue( id, out readResult );
+         return _results.TryGetValue( new TagCollection( tags ), out readResult );
       }
 
-      public void AddOrMerge( MultiTaggedReadResult<TKey, TEntry> result )
-      {
-         foreach( var item in result )
-         {
-            AddOrMerge( item );
-         }
-      }
-
-      public void AddOrMerge( TaggedReadResult<TKey, TEntry> result )
-      {
-         TaggedReadResult<TKey, TEntry> existing;
-         if( _results.TryGetValue( result.Key, out existing ) )
-         {
-            existing.MergeWith( result );
-         }
-         else
-         {
-            _results.Add( result.Key, result );
-         }
-      }
-
-      public IEnumerator<TaggedReadResult<TKey, TEntry>> GetEnumerator()
+      public IEnumerator<TaggedReadResult<TEntry, TMeasureType>> GetEnumerator()
       {
          return _results.Values.GetEnumerator();
       }
@@ -65,26 +45,6 @@ namespace Vibrant.Tsdb
       IEnumerator IEnumerable.GetEnumerator()
       {
          return _results.Values.GetEnumerator();
-      }
-
-      public MultiTaggedReadResult<TKey, TEntry> MergeWith( MultiTaggedReadResult<TKey, TEntry> other )
-      {
-         foreach( var thisResult in this )
-         {
-            var otherResult = other.FindResult( thisResult.Key );
-            thisResult.MergeWith( otherResult );
-         }
-         return this;
-      }
-
-      public MultiReadResult<TKey, TEntry> MergeInto( MultiReadResult<TKey, TEntry> other )
-      {
-         foreach( var otherResult in other )
-         {
-            var thisResult = FindResult( otherResult.Key );
-            otherResult.MergeWith( thisResult );
-         }
-         return this;
       }
    }
 }

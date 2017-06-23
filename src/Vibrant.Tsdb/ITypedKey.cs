@@ -5,11 +5,12 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface ITaggedKey<TKey>
+   public interface ITypedKey<TKey, TMeasureType>
+      where TMeasureType : IMeasureType
    {
       TKey Key { get; }
 
-      string GetMeasurementType();
+      TMeasureType GetMeasureType();
 
       string GetTagValue( string key );
 

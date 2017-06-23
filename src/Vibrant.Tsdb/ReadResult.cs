@@ -49,9 +49,10 @@ namespace Vibrant.Tsdb
          return Entries;
       }
 
-      internal TaggedReadResult<TKey, TEntry> AsTaggedResult( ITaggedKey<TKey> taggedKey )
+      internal TypedReadResult<TKey, TEntry, TMeasureType> AsTaggedResult<TMeasureType>( ITypedKey<TKey, TMeasureType> typedKey )
+         where TMeasureType : IMeasureType
       {
-         return new TaggedReadResult<TKey, TEntry>( taggedKey, Sort, Entries );
+         return new TypedReadResult<TKey, TEntry, TMeasureType>( typedKey, Sort, Entries );
       }
    }
 }

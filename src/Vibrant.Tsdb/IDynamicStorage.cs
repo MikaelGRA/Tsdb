@@ -10,8 +10,6 @@ namespace Vibrant.Tsdb
    {
       Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedAsync( TKey id, DateTime? from, DateTime? to, int segmentSize, IContinuationToken continuationToken );
 
-      Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending );
-
       Task DeleteAsync( IEnumerable<TKey> ids, DateTime to );
    }
 
