@@ -7,6 +7,8 @@ namespace Vibrant.Tsdb.Ats
 {
    public interface ITableProvider
    {
+      int MaxTableMisses { get; }
+
       ITable GetTable( DateTime timestamp );
 
       ITable GetPreviousTable( ITable currentTable );

@@ -8,6 +8,14 @@ namespace Vibrant.Tsdb.Ats
 {
    public class YearlyTableProvider : ITableProvider
    {
+      public int MaxTableMisses
+      {
+         get
+         {
+            return 5;
+         }
+      }
+
       public ITable GetPreviousTable( ITable currentTable )
       {
          return ( (YearlyTable)currentTable ).GetPrevious();

@@ -208,7 +208,8 @@ namespace Vibrant.Tsdb.Ats
       {
          List<List<TEntry>> entries = new List<List<TEntry>>();
 
-         bool isFirstTable = true;
+         var maxTableMisses = _tableProvider.MaxTableMisses;
+         int tableMisses = 0;
          bool queryMoreTables = true;
          while( queryMoreTables )
          {
@@ -221,16 +222,19 @@ namespace Vibrant.Tsdb.Ats
                // determine if we should try more
                if( foundEntries.Count > 0 )
                {
+                  tableMisses = 0;
+
                   // we want to keep trying as we found something in this table (likely there MAY be more in previous table)
                   currentTable = _tableProvider.GetPreviousTable( currentTable );
                }
                else
                {
                   // we did NOT find anything in this table
-                  if( isFirstTable )
+                  if( tableMisses <= maxTableMisses )
                   {
                      // ONLY look in previous table if this was our FIRST iteration
                      currentTable = _tableProvider.GetPreviousTable( currentTable );
+                     tableMisses++;
                   }
                   else
                   {
@@ -243,8 +247,6 @@ namespace Vibrant.Tsdb.Ats
                // if we have found everything
                queryMoreTables = false;
             }
-
-            isFirstTable = false;
          }
 
          if( sort == Sort.Ascending )
@@ -526,7 +528,8 @@ namespace Vibrant.Tsdb.Ats
 
          var currentTable = _tableProvider.GetTable( to );
 
-         bool isFirstTable = true;
+         var maxTableMisses = _tableProvider.MaxTableMisses;
+         int tableMisses = 0;
          bool queryMoreTables = true;
          while( queryMoreTables )
          {
@@ -580,13 +583,16 @@ namespace Vibrant.Tsdb.Ats
                // if we found SOMETHING (in this table), but not enough
                if( foundInTable > 0 )
                {
+                  tableMisses = 0;
+
                   currentTable = _tableProvider.GetPreviousTable( currentTable );
                }
                else
                {
                   // found nothing in this table
-                  if( isFirstTable )
+                  if( tableMisses <= maxTableMisses )
                   {
+                     tableMisses++;
                      currentTable = _tableProvider.GetPreviousTable( currentTable );
                   }
                   else
@@ -595,8 +601,6 @@ namespace Vibrant.Tsdb.Ats
                   }
                }
             }
-
-            isFirstTable = false;
          }
 
 
@@ -696,7 +700,8 @@ namespace Vibrant.Tsdb.Ats
 
          var currentTable = _tableProvider.GetTable( to );
 
-         bool isFirstTable = true;
+         var maxTableMisses = _tableProvider.MaxTableMisses;
+         int tableMisses = 0;
          bool queryMoreTables = true;
          while( queryMoreTables )
          {
@@ -740,13 +745,17 @@ namespace Vibrant.Tsdb.Ats
             // if we have found something
             if( deletedFromTable > 0 )
             {
+               tableMisses = 0;
+
                currentTable = _tableProvider.GetPreviousTable( currentTable );
             }
             else
             {
                // we did NOT find anything in this table
-               if( isFirstTable )
+               if( tableMisses <= maxTableMisses )
                {
+                  tableMisses++;
+
                   // ONLY look in previous table if this was our FIRST iteration
                   currentTable = _tableProvider.GetPreviousTable( currentTable );
                }
@@ -755,8 +764,6 @@ namespace Vibrant.Tsdb.Ats
                   queryMoreTables = false;
                }
             }
-
-            isFirstTable = false;
          }
 
          return count;
