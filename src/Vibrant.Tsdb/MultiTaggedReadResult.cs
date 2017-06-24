@@ -12,6 +12,11 @@ namespace Vibrant.Tsdb
    {
       private IDictionary<TagCollection, TaggedReadResult<TEntry, TMeasureType>> _results;
 
+      public MultiTaggedReadResult()
+      {
+         _results = new Dictionary<TagCollection, TaggedReadResult<TEntry, TMeasureType>>();
+      }
+
       public MultiTaggedReadResult( IDictionary<TagCollection, TaggedReadResult<TEntry, TMeasureType>> results )
       {
          _results = results;

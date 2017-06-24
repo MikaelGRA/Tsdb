@@ -13,7 +13,5 @@ namespace Vibrant.Tsdb
       TMeasureType GetMeasureType();
 
       string GetTagValue( string key );
-
-      IEnumerable<KeyValuePair<string, string>> GetAllTags();
    }
 }

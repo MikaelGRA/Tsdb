@@ -8,5 +8,9 @@ namespace Vibrant.Tsdb
    public interface IMeasureType
    {
       string GetName();
+
+      IEnumerable<IFieldInfo> GetFields();
+
+      IEnumerable<string> GetTags(); // ITagInfo?
    }
 }

@@ -9,17 +9,7 @@ namespace Vibrant.Tsdb
       where TMeasureType : IMeasureType
    {
       Task<IEnumerable<ITypedKey<TKey, TMeasureType>>> GetTaggedKeysAsync( string measureTypeName, IEnumerable<KeyValuePair<string, string>> requiredTags );
-   }
 
-   public interface IAggregateFunctions<TEntry, TMeasureType>
-      where TMeasureType : IMeasureType
-   {
-      TEntry Sum( IEnumerable<TEntry> entries, TMeasureType measureType );
-
-      TEntry Average( IEnumerable<TEntry> entries, TMeasureType measureType );
-
-      TEntry Min( IEnumerable<TEntry> entries, TMeasureType measureType );
-
-      TEntry Max( IEnumerable<TEntry> entries, TMeasureType measureType );
+      Task<IEnumerable<ITypedKey<TKey, TMeasureType>>> GetTaggedKeysAsync( IEnumerable<TKey> keys );
    }
 }
