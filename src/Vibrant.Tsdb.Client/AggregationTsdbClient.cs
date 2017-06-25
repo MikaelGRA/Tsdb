@@ -8,7 +8,7 @@ using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb.Client
 {
-   public class AggregationTsdbClient<TKey, TEntry, TMeasureType>
+   public class AggregationTsdbClient<TKey, TEntry, TMeasureType> : ITypedStorage<TEntry, TMeasureType>
       where TEntry : IAggregatableEntry, new()
       where TMeasureType : IMeasureType
    {
@@ -33,22 +33,26 @@ namespace Vibrant.Tsdb.Client
       {
       }
 
-      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( 
-         string measureTypeName, 
-         IEnumerable<KeyValuePair<string, string>> requiredTags, 
-         IEnumerable<string> groupByTags, 
-         GroupMethod groupMethod, 
+      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync(
+         string measureTypeName,
+         IEnumerable<KeyValuePair<string, string>> requiredTags,
+         IEnumerable<string> groupByTags,
+         GroupMethod groupMethod,
          Sort sort = Sort.Descending )
       {
-         var sortedGroupByTagsList = groupByTags.ToList(); // only iterate once
-         sortedGroupByTagsList.Sort( StringComparer.Ordinal );
+         var groupByTagsList = groupByTags.ToList(); // only iterate once
          var requiredTagsDictionary = requiredTags.ToDictionary( x => x.Key, x => x.Value );
 
-         // IF specific store does not support tags? But how do I know before having the keys?
+         // get the type information for each key
          var typedKeys = await _typedKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTagsDictionary ).ConfigureAwait( false );
 
          // get results per storage
-         var tasks = LookupDynamicStorages( typedKeys ).Select( c => ReadThroughTagsAsync( c.Storage, c.Lookups, measureTypeName, requiredTagsDictionary, sortedGroupByTagsList, groupMethod, sort ) );
+         var tasks = LookupDynamicStorages( typedKeys ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
+         if( _volumeStorageSelector != null )
+         {
+            tasks.AddRange( LookupVolumeStorages( typedKeys ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ) );
+         }
+
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
          // get list of results
@@ -58,43 +62,160 @@ namespace Vibrant.Tsdb.Client
          return MergeTaggedResults( groupMethod, sort, results );
       }
 
-      private async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadThroughTagsAsync( 
-         IStorage<TKey, TEntry> storage, 
-         IEnumerable<ITypedKey<TKey, TMeasureType>> typedKeys, 
-         string measureTypeName, 
-         Dictionary<string, string> requiredTags, 
-         List<string> sortedGroupByTagsList, 
-         GroupMethod groupMethod, 
+      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync(
+         string measureTypeName,
+         DateTime to,
+         IEnumerable<KeyValuePair<string, string>> requiredTags,
+         IEnumerable<string> groupByTags,
+         GroupMethod groupMethod,
+         Sort sort = Sort.Descending )
+      {
+         var groupByTagsList = groupByTags.ToList(); // only iterate once
+         var requiredTagsDictionary = requiredTags.ToDictionary( x => x.Key, x => x.Value );
+
+         // get the type information for each key
+         var typedKeys = await _typedKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTagsDictionary ).ConfigureAwait( false );
+
+         // get results per storage
+         var tasks = LookupDynamicStorages( typedKeys, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.To.Value, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
+         if( _volumeStorageSelector != null )
+         {
+            tasks.AddRange( LookupVolumeStorages( typedKeys, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.To.Value, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ) );
+         }
+
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+         // get list of results
+         var results = tasks.Select( x => x.Result ).ToList();
+
+         // perform final merging
+         return MergeTaggedResults( groupMethod, sort, results );
+      }
+
+      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync(
+         string measureTypeName,
+         DateTime from,
+         DateTime to,
+         IEnumerable<KeyValuePair<string, string>> requiredTags,
+         IEnumerable<string> groupByTags,
+         GroupMethod groupMethod,
+         Sort sort = Sort.Descending )
+      {
+         var groupByTagsList = groupByTags.ToList(); // only iterate once
+         var requiredTagsDictionary = requiredTags.ToDictionary( x => x.Key, x => x.Value );
+
+         // get the type information for each key
+         var typedKeys = await _typedKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTagsDictionary ).ConfigureAwait( false );
+
+         // get results per storage
+         var tasks = LookupDynamicStorages( typedKeys, from, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.From.Value, c.To.Value, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
+         if( _volumeStorageSelector != null )
+         {
+            tasks.AddRange( LookupVolumeStorages( typedKeys, from, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.From.Value, c.To.Value, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ) );
+         }
+
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+         // get list of results
+         var results = tasks.Select( x => x.Result ).ToList();
+
+         // perform final merging
+         return MergeTaggedResults( groupMethod, sort, results );
+      }
+
+      private Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsForStoreAsync(
+         IStorage<TKey, TEntry> storage,
+         IEnumerable<ITypedKey<TKey, TMeasureType>> typedKeys,
+         string measureTypeName,
+         Dictionary<string, string> requiredTags,
+         List<string> groupByTagsList,
+         GroupMethod groupMethod,
          Sort sort )
       {
-         var typedStorage = storage as ITypedStorage<TKey, TEntry, TMeasureType>;
+         var typedStorage = storage as ITypedStorage<TEntry, TMeasureType>;
          if( typedStorage != null )
          {
-            return await typedStorage.ReadGroupsAsync( measureTypeName, requiredTags, sortedGroupByTagsList, groupMethod, sort ).ConfigureAwait( false );
+            return typedStorage.ReadGroupsAsync( measureTypeName, requiredTags, groupByTagsList, groupMethod, sort );
          }
          else
          {
-            // create lookup dictionary for keys to typed keys
-            var lookups = typedKeys.ToDictionary( x => x.Key );
-            var keys = lookups.Keys.ToList();
-            var measureType = lookups.First().Value.GetMeasureType();
-            var fields = measureType.GetFields().ToArray();
-
-            // get 'traditional results'
-            var result = await storage.ReadAsync( keys, sort ).ConfigureAwait( false );
-
-            // change into result with tagged keys
-            var typedResults = result.WithTags( lookups );
-
-            // perform grouping (GroupByTags())
-            var groupedResults = GroupByTags( sortedGroupByTagsList, typedResults );
-
-            // construct final result from previously grouped results
-            return MergeTypedResults( measureType, fields, groupMethod, sort, groupedResults );
+            return ReadGroupsForUnsupportedStoreAsync( storage, typedKeys, groupByTagsList, groupMethod, sort );
          }
       }
 
-      private MultiTaggedReadResult<TEntry, TMeasureType> MergeTaggedResults( 
+      private Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsForStoreAsync(
+         IStorage<TKey, TEntry> storage,
+         DateTime to,
+         IEnumerable<ITypedKey<TKey, TMeasureType>> typedKeys,
+         string measureTypeName,
+         Dictionary<string, string> requiredTags,
+         List<string> groupByTagsList,
+         GroupMethod groupMethod,
+         Sort sort )
+      {
+         var typedStorage = storage as ITypedStorage<TEntry, TMeasureType>;
+         if( typedStorage != null )
+         {
+            return typedStorage.ReadGroupsAsync( measureTypeName, to, requiredTags, groupByTagsList, groupMethod, sort );
+         }
+         else
+         {
+            return ReadGroupsForUnsupportedStoreAsync( storage, typedKeys, groupByTagsList, groupMethod, sort );
+         }
+      }
+
+      private Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsForStoreAsync(
+         IStorage<TKey, TEntry> storage,
+         DateTime from,
+         DateTime to,
+         IEnumerable<ITypedKey<TKey, TMeasureType>> typedKeys,
+         string measureTypeName,
+         Dictionary<string, string> requiredTags,
+         List<string> groupByTagsList,
+         GroupMethod groupMethod,
+         Sort sort )
+      {
+         var typedStorage = storage as ITypedStorage<TEntry, TMeasureType>;
+         if( typedStorage != null )
+         {
+            return typedStorage.ReadGroupsAsync( measureTypeName, from, to, requiredTags, groupByTagsList, groupMethod, sort );
+         }
+         else
+         {
+            return ReadGroupsForUnsupportedStoreAsync( storage, typedKeys, groupByTagsList, groupMethod, sort );
+         }
+      }
+
+      private async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsForUnsupportedStoreAsync(
+         IStorage<TKey, TEntry> storage,
+         IEnumerable<ITypedKey<TKey, TMeasureType>> typedKeys,
+         List<string> groupByTagsList,
+         GroupMethod groupMethod,
+         Sort sort )
+      {
+         // create lookup dictionary for keys to typed keys
+         var lookups = typedKeys.ToDictionary( x => x.Key );
+         var keys = lookups.Keys.ToList();
+         var measureType = lookups.First().Value.GetMeasureType();
+         var fields = measureType.GetFields().ToArray();
+
+         // get 'traditional results'
+         var result = await storage.ReadAsync( keys, sort ).ConfigureAwait( false );
+
+         // clear out results with no entries
+         result.ClearEmptyResults();
+
+         // change into result with tagged keys
+         var typedResults = result.WithTags( lookups );
+
+         // perform grouping (GroupByTags())
+         var groupedResults = GroupByTags( groupByTagsList, typedResults );
+
+         // construct final result from previously grouped results
+         return MergeTypedResults( measureType, fields, groupMethod, sort, groupedResults );
+      }
+
+      private MultiTaggedReadResult<TEntry, TMeasureType> MergeTaggedResults(
          GroupMethod groupMethod,
          Sort sort,
          List<MultiTaggedReadResult<TEntry, TMeasureType>> results )
@@ -144,9 +265,9 @@ namespace Vibrant.Tsdb.Client
          }
       }
 
-      private Dictionary<TagCollection, List<TypedReadResult<TKey, TEntry, TMeasureType>>> GroupByTags( 
+      private Dictionary<TagCollection, List<TypedReadResult<TKey, TEntry, TMeasureType>>> GroupByTags(
          List<string> sortedGroupByTagsList,
-         MultiTypedReadResult<TKey, TEntry, TMeasureType> typedResults)
+         MultiTypedReadResult<TKey, TEntry, TMeasureType> typedResults )
       {
          var groupedResults = new Dictionary<TagCollection, List<TypedReadResult<TKey, TEntry, TMeasureType>>>();
          foreach( var taggedResult in typedResults )
@@ -206,7 +327,7 @@ namespace Vibrant.Tsdb.Client
          return finalResult;
       }
 
-      private MultiTaggedReadResult<TEntry, TMeasureType> Merge( 
+      private MultiTaggedReadResult<TEntry, TMeasureType> Merge(
          TMeasureType measureType,
          IFieldInfo[] fields,
          GroupMethod groupMethod,
@@ -280,19 +401,151 @@ namespace Vibrant.Tsdb.Client
          return result.Values;
       }
 
+      private IEnumerable<DynamicStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupDynamicStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds, DateTime to )
+      {
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>>();
+
+         foreach( var id in taggedIds )
+         {
+            var storages = _dynamicStorageSelector.GetStorage( id.Key, null, to );
+            foreach( var storage in storages )
+            {
+               DynamicStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  var actualTo = to;
+                  if( storage.To < to )
+                  {
+                     actualTo = storage.To.Value;
+                  }
+
+                  existingStorage = new DynamicStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>( storage.Storage, null, actualTo );
+                  existingStorage.Lookups = new List<ITypedKey<TKey, TMeasureType>>();
+                  result.Add( storage, existingStorage );
+               }
+
+               existingStorage.Lookups.Add( id );
+            }
+         }
+
+         return result.Values;
+      }
+
       private IEnumerable<DynamicStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupDynamicStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds, DateTime from, DateTime to )
       {
          var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>>();
 
          foreach( var id in taggedIds )
          {
-            var storages = _dynamicStorageSelector.GetStorage( id.Key, null, null );
+            var storages = _dynamicStorageSelector.GetStorage( id.Key, from, to );
             foreach( var storage in storages )
             {
                DynamicStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry> existingStorage;
                if( !result.TryGetValue( storage, out existingStorage ) )
                {
-                  existingStorage = new DynamicStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>( storage.Storage, from, to );
+                  var actualFrom = from;
+                  if( storage.From > from )
+                  {
+                     actualFrom = storage.From.Value;
+                  }
+
+                  var actualTo = to;
+                  if( storage.To < to )
+                  {
+                     actualTo = storage.To.Value;
+                  }
+
+                  existingStorage = new DynamicStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>( storage.Storage, actualFrom, actualTo );
+                  existingStorage.Lookups = new List<ITypedKey<TKey, TMeasureType>>();
+                  result.Add( storage, existingStorage );
+               }
+
+               existingStorage.Lookups.Add( id );
+            }
+         }
+
+         return result.Values;
+      }
+
+      private IEnumerable<VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupVolumeStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds )
+      {
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>, VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>>();
+
+         foreach( var id in taggedIds )
+         {
+            var storages = _volumeStorageSelector.GetStorage( id.Key, null, null );
+            foreach( var storage in storages )
+            {
+               VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  existingStorage = new VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>( storage.Storage );
+                  existingStorage.Lookups = new List<ITypedKey<TKey, TMeasureType>>();
+                  result.Add( storage, existingStorage );
+               }
+
+               existingStorage.Lookups.Add( id );
+            }
+         }
+
+         return result.Values;
+      }
+
+      private IEnumerable<VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupVolumeStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds, DateTime to )
+      {
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>, VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>>();
+
+         foreach( var id in taggedIds )
+         {
+            var storages = _volumeStorageSelector.GetStorage( id.Key, null, to );
+            foreach( var storage in storages )
+            {
+               VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  var actualTo = to;
+                  if( storage.To < to )
+                  {
+                     actualTo = storage.To.Value;
+                  }
+
+                  existingStorage = new VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>( storage.Storage, null, actualTo );
+                  existingStorage.Lookups = new List<ITypedKey<TKey, TMeasureType>>();
+                  result.Add( storage, existingStorage );
+               }
+
+               existingStorage.Lookups.Add( id );
+            }
+         }
+
+         return result.Values;
+      }
+
+      private IEnumerable<VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupVolumeStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds, DateTime from, DateTime to )
+      {
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>, VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>>();
+
+         foreach( var id in taggedIds )
+         {
+            var storages = _volumeStorageSelector.GetStorage( id.Key, from, to );
+            foreach( var storage in storages )
+            {
+               VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry> existingStorage;
+               if( !result.TryGetValue( storage, out existingStorage ) )
+               {
+                  var actualFrom = from;
+                  if( storage.From > from )
+                  {
+                     actualFrom = storage.From.Value;
+                  }
+
+                  var actualTo = to;
+                  if( storage.To < to )
+                  {
+                     actualTo = storage.To.Value;
+                  }
+
+                  existingStorage = new VolumeStorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>( storage.Storage, actualFrom, actualTo );
                   existingStorage.Lookups = new List<ITypedKey<TKey, TMeasureType>>();
                   result.Add( storage, existingStorage );
                }
@@ -355,7 +608,7 @@ namespace Vibrant.Tsdb.Client
          for( int i = 0 ; i < fieldLen ; i++ )
          {
             var field = fields[ i ];
-            newEntry.SetField( field.Key, maxs[ i ] );
+            newEntry.SetField( field.Key, (object)maxs[ i ] );
          }
 
          return newEntry;
@@ -402,7 +655,7 @@ namespace Vibrant.Tsdb.Client
          for( int i = 0 ; i < fieldLen ; i++ )
          {
             var field = fields[ i ];
-            newEntry.SetField( field.Key, mins[ i ] );
+            newEntry.SetField( field.Key, (object)mins[ i ] );
          }
 
          return newEntry;
@@ -444,7 +697,7 @@ namespace Vibrant.Tsdb.Client
          for( int i = 0 ; i < fieldLen ; i++ )
          {
             var field = fields[ i ];
-            newEntry.SetField( field.Key, sums[ i ] );
+            newEntry.SetField( field.Key, (object)sums[ i ] );
          }
 
          return newEntry;
@@ -487,7 +740,7 @@ namespace Vibrant.Tsdb.Client
          for( int i = 0 ; i < fieldLen ; i++ )
          {
             var field = fields[ i ];
-            newEntry.SetField( field.Key, sums[ i ] / count );
+            newEntry.SetField( field.Key, (object)( sums[ i ] / count ) );
          }
 
          return newEntry;

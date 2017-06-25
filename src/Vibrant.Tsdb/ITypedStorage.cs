@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public interface ITypedStorage<TKey, TEntry, TMeasureType> : IStorage<TKey, TEntry> 
+   public interface ITypedStorage<TEntry, TMeasureType>
       where TEntry : IAggregatableEntry
       where TMeasureType : IMeasureType
    {

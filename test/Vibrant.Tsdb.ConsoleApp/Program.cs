@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Vibrant.Tsdb.Ats;
 using Vibrant.Tsdb.Client;
 using Vibrant.Tsdb.ConsoleApp.Entries;
+using Vibrant.Tsdb.ConsoleApp.Model;
 using Vibrant.Tsdb.Files;
 using Vibrant.Tsdb.Helpers;
 using Vibrant.Tsdb.Sql;
@@ -46,7 +47,7 @@ namespace Vibrant.Tsdb.ConsoleApp
          var ats = config.GetSection( "AtsStorage" );
          var sql = config.GetSection( "SqlStorage" );
          var redis = config.GetSection( "RedisCache" );
-         
+
          var startTime = DateTime.UtcNow;
 
          _dataSources = new List<DataSource>();
@@ -54,12 +55,12 @@ namespace Vibrant.Tsdb.ConsoleApp
          {
             _dataSources.Add( new DataSource( new BasicKey { Id = Guid.NewGuid(), Sampling = Sampling.Daily }, startTime, TimeSpan.FromMilliseconds( 10 ) ) );
          }
-         
-         var dats = new AtsDynamicStorage<BasicKey, BasicEntry>( 
-            "VatsTables1", 
+
+         var dats = new AtsDynamicStorage<BasicKey, BasicEntry>(
+            "DatsTables1",
             ats.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( AtsDynamicStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsDynamicStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
-            new YearlyPartitioningProvider<BasicKey>(), 
+            new YearlyPartitioningProvider<BasicKey>(),
             new YearlyTableProvider(),
             this );
 
@@ -77,32 +78,59 @@ namespace Vibrant.Tsdb.ConsoleApp
             new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>( dats, null, switchDate ),
          } );
 
-         var vats = new AtsVolumeStorage<BasicKey, BasicEntry>( 
-            "DatsTable1", 
+         var vats = new AtsVolumeStorage<BasicKey, BasicEntry>(
+            "VatsTable1",
             ats.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( AtsVolumeStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsVolumeStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
-            new YearlyPartitioningProvider<BasicKey>(), 
+            new YearlyPartitioningProvider<BasicKey>(),
             this );
 
-         var tfs = new TemporaryFileStorage<BasicKey, BasicEntry>( 
+         var tfs = new TemporaryFileStorage<BasicKey, BasicEntry>(
             @"C:\tsdb\cache",
             TemporaryFileStorage<BasicKey, BasicEntry>.DefaultMaxFileSize,
             TemporaryFileStorage<BasicKey, BasicEntry>.DefaultMaxStorageSize,
             this );
 
-         var client = new TsdbClient<BasicKey, BasicEntry>( selector, vats, tfs, this );
-         
-         // redis.GetSection( "ConnectionString" ).Value
+         //var client = new TsdbClient<BasicKey, BasicEntry>( selector, vats, tfs, this );
+
+         //var batcher = new TsdbWriteBatcher<BasicKey, BasicEntry>( client, PublicationType.None, TimeSpan.FromSeconds( 5 ), 20000, this );
+
+         //ThreadPool.QueueUserWorkItem( obj => batcher.Handle() );
+
+         ////var engine = new TsdbEngine<BasicKey, BasicEntry>( this, client );
+         ////engine.StartAsync().Wait();
+
+         //Console.WriteLine( $"Info: Writing entries..." );
+         //while( true )
+         //{
+         //   var now = DateTime.UtcNow;
+         //   foreach( var ds in _dataSources )
+         //   {
+         //      var serie = ds.GetEntries( now );
+
+         //      batcher.Write( serie );
+         //   }
+
+         //   Thread.Sleep( 1000 );
+         //}
+
+
+
+
+
+
+         var typeStorage = new TestTypedKeyStorage( _dataSources.Select( x => x.Id ) );
+         var client = new TsdbClient<BasicKey, BasicEntry>( dats, tfs, this );
+         var aggregationFunctions = new AggregationTsdbClient<BasicKey, BasicEntry, MeasureType>( dats, typeStorage, this );
 
          var batcher = new TsdbWriteBatcher<BasicKey, BasicEntry>( client, PublicationType.None, TimeSpan.FromSeconds( 5 ), 20000, this );
 
          ThreadPool.QueueUserWorkItem( obj => batcher.Handle() );
 
-         //var engine = new TsdbEngine<BasicKey, BasicEntry>( this, client );
-         //engine.StartAsync().Wait();
+         var from = DateTime.UtcNow;
 
          Console.WriteLine( $"Info: Writing entries..." );
-         while( true )
+         for( int i = 0 ; i < 5 ; i++ )
          {
             var now = DateTime.UtcNow;
             foreach( var ds in _dataSources )
@@ -114,6 +142,17 @@ namespace Vibrant.Tsdb.ConsoleApp
 
             Thread.Sleep( 1000 );
          }
+
+         var to = DateTime.UtcNow;
+
+
+         Thread.Sleep( 30000 );
+         Console.WriteLine( $"Info: Reading groupings..." );
+
+         // make optional or nullable...
+         var result = aggregationFunctions.ReadGroupsAsync( "Temperature", from, to, new Dictionary<string, string>(), new[] { "Placement" }, GroupMethod.Average ).Result;
+
+         Console.WriteLine( result.Sum( x => x.Entries.Count ) );
       }
 
       public Task<IEnumerable<TsdbVolumeMoval<BasicKey>>> GetAllMovalsAsync( DateTime now )
@@ -207,7 +246,7 @@ namespace Vibrant.Tsdb.ConsoleApp
          return new BasicKey
          {
             Id = GuidHelper.ParseShortGuid( parts[ 0 ] ),
-            Sampling = (Sampling)Enum.Parse( typeof(Sampling), parts[ 1 ] ), // dictionary lookup or parse?
+            Sampling = (Sampling)Enum.Parse( typeof( Sampling ), parts[ 1 ] ), // dictionary lookup or parse?
          };
       }
 
@@ -218,12 +257,12 @@ namespace Vibrant.Tsdb.ConsoleApp
          return sb.ToString();
       }
 
-      public void Trace(string message)
+      public void Trace( string message )
       {
          Console.WriteLine( "Trace: " + message );
       }
 
-      public void Trace(Exception e, string message)
+      public void Trace( Exception e, string message )
       {
          Console.WriteLine( "Trace: " + message + "(" + e.GetType().Name + ")" );
       }

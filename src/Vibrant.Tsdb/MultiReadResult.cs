@@ -87,6 +87,17 @@ namespace Vibrant.Tsdb
          return this;
       }
 
+      public void ClearEmptyResults()
+      {
+         foreach( var kvp in _results.ToList() )
+         {
+            if( kvp.Value.Entries.Count == 0 )
+            {
+               _results.Remove( kvp.Key );
+            }
+         }
+      }
+
       public MultiTypedReadResult<TKey, TEntry, TMeasureType> WithTags<TMeasureType>( IDictionary<TKey, ITypedKey<TKey, TMeasureType>> conversions )
          where TMeasureType : IMeasureType
       {

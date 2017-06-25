@@ -372,10 +372,10 @@ namespace Vibrant.Tsdb.Client
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
-         tasks.AddRange( LookupDynamicStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.From.Value, c.To.Value, sort ) ) );
+         tasks.AddRange( LookupDynamicStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.To.Value, c.To.Value, sort ) ) );
          if( _volumeStorageSelector != null )
          {
-            tasks.AddRange( LookupVolumeStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.From.Value, c.To.Value, sort ) ) );
+            tasks.AddRange( LookupVolumeStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.To.Value, c.To.Value, sort ) ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();
@@ -507,10 +507,10 @@ namespace Vibrant.Tsdb.Client
                VolumeStorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
                if( !result.TryGetValue( storage, out existingStorage ) )
                {
-                  var actualTo = storage.To ?? to;
-                  if( actualTo > to )
+                  var actualTo = to;
+                  if( storage.To < to )
                   {
-                     actualTo = to;
+                     actualTo = storage.To.Value;
                   }
 
                   existingStorage = new VolumeStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, null, actualTo );
@@ -537,16 +537,16 @@ namespace Vibrant.Tsdb.Client
                VolumeStorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
                if( !result.TryGetValue( storage, out existingStorage ) )
                {
-                  var actualFrom = storage.From ?? from;
-                  if( actualFrom < from )
+                  var actualFrom = from;
+                  if( storage.From > from )
                   {
-                     actualFrom = from;
+                     actualFrom = storage.From.Value;
                   }
 
-                  var actualTo = storage.To ?? to;
-                  if( actualTo > to )
+                  var actualTo = to;
+                  if( storage.To < to )
                   {
-                     actualTo = to;
+                     actualTo = storage.To.Value;
                   }
 
                   existingStorage = new VolumeStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, actualFrom, actualTo );
@@ -638,13 +638,13 @@ namespace Vibrant.Tsdb.Client
                DynamicStorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
                if( !result.TryGetValue( storage, out existingStorage ) )
                {
-                  var actualTo = storage.To ?? to;
-                  if( actualTo > to )
+                  var actualTo = to;
+                  if( storage.To < to )
                   {
-                     actualTo = to;
+                     actualTo = storage.To.Value;
                   }
 
-                  existingStorage = new DynamicStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, null, to );
+                  existingStorage = new DynamicStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, null, actualTo );
                   existingStorage.Lookups = new List<TKey>();
                   result.Add( storage, existingStorage );
                }
@@ -668,19 +668,19 @@ namespace Vibrant.Tsdb.Client
                DynamicStorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
                if( !result.TryGetValue( storage, out existingStorage ) )
                {
-                  var actualFrom = storage.From ?? from;
-                  if( actualFrom < from )
+                  var actualFrom = from;
+                  if( storage.From > from )
                   {
-                     actualFrom = from;
+                     actualFrom = storage.From.Value;
                   }
 
-                  var actualTo = storage.To ?? to;
-                  if( actualTo > to )
+                  var actualTo = to;
+                  if( storage.To < to )
                   {
-                     actualTo = to;
+                     actualTo = storage.To.Value;
                   }
 
-                  existingStorage = new DynamicStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, from, to );
+                  existingStorage = new DynamicStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, actualFrom, actualTo );
                   existingStorage.Lookups = new List<TKey>();
                   result.Add( storage, existingStorage );
                }

@@ -10,13 +10,15 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.ConsoleApp.Entries
 {
-   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, IFileEntry
+   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, IFileEntry, IAggregatableEntry
    {
       private KeyValuePair<string, string>[] _empty = new KeyValuePair<string, string>[ 0 ];
 
       public DateTime Timestamp { get; set; }
 
       public double Value { get; set; }
+
+      public int Count { get; set; } = 1;
 
       public DateTime GetTimestamp()
       {
@@ -41,6 +43,36 @@ namespace Vibrant.Tsdb.ConsoleApp.Entries
       public void Write( BinaryWriter writer )
       {
          writer.Write( Value );
+      }
+
+      void IAggregatableEntry.SetCount( int count )
+      {
+         Count = count;
+      }
+
+      int IAggregatableEntry.GetCount()
+      {
+         return Count;
+      }
+
+      object IAggregatableEntry.GetField( string name )
+      {
+         return Value;
+      }
+
+      void IAggregatableEntry.SetField( string name, object value )
+      {
+         Value = (double)value;
+      }
+
+      DateTime IEntry.GetTimestamp()
+      {
+         return Timestamp;
+      }
+
+      void IEntry.SetTimestamp( DateTime timestamp )
+      {
+         Timestamp = timestamp;
       }
    }
 }

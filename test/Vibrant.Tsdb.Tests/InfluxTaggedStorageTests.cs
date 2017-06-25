@@ -10,7 +10,7 @@ using Vibrant.Tsdb.Tests.Model;
 
 namespace Vibrant.Tsdb.Tests
 {
-   public class InfluxTaggedStorageTests : AbstractDynamicStorageTests<InfluxTaggedStorage<string, BasicEntry, MeasureType>>
+   public class InfluxTaggedStorageTests : AbstractTypedStorageTests<InfluxTaggedStorage<string, BasicEntry, MeasureType>>
    {
       private static readonly string Endpoint;
       private static readonly string Database;

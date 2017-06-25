@@ -9,7 +9,7 @@ using Vibrant.Tsdb.Exceptions;
 
 namespace Vibrant.Tsdb.InfluxDB
 {
-   public class InfluxTaggedStorage<TKey, TEntry, TMeasureType> : IDynamicStorage<TKey, TEntry>, IReversableDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, ITypedStorage<TKey, TEntry, TMeasureType>, IDisposable
+   public class InfluxTaggedStorage<TKey, TEntry, TMeasureType> : IDynamicStorage<TKey, TEntry>, IReversableDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, ITypedStorage<TEntry, TMeasureType>, IDisposable
       where TEntry : IAggregatableEntry, IInfluxEntry, new()
       where TMeasureType : IMeasureType
    {

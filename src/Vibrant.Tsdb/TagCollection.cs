@@ -16,8 +16,7 @@ namespace Vibrant.Tsdb
       {
          _tags = tags;
          var sb = new StringBuilder( _tags.Sum( x => x.Key.Length + x.Value.Length + 1 + Environment.NewLine.Length ) );
-
-         // FIXME: MUST!!! be sorted!
+         
          foreach( var tag in _tags.OrderBy( x => x.Key, StringComparer.Ordinal ) )
          {
             sb.Append( tag.Key );
