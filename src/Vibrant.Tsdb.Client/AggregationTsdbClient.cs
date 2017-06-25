@@ -70,7 +70,7 @@ namespace Vibrant.Tsdb.Client
          var typedStorage = storage as ITypedStorage<TKey, TEntry, TMeasureType>;
          if( typedStorage != null )
          {
-            return await typedStorage.ReadGroupsAsync( measureTypeName, requiredTags, sortedGroupByTagsList, groupMethod, sort );
+            return await typedStorage.ReadGroupsAsync( measureTypeName, requiredTags, sortedGroupByTagsList, groupMethod, sort ).ConfigureAwait( false );
          }
          else
          {
@@ -81,7 +81,7 @@ namespace Vibrant.Tsdb.Client
             var fields = measureType.GetFields().ToArray();
 
             // get 'traditional results'
-            var result = await storage.ReadAsync( keys, sort );
+            var result = await storage.ReadAsync( keys, sort ).ConfigureAwait( false );
 
             // change into result with tagged keys
             var typedResults = result.WithTags( lookups );

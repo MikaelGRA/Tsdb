@@ -11,8 +11,8 @@ namespace Vibrant.Tsdb
 
       int GetCount();
 
-      object GetField( string key );
+      object GetField( string name );
 
-      void SetField( string key, object field );
+      void SetField( string name, object value );
    }
 }

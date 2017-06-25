@@ -223,11 +223,11 @@ namespace Vibrant.Tsdb.Tests
 
          var read = await store.ReadLatestAsync( "row5", 2 );
 
+         await store.DeleteAsync( "row5" );
+
          Assert.Equal( 2, read.Entries.Count );
          Assert.Equal( serie.Entries[ 0 ].Value, read.Entries[ 0 ].Value );
          Assert.Equal( serie.Entries[ 1 ].Value, read.Entries[ 1 ].Value );
-
-         await store.DeleteAsync( "row5" );
       }
    }
 }

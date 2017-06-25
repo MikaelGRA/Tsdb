@@ -18,14 +18,15 @@ namespace Vibrant.Tsdb.InfluxDB
       public const int DefaultWriteParallelism = 5;
 
       private readonly StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>[] _defaultSelection;
-      private DateTime _maxTo = new DateTime( 2050, 1, 1, 0, 0, 0, DateTimeKind.Utc );
-      private object _sync = new object();
-      private InfluxClient _client;
-      private string _database;
+      private readonly DateTime _maxTo = new DateTime( 2050, 1, 1, 0, 0, 0, DateTimeKind.Utc );
+      private readonly object _sync = new object();
+      private readonly InfluxClient _client;
+      private readonly string _database;
+      private readonly EntryEqualityComparer<TKey, TEntry> _comparer;
+      private readonly IKeyConverter<TKey> _keyConverter;
+      private readonly IConcurrencyControl _cc;
+
       private Task _createDatabase;
-      private EntryEqualityComparer<TKey, TEntry> _comparer;
-      private IKeyConverter<TKey> _keyConverter;
-      private IConcurrencyControl _cc;
 
       public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, IConcurrencyControl concurrency, IKeyConverter<TKey> keyConverter )
       {
@@ -230,16 +231,6 @@ namespace Vibrant.Tsdb.InfluxDB
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
-      private string CreateSelectQuery( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort )
-      {
-         StringBuilder sb = new StringBuilder();
-         foreach( var id in ids )
-         {
-            sb.Append( $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.ToIso8601()}' <= time AND time < '{to.ToIso8601()}' ORDER BY time {GetQuery( sort )};" );
-         }
-         return sb.Remove( sb.Length - 1, 1 ).ToString();
-      }
-
       private string CreateSegmentedSelectQuery( TKey id, DateTime? from, DateTime? to, int take, bool reverse, bool isFirstSegment )
       {
          if( !reverse || isFirstSegment )
@@ -280,6 +271,16 @@ namespace Vibrant.Tsdb.InfluxDB
                return $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{_maxTo.ToIso8601()}' ORDER BY time {( reverse ? "ASC" : "DESC" )} LIMIT {take}";
             }
          }
+      }
+
+      private string CreateSelectQuery( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort )
+      {
+         StringBuilder sb = new StringBuilder();
+         foreach( var id in ids )
+         {
+            sb.Append( $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE '{from.ToIso8601()}' <= time AND time < '{to.ToIso8601()}' ORDER BY time {GetQuery( sort )};" );
+         }
+         return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
       private string CreateSelectQuery( IEnumerable<TKey> ids, DateTime to, Sort sort )

@@ -11,6 +11,6 @@ namespace Vibrant.Tsdb
 
       IEnumerable<IFieldInfo> GetFields();
 
-      IEnumerable<string> GetTags(); // ITagInfo?
+      IEnumerable<string> GetTags();
    }
 }

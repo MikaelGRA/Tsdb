@@ -15,10 +15,10 @@
    "dependencies": {
       "Microsoft.CSharp": "4.0.1",
       "Vibrant.Tsdb": "6.0.0-*",
-      "Vibrant.InfluxDB.Client": "2.1.0",
       "System.Reflection": "4.1.0",
       "System.Reflection.Extensions": "4.0.1",
-      "System.Reflection.TypeExtensions": "4.1.0"
+      "System.Reflection.TypeExtensions": "4.1.0",
+      "Vibrant.InfluxDB.Client": "3.1.0"
    },
 
    "frameworks": {

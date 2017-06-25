@@ -12,6 +12,6 @@ namespace Vibrant.Tsdb
 
       TMeasureType GetMeasureType();
 
-      string GetTagValue( string key );
+      string GetTagValue( string name );
    }
 }

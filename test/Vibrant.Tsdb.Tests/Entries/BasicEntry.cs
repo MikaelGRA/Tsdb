@@ -13,7 +13,7 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.Tests.Entries
 {
-   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, IInfluxEntry, IFileEntry
+   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, IInfluxEntry, IFileEntry, IAggregatableEntry
    {
       private static readonly KeyValuePair<string, string>[] _empty = new KeyValuePair<string, string>[ 0 ];
 
@@ -21,7 +21,7 @@ namespace Vibrant.Tsdb.Tests.Entries
       {
          Fields = new SortedDictionary<string, object>( StringComparer.Ordinal );
       }
-      
+
       public DateTime Timestamp { get; set; }
 
       public double Value
@@ -29,7 +29,7 @@ namespace Vibrant.Tsdb.Tests.Entries
          get
          {
             object value;
-            if(Fields.TryGetValue("Value", out value ) )
+            if( Fields.TryGetValue( "Value", out value ) )
             {
                return (double)value;
             }
@@ -105,6 +105,41 @@ namespace Vibrant.Tsdb.Tests.Entries
       IEnumerable<KeyValuePair<string, object>> IInfluxRow.GetAllFields()
       {
          return Fields;
+      }
+
+      void IAggregatableEntry.SetCount( int count )
+      {
+         Fields[ "Count" ] = count;
+      }
+
+      int IAggregatableEntry.GetCount()
+      {
+         object count;
+         if( !Fields.TryGetValue( "Count", out count ) )
+         {
+            return 1;
+         }
+         return (int)count;
+      }
+
+      object IAggregatableEntry.GetField( string name )
+      {
+         return Fields[ name ];
+      }
+
+      void IAggregatableEntry.SetField( string name, object value )
+      {
+         Fields[ name ] = value;
+      }
+
+      DateTime IEntry.GetTimestamp()
+      {
+         return Timestamp;
+      }
+
+      void IEntry.SetTimestamp( DateTime timestamp )
+      {
+         Timestamp = timestamp;
       }
 
       #endregion

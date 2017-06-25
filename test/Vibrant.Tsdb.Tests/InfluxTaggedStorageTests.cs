@@ -6,15 +6,17 @@ using Microsoft.Extensions.Configuration;
 using Vibrant.Tsdb.Tests.Entries;
 using Vibrant.Tsdb.InfluxDB;
 using Vibrant.Tsdb.Sql;
+using Vibrant.Tsdb.Tests.Model;
 
 namespace Vibrant.Tsdb.Tests
 {
-   public class InfluxStorageTests : AbstractDynamicStorageTests<InfluxDynamicStorage<string, BasicEntry>>
+   public class InfluxTaggedStorageTests : AbstractDynamicStorageTests<InfluxTaggedStorage<string, BasicEntry, MeasureType>>
    {
       private static readonly string Endpoint;
       private static readonly string Database;
+      private static readonly TestTypedKeyStorage KeyStorage;
 
-      static InfluxStorageTests()
+      static InfluxTaggedStorageTests()
       {
          var builder = new ConfigurationBuilder()
             .AddJsonFile( "appsettings.json" )
@@ -24,11 +26,24 @@ namespace Vibrant.Tsdb.Tests
          var ats = config.GetSection( "InfluxStorage" );
          Endpoint = ats.GetSection( "Endpoint" ).Value;
          Database = ats.GetSection( "Database" ).Value;
+
+         KeyStorage = new TestTypedKeyStorage( new[]
+         {
+            "row1",
+            "row2",
+            "row3",
+            "row4",
+            "row5",
+            "row6",
+            "row7",
+            "rowlol2",
+            "rowlol3"
+         } );
       }
 
-      public override InfluxDynamicStorage<string, BasicEntry> GetStorage( string tableName )
+      public override InfluxTaggedStorage<string, BasicEntry, MeasureType> GetStorage( string tableName )
       {
-         return new InfluxDynamicStorage<string, BasicEntry>( new Uri( Endpoint ), Database );
+         return new InfluxTaggedStorage<string, BasicEntry, MeasureType>( new Uri( Endpoint ), Database, KeyStorage );
       }
    }
 }
