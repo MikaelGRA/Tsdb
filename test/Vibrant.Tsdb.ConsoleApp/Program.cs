@@ -57,7 +57,7 @@ namespace Vibrant.Tsdb.ConsoleApp
          }
 
          var dats = new AtsDynamicStorage<BasicKey, BasicEntry>(
-            "DatsTables1",
+            "DatsTables13",
             ats.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( AtsDynamicStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsDynamicStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
             new YearlyPartitioningProvider<BasicKey>(),
@@ -150,7 +150,8 @@ namespace Vibrant.Tsdb.ConsoleApp
          Console.WriteLine( $"Info: Reading groupings..." );
 
          // make optional or nullable...
-         var result = aggregationFunctions.ReadGroupsAsync( "Temperature", from, to, new Dictionary<string, string>(), new[] { "Placement" }, GroupMethod.Average ).Result;
+         //var result = client.ReadLatestAsync( _dataSources.Select( x => x.Id ), 10 ).Result;
+         var result = aggregationFunctions.ReadGroupsAsync( "Temperature", /*from, to,*/ new Dictionary<string, string>(), new[] { "Placement" }, GroupMethod.Average ).Result;
 
          Console.WriteLine( result.Sum( x => x.Entries.Count ) );
       }

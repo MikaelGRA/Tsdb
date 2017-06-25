@@ -139,7 +139,7 @@ namespace Vibrant.Tsdb.Client
          }
          else
          {
-            return ReadGroupsForUnsupportedStoreAsync( storage, typedKeys, groupByTagsList, groupMethod, sort );
+            return ReadGroupsForUnsupportedStoreAsync( storage, null, null, typedKeys, groupByTagsList, groupMethod, sort );
          }
       }
 
@@ -160,7 +160,7 @@ namespace Vibrant.Tsdb.Client
          }
          else
          {
-            return ReadGroupsForUnsupportedStoreAsync( storage, typedKeys, groupByTagsList, groupMethod, sort );
+            return ReadGroupsForUnsupportedStoreAsync( storage, null, to, typedKeys, groupByTagsList, groupMethod, sort );
          }
       }
 
@@ -182,12 +182,14 @@ namespace Vibrant.Tsdb.Client
          }
          else
          {
-            return ReadGroupsForUnsupportedStoreAsync( storage, typedKeys, groupByTagsList, groupMethod, sort );
+            return ReadGroupsForUnsupportedStoreAsync( storage, from, to, typedKeys, groupByTagsList, groupMethod, sort );
          }
       }
 
       private async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsForUnsupportedStoreAsync(
          IStorage<TKey, TEntry> storage,
+         DateTime? from,
+         DateTime? to,
          IEnumerable<ITypedKey<TKey, TMeasureType>> typedKeys,
          List<string> groupByTagsList,
          GroupMethod groupMethod,
@@ -200,7 +202,19 @@ namespace Vibrant.Tsdb.Client
          var fields = measureType.GetFields().ToArray();
 
          // get 'traditional results'
-         var result = await storage.ReadAsync( keys, sort ).ConfigureAwait( false );
+         MultiReadResult<TKey, TEntry> result;
+         if( from.HasValue && to.HasValue )
+         {
+            result = await storage.ReadAsync( keys, from.Value, to.Value, sort ).ConfigureAwait( false );
+         }
+         else if( to.HasValue )
+         {
+            result = await storage.ReadAsync( keys, to.Value, sort ).ConfigureAwait( false );
+         }
+         else
+         {
+            result = await storage.ReadAsync( keys, sort ).ConfigureAwait( false );
+         }
 
          // clear out results with no entries
          result.ClearEmptyResults();
