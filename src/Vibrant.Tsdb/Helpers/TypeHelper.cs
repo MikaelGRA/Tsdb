@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Helpers
 {
-   public static class TypeHelper
+   internal static class TypeHelper
    {
       private static Dictionary<Type, object> _defaultValues = new Dictionary<Type, object>();
 

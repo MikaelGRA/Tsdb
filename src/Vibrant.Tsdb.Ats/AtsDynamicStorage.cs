@@ -28,7 +28,6 @@ namespace Vibrant.Tsdb.Ats
       private ITableProvider _tableProvider;
       private IKeyConverter<TKey> _keyConverter;
       private IConcurrencyControl _cc;
-      private EntryEqualityComparer<TKey, TEntry> _comparer;
 
       public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider tableProvider, IKeyConverter<TKey> keyConverter )
       {
@@ -38,7 +37,6 @@ namespace Vibrant.Tsdb.Ats
          _client = _account.CreateCloudTableClient();
          _partitioningProvider = partitioningProvider;
          _tableProvider = tableProvider;
-         _comparer = new EntryEqualityComparer<TKey, TEntry>();
          _keyConverter = keyConverter;
          _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
          _tables = new Dictionary<string, CloudTable>();

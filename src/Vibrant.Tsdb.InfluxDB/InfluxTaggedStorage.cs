@@ -21,7 +21,6 @@ namespace Vibrant.Tsdb.InfluxDB
       private readonly object _sync = new object();
       private readonly InfluxClient _client;
       private readonly string _database;
-      private readonly EntryEqualityComparer<TKey, TEntry> _comparer;
       private readonly IKeyConverter<TKey> _keyConverter;
       private readonly IConcurrencyControl _cc;
       private readonly ITypedKeyStorage<TKey, TMeasureType> _typeStorage;
@@ -35,8 +34,7 @@ namespace Vibrant.Tsdb.InfluxDB
 
          _client.DefaultQueryOptions.Precision = TimestampPrecision.Nanosecond;
          _client.DefaultWriteOptions.Precision = TimestampPrecision.Nanosecond;
-
-         _comparer = new EntryEqualityComparer<TKey, TEntry>();
+         
          _keyConverter = keyConverter;
          _cc = concurrency;
          _typeStorage = typeStorage;

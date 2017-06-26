@@ -16,7 +16,6 @@ namespace Vibrant.Tsdb.Client
       private readonly IDynamicStorageSelector<TKey, TEntry> _dynamicStorageSelector;
       private readonly IVolumeStorageSelector<TKey, TEntry> _volumeStorageSelector;
       private readonly ITsdbLogger _logger;
-      private readonly Dictionary<AggregationExpressionKey, Func<IEnumerable<TEntry>, IFieldInfo[], TEntry>> _cachedExpressions;
 
       public AggregationTsdbClient( IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector, IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector, ITypedKeyStorage<TKey, TMeasureType> typedKeyStorage, ITsdbLogger logger )
       {
@@ -24,8 +23,6 @@ namespace Vibrant.Tsdb.Client
          _dynamicStorageSelector = dynamicStorageSelector;
          _volumeStorageSelector = volumeStorageSelector;
          _logger = logger;
-
-         _cachedExpressions = new Dictionary<AggregationExpressionKey, Func<IEnumerable<TEntry>, IFieldInfo[], TEntry>>();
       }
 
       public AggregationTsdbClient( IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector, ITypedKeyStorage<TKey, TMeasureType> typedKeyStorage, ITsdbLogger logger )

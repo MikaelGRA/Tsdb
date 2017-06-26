@@ -36,7 +36,7 @@ namespace Vibrant.Tsdb
          return _results.TryGetValue( id, out readResult );
       }
 
-      public void AddOrMerge( MultiReadResult<TKey, TEntry> result )
+      internal void AddOrMerge( MultiReadResult<TKey, TEntry> result )
       {
          foreach( var item in result )
          {
@@ -44,7 +44,7 @@ namespace Vibrant.Tsdb
          }
       }
 
-      public void AddOrMerge( ReadResult<TKey, TEntry> result )
+      internal void AddOrMerge( ReadResult<TKey, TEntry> result )
       {
          ReadResult<TKey, TEntry> existing;
          if( _results.TryGetValue( result.Key, out existing ) )
@@ -67,27 +67,7 @@ namespace Vibrant.Tsdb
          return _results.Values.GetEnumerator();
       }
 
-      public MultiReadResult<TKey, TEntry> MergeWith( MultiReadResult<TKey, TEntry> other )
-      {
-         foreach( var thisResult in this )
-         {
-            var otherResult = other.FindResult( thisResult.Key );
-            thisResult.MergeWith( otherResult );
-         }
-         return this;
-      }
-
-      public MultiReadResult<TKey, TEntry> MergeInto( MultiReadResult<TKey, TEntry> other )
-      {
-         foreach( var otherResult in other )
-         {
-            var thisResult = FindResult( otherResult.Key );
-            otherResult.MergeWith( thisResult );
-         }
-         return this;
-      }
-
-      public void ClearEmptyResults()
+      internal void ClearEmptyResults()
       {
          foreach( var kvp in _results.ToList() )
          {
@@ -98,7 +78,7 @@ namespace Vibrant.Tsdb
          }
       }
 
-      public MultiTypedReadResult<TKey, TEntry, TMeasureType> WithTags<TMeasureType>( IDictionary<TKey, ITypedKey<TKey, TMeasureType>> conversions )
+      internal MultiTypedReadResult<TKey, TEntry, TMeasureType> WithTags<TMeasureType>( IDictionary<TKey, ITypedKey<TKey, TMeasureType>> conversions )
          where TMeasureType : IMeasureType
       {
          var convertedResults = new Dictionary<TKey, TypedReadResult<TKey, TEntry, TMeasureType>>();

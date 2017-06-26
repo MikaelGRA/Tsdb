@@ -29,7 +29,7 @@ namespace Vibrant.Tsdb
 
       public List<TEntry> Entries { get; private set; }
 
-      public ReadResult<TKey, TEntry> MergeWith( ReadResult<TKey, TEntry> other )
+      internal ReadResult<TKey, TEntry> MergeWith( ReadResult<TKey, TEntry> other )
       {
          Entries = MergeSort.Sort(
             collections: new[] { Entries, other.Entries },
