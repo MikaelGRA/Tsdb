@@ -84,7 +84,7 @@ namespace Vibrant.Tsdb.InfluxDB
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             series = series.ToList(); // ensure we only iterate once
-            var keys = await _typeStorage.GetTaggedKeysAsync( series.Select( x => x.GetKey() ) ).ConfigureAwait( false );
+            var keys = await _typeStorage.GetTaggedKeysOrThrowAsync( series.Select( x => x.GetKey() ) ).ConfigureAwait( false );
             var keyDictionary = keys.ToDictionary( x => x.Key );
 
             await CreateDatabase().ConfigureAwait( false );
@@ -97,7 +97,7 @@ namespace Vibrant.Tsdb.InfluxDB
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
-            var keys = await _typeStorage.GetTaggedKeysAsync( ids ).ConfigureAwait( false );
+            var keys = await _typeStorage.GetTaggedKeysOrThrowAsync( ids ).ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateDeleteQuery( keys, from, to ) ).ConfigureAwait( false );
          }
       }
@@ -107,7 +107,7 @@ namespace Vibrant.Tsdb.InfluxDB
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
-            var keys = await _typeStorage.GetTaggedKeysAsync( ids ).ConfigureAwait( false );
+            var keys = await _typeStorage.GetTaggedKeysOrThrowAsync( ids ).ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateDeleteQuery( keys, to ) ).ConfigureAwait( false );
          }
       }
@@ -117,7 +117,7 @@ namespace Vibrant.Tsdb.InfluxDB
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
             await CreateDatabase().ConfigureAwait( false );
-            var keys = await _typeStorage.GetTaggedKeysAsync( ids ).ConfigureAwait( false );
+            var keys = await _typeStorage.GetTaggedKeysOrThrowAsync( ids ).ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateDeleteQuery( keys ) ).ConfigureAwait( false );
          }
       }
@@ -183,7 +183,7 @@ namespace Vibrant.Tsdb.InfluxDB
             await CreateDatabase().ConfigureAwait( false );
             List<TKey> keys = ids.ToList();
 
-            var typedKeys = await _typeStorage.GetTaggedKeysAsync( keys ).ConfigureAwait( false );
+            var typedKeys = await _typeStorage.GetTaggedKeysOrThrowAsync( keys ).ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateLatestSelectQuery( typedKeys, count ) ).ConfigureAwait( false );
             return Convert( keys, resultSet, Sort.Descending );
          }
@@ -196,7 +196,7 @@ namespace Vibrant.Tsdb.InfluxDB
             await CreateDatabase().ConfigureAwait( false );
             List<TKey> keys = ids.ToList();
 
-            var typedKeys = await _typeStorage.GetTaggedKeysAsync( keys ).ConfigureAwait( false );
+            var typedKeys = await _typeStorage.GetTaggedKeysOrThrowAsync( keys ).ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( typedKeys, sort ) ).ConfigureAwait( false );
             return Convert( keys, resultSet, sort );
          }
@@ -209,7 +209,7 @@ namespace Vibrant.Tsdb.InfluxDB
             await CreateDatabase().ConfigureAwait( false );
             List<TKey> keys = ids.ToList();
 
-            var typedKeys = await _typeStorage.GetTaggedKeysAsync( keys ).ConfigureAwait( false );
+            var typedKeys = await _typeStorage.GetTaggedKeysOrThrowAsync( keys ).ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( typedKeys, to, sort ) ).ConfigureAwait( false );
             return Convert( keys, resultSet, sort );
          }
@@ -222,7 +222,7 @@ namespace Vibrant.Tsdb.InfluxDB
             await CreateDatabase().ConfigureAwait( false );
             List<TKey> keys = ids.ToList();
 
-            var typedKeys = await _typeStorage.GetTaggedKeysAsync( keys ).ConfigureAwait( false );
+            var typedKeys = await _typeStorage.GetTaggedKeysOrThrowAsync( keys ).ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSelectQuery( typedKeys, from, to, sort ) ).ConfigureAwait( false );
             return Convert( keys, resultSet, sort );
          }
@@ -235,7 +235,7 @@ namespace Vibrant.Tsdb.InfluxDB
             await CreateDatabase().ConfigureAwait( false );
             var token = (ContinuationToken)continuationToken;
             to = token?.At ?? to;
-            var key = await _typeStorage.GetTaggedKeyAsync( id ).ConfigureAwait( false );
+            var key = await _typeStorage.GetTaggedKeyOrThrowAsync( id ).ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSegmentedSelectQuery( key, from, to, segmentSize, false, token == null ) ).ConfigureAwait( false );
             bool hasMore = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows.Count == segmentSize;
             return Convert( key, resultSet, segmentSize );
@@ -249,7 +249,7 @@ namespace Vibrant.Tsdb.InfluxDB
             await CreateDatabase().ConfigureAwait( false );
             var token = (ContinuationToken)continuationToken;
             from = token?.At ?? from;
-            var key = await _typeStorage.GetTaggedKeyAsync( id ).ConfigureAwait( false );
+            var key = await _typeStorage.GetTaggedKeyOrThrowAsync( id ).ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateSegmentedSelectQuery( key, from, to, segmentSize, true, token == null ) ).ConfigureAwait( false );
             bool hasMore = resultSet.Results.FirstOrDefault()?.Series.FirstOrDefault()?.Rows.Count == segmentSize;
             return Convert( key, resultSet, segmentSize );
@@ -502,13 +502,13 @@ namespace Vibrant.Tsdb.InfluxDB
                }
 
                var tags = new TagCollection( serie.GroupedTags.ToDictionary( x => x.Key, x => (string)x.Value ) );
-               var taggedReadResiæt = new TaggedReadResult<TEntry, TMeasureType>( measureType, tags, sort, entries );
+               var taggedReadResiæt = new TaggedReadResult<TEntry, TMeasureType>( tags, sort, entries );
 
                output.Add( tags, taggedReadResiæt );
             }
          }
 
-         return new MultiTaggedReadResult<TEntry, TMeasureType>( output );
+         return new MultiTaggedReadResult<TEntry, TMeasureType>( measureType, output );
       }
 
       private MultiReadResult<TKey, TEntry> Convert( List<TKey> requiredIds, InfluxResultSet<TEntry> resultSet, Sort sort )

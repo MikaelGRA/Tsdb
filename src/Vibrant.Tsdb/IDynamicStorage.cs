@@ -9,8 +9,6 @@ namespace Vibrant.Tsdb
       where TEntry : IEntry
    {
       Task<SegmentedReadResult<TKey, TEntry>> ReadSegmentedAsync( TKey id, DateTime? from, DateTime? to, int segmentSize, IContinuationToken continuationToken );
-
-      Task DeleteAsync( IEnumerable<TKey> ids, DateTime to );
    }
 
    public interface IReversableDynamicStorage<TKey, TEntry>

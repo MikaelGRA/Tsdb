@@ -56,7 +56,7 @@ namespace Vibrant.Tsdb.Client
          var results = tasks.Select( x => x.Result ).ToList();
 
          // perform final merging
-         return MergeTaggedResults( groupMethod, sort, results );
+         return await MergeTaggedResultsAsync( measureTypeName, groupMethod, sort, results );
       }
 
       public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync(
@@ -86,7 +86,7 @@ namespace Vibrant.Tsdb.Client
          var results = tasks.Select( x => x.Result ).ToList();
 
          // perform final merging
-         return MergeTaggedResults( groupMethod, sort, results );
+         return await MergeTaggedResultsAsync( measureTypeName, groupMethod, sort, results );
       }
 
       public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync(
@@ -117,7 +117,7 @@ namespace Vibrant.Tsdb.Client
          var results = tasks.Select( x => x.Result ).ToList();
 
          // perform final merging
-         return MergeTaggedResults( groupMethod, sort, results );
+         return await MergeTaggedResultsAsync( measureTypeName, groupMethod, sort, results );
       }
 
       private Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsForStoreAsync(
@@ -226,7 +226,8 @@ namespace Vibrant.Tsdb.Client
          return MergeTypedResults( measureType, fields, groupMethod, sort, groupedResults );
       }
 
-      private MultiTaggedReadResult<TEntry, TMeasureType> MergeTaggedResults(
+      private async Task<MultiTaggedReadResult<TEntry, TMeasureType>> MergeTaggedResultsAsync(
+         string measureTypeName,
          GroupMethod groupMethod,
          Sort sort,
          List<MultiTaggedReadResult<TEntry, TMeasureType>> results )
@@ -247,9 +248,10 @@ namespace Vibrant.Tsdb.Client
 
             foreach( var multiTaggedReadResult in results )
             {
+               measureType = multiTaggedReadResult.MeasureType;
+
                foreach( var taggedReadResult in multiTaggedReadResult )
                {
-                  measureType = taggedReadResult.MeasureType;
                   anyResults = true;
 
                   List<TaggedReadResult<TEntry, TMeasureType>> existingList;
@@ -270,8 +272,8 @@ namespace Vibrant.Tsdb.Client
             }
             else
             {
-               // hmmm? How do we do anything here?? We need a measure type!
-               return new MultiTaggedReadResult<TEntry, TMeasureType>();
+               measureType = await _typedKeyStorage.GetMeasureTypeAsync( measureTypeName );
+               return new MultiTaggedReadResult<TEntry, TMeasureType>( measureType );
             }
          }
       }
@@ -332,9 +334,9 @@ namespace Vibrant.Tsdb.Client
 
             // need tag information RIGHT HERE
             var tagCollection = collections.Key;
-            finalResults.Add( tagCollection, new TaggedReadResult<TEntry, TMeasureType>( measureType, tagCollection, sort, newCollection ) );
+            finalResults.Add( tagCollection, new TaggedReadResult<TEntry, TMeasureType>( tagCollection, sort, newCollection ) );
          }
-         var finalResult = new MultiTaggedReadResult<TEntry, TMeasureType>( finalResults );
+         var finalResult = new MultiTaggedReadResult<TEntry, TMeasureType>( measureType, finalResults );
          return finalResult;
       }
 
@@ -365,9 +367,9 @@ namespace Vibrant.Tsdb.Client
 
             // need tag information RIGHT HERE
             var tagCollection = collections.Key;
-            finalResults.Add( tagCollection, new TaggedReadResult<TEntry, TMeasureType>( measureType, tagCollection, sort, newCollection ) );
+            finalResults.Add( tagCollection, new TaggedReadResult<TEntry, TMeasureType>( tagCollection, sort, newCollection ) );
          }
-         var finalResult = new MultiTaggedReadResult<TEntry, TMeasureType>( finalResults );
+         var finalResult = new MultiTaggedReadResult<TEntry, TMeasureType>( measureType, finalResults );
          return finalResult;
       }
 

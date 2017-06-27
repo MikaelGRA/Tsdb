@@ -309,13 +309,24 @@ namespace Vibrant.Tsdb.Client
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
+      public async Task DeleteAsync( IEnumerable<TKey> ids, DateTime to )
+      {
+         var tasks = new List<Task>();
+         tasks.AddRange( LookupDynamicStorages( ids, to ).Select( c => c.Storage.DeleteAsync( c.Lookups, c.To.Value ) ) );
+         if( _volumeStorageSelector != null )
+         {
+            tasks.AddRange( LookupVolumeStorages( ids, to ).Select( c => c.Storage.DeleteAsync( c.Lookups, c.To.Value ) ) );
+         }
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+      }
+
       public async Task DeleteAsync( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          var tasks = new List<Task>();
          tasks.AddRange( LookupDynamicStorages( ids, from, to ).Select( c => c.Storage.DeleteAsync( c.Lookups, c.From.Value, c.To.Value ) ) );
          if( _volumeStorageSelector != null )
          {
-            tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.DeleteAsync( c.Lookups, from, to ) ) );
+            tasks.AddRange( LookupVolumeStorages( ids, from, to ).Select( c => c.Storage.DeleteAsync( c.Lookups, c.From.Value, c.To.Value ) ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
@@ -372,10 +383,10 @@ namespace Vibrant.Tsdb.Client
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
-         tasks.AddRange( LookupDynamicStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.To.Value, c.To.Value, sort ) ) );
+         tasks.AddRange( LookupDynamicStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.To.Value, sort ) ) );
          if( _volumeStorageSelector != null )
          {
-            tasks.AddRange( LookupVolumeStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.To.Value, c.To.Value, sort ) ) );
+            tasks.AddRange( LookupVolumeStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.To.Value, sort ) ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();

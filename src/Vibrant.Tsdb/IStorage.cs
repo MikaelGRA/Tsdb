@@ -9,9 +9,11 @@ namespace Vibrant.Tsdb
    {
       Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> series );
 
-      Task DeleteAsync( IEnumerable<TKey> ids, DateTime from, DateTime to );
-
       Task DeleteAsync( IEnumerable<TKey> ids );
+
+      Task DeleteAsync( IEnumerable<TKey> ids, DateTime to );
+
+      Task DeleteAsync( IEnumerable<TKey> ids, DateTime from, DateTime to );
 
       Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids, int count );
 

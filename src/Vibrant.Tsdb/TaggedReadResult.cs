@@ -9,15 +9,12 @@ namespace Vibrant.Tsdb
       where TEntry : IEntry
       where TMeasureType : IMeasureType
    {
-      public TaggedReadResult( TMeasureType measureType, TagCollection groupedTags, Sort sort, List<TEntry> entries )
+      public TaggedReadResult( TagCollection groupedTags, Sort sort, List<TEntry> entries )
       {
-         MeasureType = measureType;
          GroupedTags = groupedTags;
          Sort = sort;
          Entries = entries;
       }
-
-      public TMeasureType MeasureType { get; private set; }
 
       public Sort Sort { get; private set; }
 

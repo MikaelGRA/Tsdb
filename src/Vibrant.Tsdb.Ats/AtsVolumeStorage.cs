@@ -106,6 +106,16 @@ namespace Vibrant.Tsdb.Ats
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
+      public async Task DeleteAsync( IEnumerable<TKey> ids, DateTime to )
+      {
+         var tasks = new List<Task<int>>();
+         foreach( var id in ids )
+         {
+            tasks.Add( DeleteForId( id, to ) );
+         }
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+      }
+
       public async Task DeleteAsync( IEnumerable<TKey> ids )
       {
          var tasks = new List<Task<int>>();
@@ -211,6 +221,26 @@ namespace Vibrant.Tsdb.Ats
 
          // remove items between from and to
          int count = oldEntries.RemoveAll( x => x.GetTimestamp() >= from && x.GetTimestamp() < to );
+
+         // create new entities
+         var newEntities = CreateTableEntitiesFor( id, oldEntries ).ToDictionary( x => x.RowKey );
+
+         var operations = CreateAtsOperations( newEntities, oldEntities );
+
+         await ExecuteAtsOperatioons( operations ).ConfigureAwait( false );
+
+         return count;
+      }
+
+      private async Task<int> DeleteForId( TKey id, DateTime to )
+      {
+         var retrievals = await RetrieveBeforeForId( id, to, Sort.Descending ).ConfigureAwait( false );
+
+         var oldEntities = retrievals.ToDictionary( x => x.RowKey );
+         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TKey, TEntry>( Sort.Descending ) ).ToList();
+
+         // remove items between from and to
+         int count = oldEntries.RemoveAll( x => x.GetTimestamp() < to );
 
          // create new entities
          var newEntities = CreateTableEntitiesFor( id, oldEntries ).ToDictionary( x => x.RowKey );
