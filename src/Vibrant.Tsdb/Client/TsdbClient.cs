@@ -11,163 +11,54 @@ namespace Vibrant.Tsdb.Client
       where TEntry : IEntry
    {
       private static readonly ISerie<TKey, TEntry>[] _series = new ISerie<TKey, TEntry>[ 0 ];
-      private readonly IDynamicStorageSelector<TKey, TEntry> _dynamicStorageSelector;
-      private readonly IVolumeStorageSelector<TKey, TEntry> _volumeStorageSelector;
+      private readonly IStorageSelector<TKey, TEntry> _storageSelector;
       private readonly IPublishSubscribe<TKey, TEntry> _remotePublishSubscribe;
       private readonly ITemporaryStorage<TKey, TEntry> _temporaryStorage;
       private readonly ITsdbLogger _logger;
       private readonly DefaultPublishSubscribe<TKey, TEntry> _localPublishSubscribe;
-      private readonly MigrationProvider<TKey, TEntry> _migrations;
 
       public TsdbClient(
-         IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
-         IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         IStorageSelector<TKey, TEntry> storageSelector,
          IPublishSubscribe<TKey, TEntry> remotePublishSubscribe,
          ITemporaryStorage<TKey, TEntry> temporaryStorage,
          ITsdbLogger logger )
       {
-         _dynamicStorageSelector = dynamicStorageSelector;
-         _volumeStorageSelector = volumeStorageSelector;
+         _storageSelector = storageSelector;
          _remotePublishSubscribe = remotePublishSubscribe;
          _temporaryStorage = temporaryStorage;
          _localPublishSubscribe = new DefaultPublishSubscribe<TKey, TEntry>( false );
          _logger = logger;
-         _migrations = new MigrationProvider<TKey, TEntry>( _dynamicStorageSelector, _volumeStorageSelector );
       }
 
       public TsdbClient(
-         IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
-         IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         IStorageSelector<TKey, TEntry> storageSelector,
          IPublishSubscribe<TKey, TEntry> remotePublishSubscribe,
          ITsdbLogger logger )
-         : this( dynamicStorageSelector, volumeStorageSelector, remotePublishSubscribe, null, logger )
+         : this( storageSelector, remotePublishSubscribe, null, logger )
       {
       }
 
       public TsdbClient(
-         IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
-         IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         IStorageSelector<TKey, TEntry> storageSelector,
          IPublishSubscribe<TKey, TEntry> remotePublishSubscribe,
          ITemporaryStorage<TKey, TEntry> temporaryStorage )
-         : this( dynamicStorageSelector, volumeStorageSelector, remotePublishSubscribe, temporaryStorage, NullTsdbLogger.Default )
+         : this( storageSelector, remotePublishSubscribe, temporaryStorage, NullTsdbLogger.Default )
       {
       }
 
       public TsdbClient(
-         IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
-         IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         IStorageSelector<TKey, TEntry> storageSelector,
          ITemporaryStorage<TKey, TEntry> temporaryStorage )
-         : this( dynamicStorageSelector, volumeStorageSelector, null, temporaryStorage, NullTsdbLogger.Default )
+         : this( storageSelector, null, temporaryStorage, NullTsdbLogger.Default )
       {
       }
 
       public TsdbClient(
-         IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
-         ITemporaryStorage<TKey, TEntry> temporaryStorage )
-         : this( dynamicStorageSelector, null, null, temporaryStorage, NullTsdbLogger.Default )
-      {
-      }
-
-      public TsdbClient(
-         IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
-         IVolumeStorageSelector<TKey, TEntry> volumeStorageSelector,
+         IStorageSelector<TKey, TEntry> storageSelector,
          ITemporaryStorage<TKey, TEntry> temporaryStorage,
          ITsdbLogger logger )
-         : this( dynamicStorageSelector, volumeStorageSelector, null, temporaryStorage, logger )
+         : this( storageSelector, null, temporaryStorage, logger )
       {
-      }
-
-      public TsdbClient(
-         IDynamicStorageSelector<TKey, TEntry> dynamicStorageSelector,
-         ITemporaryStorage<TKey, TEntry> temporaryStorage,
-         ITsdbLogger logger )
-         : this( dynamicStorageSelector, null, null, temporaryStorage, logger )
-      {
-      }
-
-      public async Task MoveToVolumeStorageAsync( TKey id, int batchSize )
-      {
-         if( _volumeStorageSelector == null )
-         {
-            throw new InvalidOperationException( "No volume storage has been provided for this TsdbClient." );
-         }
-
-
-         foreach( var migration in _migrations.Provide( id, null, null ).Reverse() )
-         {
-            var dynamic = migration.Dynamic;
-            var volume = migration.Volume;
-
-            var readSegmentedAsync = dynamic is IReversableDynamicStorage<TKey, TEntry>
-               ? ( (IReversableDynamicStorage<TKey, TEntry>)dynamic ).ReadReverseSegmentedAsync
-               : (Func<TKey, DateTime?, DateTime?, int, IContinuationToken, Task<SegmentedReadResult<TKey, TEntry>>>)dynamic.ReadSegmentedAsync;
-
-            var sw = Stopwatch.StartNew();
-
-            IContinuationToken token = null;
-            do
-            {
-               var segment = await readSegmentedAsync( id, migration.From, migration.To, batchSize, token ).ConfigureAwait( false );
-               if( segment.Entries.Count > 0 )
-               {
-                  await volume.WriteAsync( segment ).ConfigureAwait( false );
-                  await segment.DeleteAsync().ConfigureAwait( false );
-
-                  _logger.Trace( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
-               }
-               token = segment.ContinuationToken;
-
-               sw.Restart();
-            }
-            while( token.HasMore );
-         }
-      }
-
-      public async Task MoveToVolumeStorageAsync( TKey id, int batchSize, DateTime to, TimeSpan storageExpiration )
-      {
-         if( _volumeStorageSelector == null )
-         {
-            throw new InvalidOperationException( "No volume storage has been provided for this TsdbClient." );
-         }
-
-
-         foreach( var migration in _migrations.Provide( id, null, to ).Reverse() )
-         {
-            // barrier, dont migrate items from stores that has not been in use for a while
-            if( migration.To.HasValue )
-            {
-               if( to - migration.To.Value > storageExpiration )
-               {
-                  break;
-               }
-            }
-
-            var dynamic = migration.Dynamic;
-            var volume = migration.Volume;
-
-            var readSegmentedAsync = dynamic is IReversableDynamicStorage<TKey, TEntry>
-               ? ( (IReversableDynamicStorage<TKey, TEntry>)dynamic ).ReadReverseSegmentedAsync
-               : (Func<TKey, DateTime?, DateTime?, int, IContinuationToken, Task<SegmentedReadResult<TKey, TEntry>>>)dynamic.ReadSegmentedAsync;
-
-            var sw = Stopwatch.StartNew();
-
-            IContinuationToken token = null;
-            do
-            {
-               var segment = await readSegmentedAsync( id, migration.From, migration.To, batchSize, token ).ConfigureAwait( false );
-               if( segment.Entries.Count > 0 )
-               {
-                  await volume.WriteAsync( segment ).ConfigureAwait( false );
-                  await segment.DeleteAsync().ConfigureAwait( false );
-
-                  _logger.Trace( $"Moved {segment.Entries.Count} from dynamic to volume storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
-               }
-               token = segment.ContinuationToken;
-
-               sw.Restart();
-            }
-            while( token.HasMore );
-         }
       }
 
       public async Task MoveFromTemporaryStorageAsync( int batchSize )
@@ -191,32 +82,17 @@ namespace Vibrant.Tsdb.Client
             {
                // write to volumetric
                var tasks = new List<Task>();
-               tasks.AddRange( LookupDynamicStorages( batch.Series ).Select( c => c.Storage.WriteAsync( c.Lookups ) ) );
+               tasks.AddRange( LookupStorages( batch.Series ).Select( c => c.Storage.WriteAsync( c.Lookups ) ) );
                await Task.WhenAll( tasks ).ConfigureAwait( false );
 
                // delete
                await batch.DeleteAsync().ConfigureAwait( false );
 
-               _logger.Trace( $"Moved {read} from temporary to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+               _logger.Trace( $"Moved {read} from temporary to permanent storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
                sw.Restart();
             }
          }
          while( read != 0 );
-      }
-
-      public async Task WriteDirectlyToVolumeStorageAsync( IEnumerable<ISerie<TKey, TEntry>> items )
-      {
-         if( _volumeStorageSelector == null )
-         {
-            throw new InvalidOperationException( "No volume storage has been provided for this TsdbClient." );
-         }
-         var sw = Stopwatch.StartNew();
-
-         var tasks = new List<Task>();
-         tasks.AddRange( LookupVolumeStorages( items ).Select( c => c.Storage.WriteAsync( c.Lookups ) ) );
-         await Task.WhenAll( tasks ).ConfigureAwait( false );
-
-         _logger.Trace( $"Wrote {items.Count()} directly to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
       }
 
       public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items )
@@ -243,7 +119,7 @@ namespace Vibrant.Tsdb.Client
          }
 
          var tasks = new List<Task<IEnumerable<ISerie<TKey, TEntry>>>>();
-         tasks.AddRange( LookupDynamicStorages( items ).Select( c => WriteToDynamicStorageAsync( c.Storage, c.Lookups, useTemporaryStorageOnFailure ) ) );
+         tasks.AddRange( LookupStorages( items ).Select( c => WriteToStorageAsync( c.Storage, c.Lookups, useTemporaryStorageOnFailure ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
          // Only publish things that were written
@@ -264,13 +140,13 @@ namespace Vibrant.Tsdb.Client
          }
       }
 
-      private async Task<IEnumerable<ISerie<TKey, TEntry>>> WriteToDynamicStorageAsync( IDynamicStorage<TKey, TEntry> storage, IEnumerable<ISerie<TKey, TEntry>> series, bool useTemporaryStorageOnFailure )
+      private async Task<IEnumerable<ISerie<TKey, TEntry>>> WriteToStorageAsync( IStorage<TKey, TEntry> storage, IEnumerable<ISerie<TKey, TEntry>> series, bool useTemporaryStorageOnFailure )
       {
          var sw = Stopwatch.StartNew();
          try
          {
             await storage.WriteAsync( series ).ConfigureAwait( false );
-            _logger.Trace( $"Wrote {series.Sum( x => x.GetEntries().Count )} to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+            _logger.Trace( $"Inserted {series.Sum( x => x.GetEntries().Count )} to storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
             return series;
          }
          catch( Exception e1 )
@@ -284,15 +160,15 @@ namespace Vibrant.Tsdb.Client
 
                try
                {
-                  _temporaryStorage.WriteAsync( series );
+                  await _temporaryStorage.WriteAsync( series );
                }
                catch( Exception e2 )
                {
-                  _logger.Error( e2, $"An error ocurred while writing to temporary storage after failing to write to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+                  _logger.Error( e2, $"An error ocurred while writing to temporary storage after failing to write to permanent storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
                }
             }
 
-            _logger.Error( e1, $"An error ocurred while writing to dynamic storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
+            _logger.Error( e1, $"An error ocurred while writing to storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
 
             return _series;
          }
@@ -301,33 +177,21 @@ namespace Vibrant.Tsdb.Client
       public async Task DeleteAsync( IEnumerable<TKey> ids )
       {
          var tasks = new List<Task>();
-         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.DeleteAsync( c.Lookups ) ) );
-         if( _volumeStorageSelector != null )
-         {
-            tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.DeleteAsync( c.Lookups ) ) );
-         }
+         tasks.AddRange( LookupStorages( ids ).Select( c => c.Storage.DeleteAsync( c.Lookups ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
       public async Task DeleteAsync( IEnumerable<TKey> ids, DateTime to )
       {
          var tasks = new List<Task>();
-         tasks.AddRange( LookupDynamicStorages( ids, to ).Select( c => c.Storage.DeleteAsync( c.Lookups, c.To.Value ) ) );
-         if( _volumeStorageSelector != null )
-         {
-            tasks.AddRange( LookupVolumeStorages( ids, to ).Select( c => c.Storage.DeleteAsync( c.Lookups, c.To.Value ) ) );
-         }
+         tasks.AddRange( LookupStorages( ids, to ).Select( c => c.Storage.DeleteAsync( c.Lookups, c.To.Value ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
       public async Task DeleteAsync( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
          var tasks = new List<Task>();
-         tasks.AddRange( LookupDynamicStorages( ids, from, to ).Select( c => c.Storage.DeleteAsync( c.Lookups, c.From.Value, c.To.Value ) ) );
-         if( _volumeStorageSelector != null )
-         {
-            tasks.AddRange( LookupVolumeStorages( ids, from, to ).Select( c => c.Storage.DeleteAsync( c.Lookups, c.From.Value, c.To.Value ) ) );
-         }
+         tasks.AddRange( LookupStorages( ids, from, to ).Select( c => c.Storage.DeleteAsync( c.Lookups, c.From.Value, c.To.Value ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
@@ -342,26 +206,13 @@ namespace Vibrant.Tsdb.Client
 
       private async Task<ReadResult<TKey, TEntry>> ReadLatestInternal( TKey key, int count )
       {
-         var dynamics = _dynamicStorageSelector.GetStorage( key, null, null );
-         foreach( var dynamic in dynamics )
+         var storages = _storageSelector.GetStorage( key, null, null );
+         foreach( var storage in storages )
          {
-            var rr = await dynamic.Storage.ReadLatestAsync( key, count );
+            var rr = await storage.Storage.ReadLatestAsync( key, count );
             if( rr.Entries.Count > 0 )
             {
                return rr;
-            }
-         }
-
-         if( _volumeStorageSelector != null )
-         {
-            var volumes = _volumeStorageSelector.GetStorage( key, null, null );
-            foreach( var volume in volumes )
-            {
-               var rr = await volume.Storage.ReadLatestAsync( key, count );
-               if( rr.Entries.Count > 0 )
-               {
-                  return rr;
-               }
             }
          }
 
@@ -371,11 +222,7 @@ namespace Vibrant.Tsdb.Client
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
-         tasks.AddRange( LookupDynamicStorages( ids ).Select( c => c.Storage.ReadAsync( c.Lookups, sort ) ) );
-         if( _volumeStorageSelector != null )
-         {
-            tasks.AddRange( LookupVolumeStorages( ids ).Select( c => c.Storage.ReadAsync( c.Lookups, sort ) ) );
-         }
+         tasks.AddRange( LookupStorages( ids ).Select( c => c.Storage.ReadAsync( c.Lookups, sort ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();
       }
@@ -383,11 +230,7 @@ namespace Vibrant.Tsdb.Client
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
-         tasks.AddRange( LookupDynamicStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.To.Value, sort ) ) );
-         if( _volumeStorageSelector != null )
-         {
-            tasks.AddRange( LookupVolumeStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.To.Value, sort ) ) );
-         }
+         tasks.AddRange( LookupStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.To.Value, sort ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();
       }
@@ -395,11 +238,7 @@ namespace Vibrant.Tsdb.Client
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
       {
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
-         tasks.AddRange( LookupDynamicStorages( ids, from, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.From.Value, c.To.Value, sort ) ) );
-         if( _volumeStorageSelector != null )
-         {
-            tasks.AddRange( LookupVolumeStorages( ids, from, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.From.Value, c.To.Value, sort ) ) );
-         }
+         tasks.AddRange( LookupStorages( ids, from, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.From.Value, c.To.Value, sort ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
          return tasks.Select( x => x.Result ).Combine();
       }
@@ -436,157 +275,21 @@ namespace Vibrant.Tsdb.Client
 
       #region Lookup
 
-      private IEnumerable<VolumeStorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry>> LookupVolumeStorages( IEnumerable<ISerie<TKey, TEntry>> series )
+      private IEnumerable<StorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry>> LookupStorages( IEnumerable<ISerie<TKey, TEntry>> series )
       {
-         var fr = new Dictionary<StorageKey<TKey, TEntry>, VolumeStorageLookupResult<TKey, Serie<TKey, TEntry>, TEntry>>();
-
-         foreach( var serie in series )
-         {
-            var key = serie.GetKey();
-
-            foreach( var entry in serie.GetEntries() )
-            {
-               var storage = _volumeStorageSelector.GetStorage( key, entry );
-               if( storage != null )
-               {
-                  var storageKey = new StorageKey<TKey, TEntry>( key, storage );
-
-                  VolumeStorageLookupResult<TKey, Serie<TKey, TEntry>, TEntry> existingStorage;
-                  if( !fr.TryGetValue( storageKey, out existingStorage ) )
-                  {
-                     existingStorage = new VolumeStorageLookupResult<TKey, Serie<TKey, TEntry>, TEntry>( storage );
-                     existingStorage.Lookups = new Serie<TKey, TEntry>( key );
-                     fr.Add( storageKey, existingStorage );
-                  }
-
-                  existingStorage.Lookups.Entries.Add( entry );
-               }
-            }
-         }
-
-         // collect series into groupings of storage
-         var sr = new Dictionary<IStorage<TKey, TEntry>, VolumeStorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry>>();
-         VolumeStorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry> current = null;
-         foreach( var kvp in fr )
-         {
-            var key = kvp.Key.Storage;
-            if( current?.Storage != key && !sr.TryGetValue( key, out current ) )
-            {
-               current = new VolumeStorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry>( kvp.Value.Storage );
-               current.Lookups = new List<Serie<TKey, TEntry>>();
-               sr.Add( key, current );
-            }
-            current.Lookups.Add( kvp.Value.Lookups );
-         }
-
-         return sr.Values;
-      }
-
-      private IEnumerable<VolumeStorageLookupResult<TKey, List<TKey>, TEntry>> LookupVolumeStorages( IEnumerable<TKey> ids )
-      {
-         var result = new Dictionary<StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>, VolumeStorageLookupResult<TKey, List<TKey>, TEntry>>();
-
-         foreach( var id in ids )
-         {
-            var storages = _volumeStorageSelector.GetStorage( id, null, null );
-            foreach( var storage in storages )
-            {
-               VolumeStorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
-               if( !result.TryGetValue( storage, out existingStorage ) )
-               {
-                  existingStorage = new VolumeStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage );
-                  existingStorage.Lookups = new List<TKey>();
-                  result.Add( storage, existingStorage );
-               }
-
-               existingStorage.Lookups.Add( id );
-            }
-         }
-
-         return result.Values;
-      }
-
-      private IEnumerable<VolumeStorageLookupResult<TKey, List<TKey>, TEntry>> LookupVolumeStorages( IEnumerable<TKey> ids, DateTime to )
-      {
-         var result = new Dictionary<StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>, VolumeStorageLookupResult<TKey, List<TKey>, TEntry>>();
-
-         foreach( var id in ids )
-         {
-            var storages = _volumeStorageSelector.GetStorage( id, null, to );
-            foreach( var storage in storages )
-            {
-               VolumeStorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
-               if( !result.TryGetValue( storage, out existingStorage ) )
-               {
-                  var actualTo = to;
-                  if( storage.To < to )
-                  {
-                     actualTo = storage.To.Value;
-                  }
-
-                  existingStorage = new VolumeStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, null, actualTo );
-                  existingStorage.Lookups = new List<TKey>();
-                  result.Add( storage, existingStorage );
-               }
-
-               existingStorage.Lookups.Add( id );
-            }
-         }
-
-         return result.Values;
-      }
-
-      private IEnumerable<VolumeStorageLookupResult<TKey, List<TKey>, TEntry>> LookupVolumeStorages( IEnumerable<TKey> ids, DateTime from, DateTime to )
-      {
-         var result = new Dictionary<StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>, VolumeStorageLookupResult<TKey, List<TKey>, TEntry>>();
-
-         foreach( var id in ids )
-         {
-            var storages = _volumeStorageSelector.GetStorage( id, from, to );
-            foreach( var storage in storages )
-            {
-               VolumeStorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
-               if( !result.TryGetValue( storage, out existingStorage ) )
-               {
-                  var actualFrom = from;
-                  if( storage.From > from )
-                  {
-                     actualFrom = storage.From.Value;
-                  }
-
-                  var actualTo = to;
-                  if( storage.To < to )
-                  {
-                     actualTo = storage.To.Value;
-                  }
-
-                  existingStorage = new VolumeStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, actualFrom, actualTo );
-                  existingStorage.Lookups = new List<TKey>();
-                  result.Add( storage, existingStorage );
-               }
-
-               existingStorage.Lookups.Add( id );
-            }
-         }
-
-         return result.Values;
-      }
-
-      private IEnumerable<DynamicStorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry>> LookupDynamicStorages( IEnumerable<ISerie<TKey, TEntry>> series )
-      {
-         var fr = new Dictionary<StorageKey<TKey, TEntry>, DynamicStorageLookupResult<TKey, Serie<TKey, TEntry>, TEntry>>();
+         var fr = new Dictionary<StorageKey<TKey, TEntry>, StorageLookupResult<TKey, Serie<TKey, TEntry>, TEntry>>();
          foreach( var serie in series )
          {
             var key = serie.GetKey();
             foreach( var entry in serie.GetEntries() )
             {
-               var storage = _dynamicStorageSelector.GetStorage( key, entry );
+               var storage = _storageSelector.GetStorage( key, entry );
                var storageKey = new StorageKey<TKey, TEntry>( key, storage );
 
-               DynamicStorageLookupResult<TKey, Serie<TKey, TEntry>, TEntry> existingStorage;
+               StorageLookupResult<TKey, Serie<TKey, TEntry>, TEntry> existingStorage;
                if( !fr.TryGetValue( storageKey, out existingStorage ) )
                {
-                  existingStorage = new DynamicStorageLookupResult<TKey, Serie<TKey, TEntry>, TEntry>( storage );
+                  existingStorage = new StorageLookupResult<TKey, Serie<TKey, TEntry>, TEntry>( storage );
                   existingStorage.Lookups = new Serie<TKey, TEntry>( key );
                   fr.Add( storageKey, existingStorage );
                }
@@ -596,14 +299,14 @@ namespace Vibrant.Tsdb.Client
          }
 
          // collect series into groupings of storage
-         var sr = new Dictionary<IStorage<TKey, TEntry>, DynamicStorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry>>();
-         DynamicStorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry> current = null;
+         var sr = new Dictionary<IStorage<TKey, TEntry>, StorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry>>();
+         StorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry> current = null;
          foreach( var kvp in fr )
          {
             var key = kvp.Key.Storage;
             if( current?.Storage != key && !sr.TryGetValue( key, out current ) )
             {
-               current = new DynamicStorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry>( kvp.Value.Storage );
+               current = new StorageLookupResult<TKey, List<Serie<TKey, TEntry>>, TEntry>( kvp.Value.Storage );
                current.Lookups = new List<Serie<TKey, TEntry>>();
                sr.Add( key, current );
             }
@@ -613,19 +316,19 @@ namespace Vibrant.Tsdb.Client
          return sr.Values;
       }
 
-      private IEnumerable<DynamicStorageLookupResult<TKey, List<TKey>, TEntry>> LookupDynamicStorages( IEnumerable<TKey> ids )
+      private IEnumerable<StorageLookupResult<TKey, List<TKey>, TEntry>> LookupStorages( IEnumerable<TKey> ids )
       {
-         var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, List<TKey>, TEntry>>();
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>, StorageLookupResult<TKey, List<TKey>, TEntry>>();
 
          foreach( var id in ids )
          {
-            var storages = _dynamicStorageSelector.GetStorage( id, null, null );
+            var storages = _storageSelector.GetStorage( id, null, null );
             foreach( var storage in storages )
             {
-               DynamicStorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
+               StorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
                if( !result.TryGetValue( storage, out existingStorage ) )
                {
-                  existingStorage = new DynamicStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage );
+                  existingStorage = new StorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage );
                   existingStorage.Lookups = new List<TKey>();
                   result.Add( storage, existingStorage );
                }
@@ -637,16 +340,16 @@ namespace Vibrant.Tsdb.Client
          return result.Values;
       }
 
-      private IEnumerable<DynamicStorageLookupResult<TKey, List<TKey>, TEntry>> LookupDynamicStorages( IEnumerable<TKey> ids, DateTime to )
+      private IEnumerable<StorageLookupResult<TKey, List<TKey>, TEntry>> LookupStorages( IEnumerable<TKey> ids, DateTime to )
       {
-         var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, List<TKey>, TEntry>>();
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>, StorageLookupResult<TKey, List<TKey>, TEntry>>();
 
          foreach( var id in ids )
          {
-            var storages = _dynamicStorageSelector.GetStorage( id, null, to );
+            var storages = _storageSelector.GetStorage( id, null, to );
             foreach( var storage in storages )
             {
-               DynamicStorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
+               StorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
                if( !result.TryGetValue( storage, out existingStorage ) )
                {
                   var actualTo = to;
@@ -655,7 +358,7 @@ namespace Vibrant.Tsdb.Client
                      actualTo = storage.To.Value;
                   }
 
-                  existingStorage = new DynamicStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, null, actualTo );
+                  existingStorage = new StorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, null, actualTo );
                   existingStorage.Lookups = new List<TKey>();
                   result.Add( storage, existingStorage );
                }
@@ -667,16 +370,16 @@ namespace Vibrant.Tsdb.Client
          return result.Values;
       }
 
-      private IEnumerable<DynamicStorageLookupResult<TKey, List<TKey>, TEntry>> LookupDynamicStorages( IEnumerable<TKey> ids, DateTime from, DateTime to )
+      private IEnumerable<StorageLookupResult<TKey, List<TKey>, TEntry>> LookupStorages( IEnumerable<TKey> ids, DateTime from, DateTime to )
       {
-         var result = new Dictionary<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>, DynamicStorageLookupResult<TKey, List<TKey>, TEntry>>();
+         var result = new Dictionary<StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>, StorageLookupResult<TKey, List<TKey>, TEntry>>();
 
          foreach( var id in ids )
          {
-            var storages = _dynamicStorageSelector.GetStorage( id, from, to );
+            var storages = _storageSelector.GetStorage( id, from, to );
             foreach( var storage in storages )
             {
-               DynamicStorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
+               StorageLookupResult<TKey, List<TKey>, TEntry> existingStorage;
                if( !result.TryGetValue( storage, out existingStorage ) )
                {
                   var actualFrom = from;
@@ -691,7 +394,7 @@ namespace Vibrant.Tsdb.Client
                      actualTo = storage.To.Value;
                   }
 
-                  existingStorage = new DynamicStorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, actualFrom, actualTo );
+                  existingStorage = new StorageLookupResult<TKey, List<TKey>, TEntry>( storage.Storage, actualFrom, actualTo );
                   existingStorage.Lookups = new List<TKey>();
                   result.Add( storage, existingStorage );
                }

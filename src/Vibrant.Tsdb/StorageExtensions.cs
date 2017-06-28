@@ -19,7 +19,7 @@ namespace Vibrant.Tsdb
          return storage.DeleteAsync( new[] { id }, from, to );
       }
 
-      public static Task DeleteAsync<TKey, TEntry>( this IDynamicStorage<TKey, TEntry> storage, TKey id, DateTime to )
+      public static Task DeleteAsync<TKey, TEntry>( this IStorage<TKey, TEntry> storage, TKey id, DateTime to )
          where TEntry : IEntry
       {
          return storage.DeleteAsync( new[] { id }, to );

@@ -5,28 +5,17 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Client
 {
-   internal class StorageLookupResult<TKey, TStorage, TEntry, TLookup>
-      where TStorage : IStorage<TKey, TEntry>
-      where TEntry : IEntry
+   internal class StorageLookupResult<TKey, TLookup, TEntry> : StorageLookupResultBase<TKey, IStorage<TKey, TEntry>, TEntry, TLookup>
+     where TEntry : IEntry
    {
-      public StorageLookupResult( TStorage storage )
+      public StorageLookupResult( IStorage<TKey, TEntry> storage )
+         : base( storage )
       {
-         Storage = storage;
+
       }
 
-      public StorageLookupResult( TStorage storage, DateTime? from, DateTime? to )
+      public StorageLookupResult( IStorage<TKey, TEntry> storage, DateTime? from, DateTime? to ) : base( storage, from, to )
       {
-         Storage = storage;
-         From = from;
-         To = to;
       }
-
-      public TLookup Lookups { get; set; }
-
-      public TStorage Storage { get; private set; }
-
-      public DateTime? From { get; private set; }
-
-      public DateTime? To { get; private set; }
    }
 }

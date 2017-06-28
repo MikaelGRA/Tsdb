@@ -13,13 +13,13 @@ using Vibrant.Tsdb.Sql.Serialization;
 
 namespace Vibrant.Tsdb.Sql
 {
-   public class SqlDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IReversableDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
+   public class SqlDynamicStorage<TKey, TEntry> : IStorage<TKey, TEntry>, IStorageSelector<TKey, TEntry>, IDisposable
       where TEntry : ISqlEntry, new()
    {
       private const int DefaultReadParallelism = 5;
       private const int DefaultWriteParallelism = 5;
 
-      private readonly StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>[] _defaultSelection;
+      private readonly StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>[] _defaultSelection;
       private object _sync = new object();
       private string _tableName;
       private string _connectionString;
@@ -35,7 +35,7 @@ namespace Vibrant.Tsdb.Sql
          _connectionString = connectionString;
          _cc = concurrency;
          _keyConverter = keyConverter;
-         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
+         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>( this ) };
       }
 
       public SqlDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency )
@@ -48,12 +48,12 @@ namespace Vibrant.Tsdb.Sql
       {
       }
 
-      public IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
+      public IEnumerable<StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
       {
          return _defaultSelection;
       }
 
-      public IDynamicStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
+      public IStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
       {
          return this;
       }

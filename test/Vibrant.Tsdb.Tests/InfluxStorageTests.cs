@@ -9,12 +9,12 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.Tests
 {
-   public class InfluxDynamicStorageTests : AbstractDynamicStorageTests<InfluxDynamicStorage<string, BasicEntry>>
+   public class InfluxStorageTests : AbstractStorageTests<InfluxDynamicStorage<string, BasicEntry>>
    {
       private static readonly string Endpoint;
       private static readonly string Database;
 
-      static InfluxDynamicStorageTests()
+      static InfluxStorageTests()
       {
          var builder = new ConfigurationBuilder()
             .AddJsonFile( "appsettings.json" )

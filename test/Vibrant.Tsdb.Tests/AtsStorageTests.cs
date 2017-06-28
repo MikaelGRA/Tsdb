@@ -8,11 +8,11 @@ using Vibrant.Tsdb.Tests.Entries;
 
 namespace Vibrant.Tsdb.Tests
 {
-   public class AtsDynamicStorageTests : AbstractDynamicStorageTests<AtsDynamicStorage<string, BasicEntry>>
+   public class AtsStorageTests : AbstractStorageTests<AtsDynamicStorage<string, BasicEntry>>
    {
       private static readonly string ConnectionString;
 
-      static AtsDynamicStorageTests()
+      static AtsStorageTests()
       {
          var builder = new ConfigurationBuilder()
             .AddJsonFile( "appsettings.json" )

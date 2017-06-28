@@ -11,13 +11,13 @@ using System.Threading;
 
 namespace Vibrant.Tsdb.InfluxDB
 {
-   public class InfluxDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IReversableDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
+   public class InfluxDynamicStorage<TKey, TEntry> : IStorage<TKey, TEntry>, IDisposable
       where TEntry : IInfluxEntry, new()
    {
       public const int DefaultReadParallelism = 20;
       public const int DefaultWriteParallelism = 5;
 
-      private readonly StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>[] _defaultSelection;
+      private readonly StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>[] _defaultSelection;
       private readonly DateTime _maxTo = new DateTime( 2050, 1, 1, 0, 0, 0, DateTimeKind.Utc );
       private readonly object _sync = new object();
       private readonly InfluxClient _client;
@@ -38,7 +38,7 @@ namespace Vibrant.Tsdb.InfluxDB
          _keyConverter = keyConverter;
          _cc = concurrency;
 
-         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
+         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>( this ) };
       }
 
       public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, IKeyConverter<TKey> keyConverter )
@@ -68,12 +68,12 @@ namespace Vibrant.Tsdb.InfluxDB
 
       }
 
-      public IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
+      public IEnumerable<StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
       {
          return _defaultSelection;
       }
 
-      public IDynamicStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
+      public IStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
       {
          return this;
       }

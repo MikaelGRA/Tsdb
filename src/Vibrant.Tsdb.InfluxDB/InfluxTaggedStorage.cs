@@ -9,14 +9,14 @@ using Vibrant.Tsdb.Exceptions;
 
 namespace Vibrant.Tsdb.InfluxDB
 {
-   public class InfluxTaggedStorage<TKey, TEntry, TMeasureType> : IDynamicStorage<TKey, TEntry>, IReversableDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, ITypedStorage<TEntry, TMeasureType>, IDisposable
+   public class InfluxTaggedStorage<TKey, TEntry, TMeasureType> : IStorage<TKey, TEntry>, IStorageSelector<TKey, TEntry>, ITypedStorage<TEntry, TMeasureType>, IDisposable
       where TEntry : IAggregatableEntry, IInfluxEntry, new()
       where TMeasureType : IMeasureType
    {
       public const int DefaultReadParallelism = 20;
       public const int DefaultWriteParallelism = 5;
 
-      private readonly StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>[] _defaultSelection;
+      private readonly StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>[] _defaultSelection;
       private readonly DateTime _maxTo = new DateTime( 2050, 1, 1, 0, 0, 0, DateTimeKind.Utc );
       private readonly object _sync = new object();
       private readonly InfluxClient _client;
@@ -39,7 +39,7 @@ namespace Vibrant.Tsdb.InfluxDB
          _cc = concurrency;
          _typeStorage = typeStorage;
 
-         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
+         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>( this ) };
       }
 
       public InfluxTaggedStorage( Uri endpoint, string database, string username, string password, IKeyConverter<TKey> keyConverter, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
@@ -69,12 +69,12 @@ namespace Vibrant.Tsdb.InfluxDB
 
       }
 
-      public IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
+      public IEnumerable<StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
       {
          return _defaultSelection;
       }
 
-      public IDynamicStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
+      public IStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
       {
          return this;
       }

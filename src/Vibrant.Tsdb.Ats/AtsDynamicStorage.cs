@@ -12,13 +12,13 @@ using Vibrant.Tsdb.Ats.Serialization;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public class AtsDynamicStorage<TKey, TEntry> : IDynamicStorage<TKey, TEntry>, IDynamicStorageSelector<TKey, TEntry>, IDisposable
+   public class AtsDynamicStorage<TKey, TEntry> : IStorage<TKey, TEntry>, IStorageSelector<TKey, TEntry>, IDisposable
      where TEntry : IAtsEntry, new()
    {
       public const int DefaultReadParallelism = 50;
       public const int DefaultWriteParallelism = 50;
 
-      private readonly StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>[] _defaultSelection;
+      private readonly StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>[] _defaultSelection;
       private object _sync = new object();
       private string _tableName;
       private Dictionary<string, CloudTable> _tables;
@@ -38,7 +38,7 @@ namespace Vibrant.Tsdb.Ats
          _partitioningProvider = partitioningProvider;
          _tableProvider = tableProvider;
          _keyConverter = keyConverter;
-         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>( this ) };
+         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>( this ) };
          _tables = new Dictionary<string, CloudTable>();
 
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
@@ -59,12 +59,12 @@ namespace Vibrant.Tsdb.Ats
       {
       }
 
-      public IEnumerable<StorageSelection<TKey, TEntry, IDynamicStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
+      public IEnumerable<StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
       {
          return _defaultSelection;
       }
 
-      public IDynamicStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
+      public IStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
       {
          return this;
       }

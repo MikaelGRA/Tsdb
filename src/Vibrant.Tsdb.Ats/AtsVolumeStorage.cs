@@ -17,13 +17,13 @@ namespace Vibrant.Tsdb.Ats
    /// Implementation of IVolumeStorage that uses Azure Table Storage
    /// as its backend. 
    /// </summary>
-   public class AtsVolumeStorage<TKey, TEntry> : IVolumeStorage<TKey, TEntry>, IVolumeStorageSelector<TKey, TEntry>, IDisposable
+   public class AtsVolumeStorage<TKey, TEntry> : IStorage<TKey, TEntry>, IStorageSelector<TKey, TEntry>, IDisposable
       where TEntry : IAtsEntry, new()
    {
       public const int DefaultReadParallelism = 15;
       public const int DefaultWriteParallelism = 30;
 
-      private readonly StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>[] _defaultSelection;
+      private readonly StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>[] _defaultSelection;
       private object _sync = new object();
       private string _tableName;
       private CloudStorageAccount _account;
@@ -41,7 +41,7 @@ namespace Vibrant.Tsdb.Ats
          _client = _account.CreateCloudTableClient();
          _partitioningProvider = provider;
          _keyConverter = keyConverter;
-         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>( this ) };
+         _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>( this ) };
 
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
@@ -63,12 +63,12 @@ namespace Vibrant.Tsdb.Ats
 
       #region Public
 
-      public IEnumerable<StorageSelection<TKey, TEntry, IVolumeStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
+      public IEnumerable<StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>> GetStorage( TKey id, DateTime? from, DateTime? to )
       {
          return _defaultSelection;
       }
 
-      public IVolumeStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
+      public IStorage<TKey, TEntry> GetStorage( TKey key, TEntry entry )
       {
          return this;
       }

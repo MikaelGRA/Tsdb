@@ -17,7 +17,7 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.ConsoleApp
 {
-   public class Program : IWorkProvider<BasicKey>, ITsdbLogger, IKeyConverter<BasicKey>
+   public class Program : ITsdbLogger, IKeyConverter<BasicKey>
    {
       public event Action<TsdbVolumeMoval<BasicKey>> MovalChangedOrAdded;
       public event Action<BasicKey> MovalRemoved;
@@ -72,10 +72,10 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          var switchDate = new DateTime( 2016, 10, 20, 18, 25, 0, DateTimeKind.Utc );
 
-         var selector = new TestDynamicStorageSelector( new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>[]
+         var selector = new TestStorageSelector( new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>[]
          {
-            new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>( dsql, switchDate, null ),
-            new StorageSelection<BasicKey, BasicEntry, IDynamicStorage<BasicKey, BasicEntry>>( dats, null, switchDate ),
+            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dsql, switchDate, null ),
+            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dats, null, switchDate ),
          } );
 
          var vats = new AtsVolumeStorage<BasicKey, BasicEntry>(

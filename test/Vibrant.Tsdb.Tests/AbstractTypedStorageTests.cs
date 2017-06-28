@@ -9,7 +9,7 @@ using Xunit;
 namespace Vibrant.Tsdb.Tests
 {
    public abstract class AbstractTypedStorageTests<TStorage> : AbstractStorageTests<TStorage>
-     where TStorage : IDynamicStorage<string, BasicEntry>, ITypedStorage<BasicEntry, MeasureType>
+     where TStorage : IStorage<string, BasicEntry>, ITypedStorage<BasicEntry, MeasureType>
    {
       [Fact]
       public async Task Should_Read_Grouped()

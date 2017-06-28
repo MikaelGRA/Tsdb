@@ -8,7 +8,7 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.Tests
 {
-    public class SqlStorageTests : AbstractDynamicStorageTests<SqlDynamicStorage<string, BasicEntry>>
+    public class SqlStorageTests : AbstractStorageTests<SqlDynamicStorage<string, BasicEntry>>
    {
       private static readonly string ConnectionString;
 
