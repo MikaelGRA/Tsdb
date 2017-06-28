@@ -13,7 +13,7 @@ using Vibrant.Tsdb.Sql.Serialization;
 
 namespace Vibrant.Tsdb.Sql
 {
-   public class SqlDynamicStorage<TKey, TEntry> : IStorage<TKey, TEntry>, IStorageSelector<TKey, TEntry>, IDisposable
+   public class SqlStorage<TKey, TEntry> : IStorage<TKey, TEntry>, IStorageSelector<TKey, TEntry>, IDisposable
       where TEntry : ISqlEntry, new()
    {
       private const int DefaultReadParallelism = 5;
@@ -27,7 +27,7 @@ namespace Vibrant.Tsdb.Sql
       private IKeyConverter<TKey> _keyConverter;
       private IConcurrencyControl _cc;
 
-      public SqlDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IKeyConverter<TKey> keyConverter )
+      public SqlStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IKeyConverter<TKey> keyConverter )
       {
          SqlMapper.AddTypeMap( typeof( DateTime ), DbType.DateTime2 );
 
@@ -38,12 +38,12 @@ namespace Vibrant.Tsdb.Sql
          _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>( this ) };
       }
 
-      public SqlDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency )
+      public SqlStorage( string tableName, string connectionString, IConcurrencyControl concurrency )
          : this( tableName, connectionString, concurrency, DefaultKeyConverter<TKey>.Current )
       {
       }
 
-      public SqlDynamicStorage( string tableName, string connectionString )
+      public SqlStorage( string tableName, string connectionString )
          : this( tableName, connectionString, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), DefaultKeyConverter<TKey>.Current )
       {
       }

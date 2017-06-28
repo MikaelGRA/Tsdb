@@ -56,15 +56,15 @@ namespace Vibrant.Tsdb.ConsoleApp
             _dataSources.Add( new DataSource( new BasicKey { Id = Guid.NewGuid(), Sampling = Sampling.Daily }, startTime, TimeSpan.FromMilliseconds( 10 ) ) );
          }
 
-         var dats = new AtsDynamicStorage<BasicKey, BasicEntry>(
+         var dats = new AtsStorage<BasicKey, BasicEntry>(
             "DatsTables13",
             ats.GetSection( "ConnectionString" ).Value,
-            new ConcurrencyControl( AtsDynamicStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsDynamicStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
+            new ConcurrencyControl( AtsStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
             new YearlyPartitioningProvider<BasicKey>(),
             new YearlyTableProvider(),
             this );
 
-         var dsql = new SqlDynamicStorage<BasicKey, BasicEntry>(
+         var dsql = new SqlStorage<BasicKey, BasicEntry>(
             "SqlTable3",
             sql.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( 5, 5 ),

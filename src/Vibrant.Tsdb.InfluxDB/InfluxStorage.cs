@@ -11,7 +11,7 @@ using System.Threading;
 
 namespace Vibrant.Tsdb.InfluxDB
 {
-   public class InfluxDynamicStorage<TKey, TEntry> : IStorage<TKey, TEntry>, IDisposable
+   public class InfluxStorage<TKey, TEntry> : IStorage<TKey, TEntry>, IDisposable
       where TEntry : IInfluxEntry, new()
    {
       public const int DefaultReadParallelism = 20;
@@ -27,7 +27,7 @@ namespace Vibrant.Tsdb.InfluxDB
 
       private Task _createDatabase;
 
-      public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, IConcurrencyControl concurrency, IKeyConverter<TKey> keyConverter )
+      public InfluxStorage( Uri endpoint, string database, string username, string password, IConcurrencyControl concurrency, IKeyConverter<TKey> keyConverter )
       {
          _client = new InfluxClient( endpoint, username, password );
          _database = database;
@@ -41,28 +41,28 @@ namespace Vibrant.Tsdb.InfluxDB
          _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>( this ) };
       }
 
-      public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, IKeyConverter<TKey> keyConverter )
+      public InfluxStorage( Uri endpoint, string database, string username, string password, IKeyConverter<TKey> keyConverter )
          : this( endpoint, database, username, password, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), keyConverter )
       {
       }
 
-      public InfluxDynamicStorage( Uri endpoint, string database, string username, string password, IConcurrencyControl concurrency )
+      public InfluxStorage( Uri endpoint, string database, string username, string password, IConcurrencyControl concurrency )
          : this( endpoint, database, username, password, concurrency, DefaultKeyConverter<TKey>.Current )
       {
       }
 
-      public InfluxDynamicStorage( Uri endpoint, string database, string username, string password )
+      public InfluxStorage( Uri endpoint, string database, string username, string password )
          : this( endpoint, database, username, password, DefaultKeyConverter<TKey>.Current )
       {
       }
 
-      public InfluxDynamicStorage( Uri endpoint, string database, IConcurrencyControl concurrency )
+      public InfluxStorage( Uri endpoint, string database, IConcurrencyControl concurrency )
          : this( endpoint, database, null, null, concurrency, DefaultKeyConverter<TKey>.Current )
       {
 
       }
 
-      public InfluxDynamicStorage( Uri endpoint, string database )
+      public InfluxStorage( Uri endpoint, string database )
          : this( endpoint, database, null, null, DefaultKeyConverter<TKey>.Current )
       {
 

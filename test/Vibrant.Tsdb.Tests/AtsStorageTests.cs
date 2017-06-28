@@ -8,7 +8,7 @@ using Vibrant.Tsdb.Tests.Entries;
 
 namespace Vibrant.Tsdb.Tests
 {
-   public class AtsStorageTests : AbstractStorageTests<AtsDynamicStorage<string, BasicEntry>>
+   public class AtsStorageTests : AbstractStorageTests<AtsStorage<string, BasicEntry>>
    {
       private static readonly string ConnectionString;
 
@@ -23,9 +23,9 @@ namespace Vibrant.Tsdb.Tests
          ConnectionString = ats.GetSection( "ConnectionString" ).Value;
       }
 
-      public override AtsDynamicStorage<string, BasicEntry> GetStorage( string tableName )
+      public override AtsStorage<string, BasicEntry> GetStorage( string tableName )
       {
-         return new AtsDynamicStorage<string, BasicEntry>( tableName + "Dynamic", ConnectionString );
+         return new AtsStorage<string, BasicEntry>( tableName + "Dynamic", ConnectionString );
       }
    }
 }

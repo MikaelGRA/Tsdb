@@ -12,7 +12,7 @@ using Vibrant.Tsdb.Ats.Serialization;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public class AtsDynamicStorage<TKey, TEntry> : IStorage<TKey, TEntry>, IStorageSelector<TKey, TEntry>, IDisposable
+   public class AtsStorage<TKey, TEntry> : IStorage<TKey, TEntry>, IStorageSelector<TKey, TEntry>, IDisposable
      where TEntry : IAtsEntry, new()
    {
       public const int DefaultReadParallelism = 50;
@@ -29,7 +29,7 @@ namespace Vibrant.Tsdb.Ats
       private IKeyConverter<TKey> _keyConverter;
       private IConcurrencyControl _cc;
 
-      public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider tableProvider, IKeyConverter<TKey> keyConverter )
+      public AtsStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider tableProvider, IKeyConverter<TKey> keyConverter )
       {
          _cc = concurrency;
          _tableName = tableName;
@@ -44,17 +44,17 @@ namespace Vibrant.Tsdb.Ats
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
 
-      public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider tableProvider )
+      public AtsStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider tableProvider )
          : this( tableName, connectionString, concurrency, partitioningProvider, tableProvider, DefaultKeyConverter<TKey>.Current )
       {
       }
 
-      public AtsDynamicStorage( string tableName, string connectionString, IConcurrencyControl concurrency )
+      public AtsStorage( string tableName, string connectionString, IConcurrencyControl concurrency )
          : this( tableName, connectionString, concurrency, new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider() )
       {
       }
 
-      public AtsDynamicStorage( string tableName, string connectionString )
+      public AtsStorage( string tableName, string connectionString )
          : this( tableName, connectionString, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider() )
       {
       }

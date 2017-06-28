@@ -37,7 +37,7 @@ namespace Vibrant.Tsdb.Client
          var typedKeys = await _typedKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTagsDictionary ).ConfigureAwait( false );
 
          // get results per storage
-         var tasks = LookupDynamicStorages( typedKeys ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
+         var tasks = LookupStorages( typedKeys ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
 
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
@@ -63,7 +63,7 @@ namespace Vibrant.Tsdb.Client
          var typedKeys = await _typedKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTagsDictionary ).ConfigureAwait( false );
 
          // get results per storage
-         var tasks = LookupDynamicStorages( typedKeys, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.To.Value, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
+         var tasks = LookupStorages( typedKeys, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.To.Value, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
 
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
@@ -90,7 +90,7 @@ namespace Vibrant.Tsdb.Client
          var typedKeys = await _typedKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTagsDictionary ).ConfigureAwait( false );
 
          // get results per storage
-         var tasks = LookupDynamicStorages( typedKeys, from, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.From.Value, c.To.Value, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
+         var tasks = LookupStorages( typedKeys, from, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.From.Value, c.To.Value, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
 
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
@@ -371,7 +371,7 @@ namespace Vibrant.Tsdb.Client
          }
       }
 
-      private IEnumerable<StorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupDynamicStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds )
+      private IEnumerable<StorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds )
       {
          var result = new Dictionary<StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>, StorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>>();
 
@@ -395,7 +395,7 @@ namespace Vibrant.Tsdb.Client
          return result.Values;
       }
 
-      private IEnumerable<StorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupDynamicStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds, DateTime to )
+      private IEnumerable<StorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds, DateTime to )
       {
          var result = new Dictionary<StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>, StorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>>();
 
@@ -425,7 +425,7 @@ namespace Vibrant.Tsdb.Client
          return result.Values;
       }
 
-      private IEnumerable<StorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupDynamicStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds, DateTime from, DateTime to )
+      private IEnumerable<StorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds, DateTime from, DateTime to )
       {
          var result = new Dictionary<StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>, StorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>>();
 
