@@ -1,0 +1,42 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp1.0</TargetFramework>
+    <AssemblyName>Vibrant.Tsdb.Tests</AssemblyName>
+    <PackageId>Vibrant.Tsdb.Tests</PackageId>
+    <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
+    <PackageTargetFallback>$(PackageTargetFallback);dnxcore50;portable-net451+win8</PackageTargetFallback>
+    <RuntimeFrameworkVersion>1.0.4</RuntimeFrameworkVersion>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb.Ats\Vibrant.Tsdb.Ats.csproj" />
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb.Sql\Vibrant.Tsdb.Sql.csproj" />
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb.Redis\Vibrant.Tsdb.Redis.csproj" />
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb\Vibrant.Tsdb.csproj" />
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb.InfluxDB\Vibrant.Tsdb.InfluxDB.csproj" />
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb.Files\Vibrant.Tsdb.Files.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.0.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
+    <PackageReference Include="xunit" Version="2.2.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="1.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="1.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" />
+  </ItemGroup>
+
+</Project>

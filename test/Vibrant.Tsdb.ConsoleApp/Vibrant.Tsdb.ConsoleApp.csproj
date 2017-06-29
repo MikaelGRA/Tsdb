@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net46;netcoreapp1.0</TargetFrameworks>
+    <AssemblyName>Vibrant.Tsdb.ConsoleApp</AssemblyName>
+    <OutputType>Exe</OutputType>
+    <PackageId>Vibrant.Tsdb.ConsoleApp</PackageId>
+    <PackageTargetFallback Condition=" '$(TargetFramework)' == 'netcoreapp1.0' ">$(PackageTargetFallback);dnxcore50;portable-net451+win8</PackageTargetFallback>
+    <RuntimeFrameworkVersion Condition=" '$(TargetFramework)' == 'netcoreapp1.0' ">1.0.4</RuntimeFrameworkVersion>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb\Vibrant.Tsdb.csproj" />
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb.Ats\Vibrant.Tsdb.Ats.csproj" />
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb.Files\Vibrant.Tsdb.Files.csproj" />
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb.InfluxDB\Vibrant.Tsdb.InfluxDB.csproj" />
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb.Redis\Vibrant.Tsdb.Redis.csproj" />
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb.Sql\Vibrant.Tsdb.Sql.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="1.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="1.0.2" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net46' ">
+    <Reference Include="System" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <PropertyGroup Condition=" '$(TargetFramework)' == 'netcoreapp1.0' ">
+    <DefineConstants>$(DefineConstants);COREFX</DefineConstants>
+  </PropertyGroup>
+
+</Project>

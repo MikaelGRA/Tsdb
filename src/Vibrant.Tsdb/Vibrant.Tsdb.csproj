@@ -1,0 +1,47 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>An easy-to-use timeseries database client that allows storing of masses of simple of data structures identified by a string id and a timestamp.</Description>
+    <Copyright>Copyright (c) 2015-2017 MikaelGRA</Copyright>
+    <AssemblyTitle>TSDB client for .NET</AssemblyTitle>
+    <Version>7.0.0</Version>
+    <Authors>MikaelGRA</Authors>
+    <TargetFrameworks>net45;netstandard1.3</TargetFrameworks>
+    <AssemblyName>Vibrant.Tsdb</AssemblyName>
+    <PackageId>Vibrant.Tsdb</PackageId>
+    <PackageTags>time;nosql;timeseries;data</PackageTags>
+    <PackageReleaseNotes>https://github.com/MikaelGRA/Tsdb/blob/master/CHANGELOG.md</PackageReleaseNotes>
+    <PackageProjectUrl>https://github.com/MikaelGRA/Tsdb</PackageProjectUrl>
+    <PackageLicenseUrl>https://github.com/MikaelGRA/Tsdb/blob/master/LICENSE</PackageLicenseUrl>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
+    <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net45' ">
+    <Reference Include="System" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup Condition=" '$(TargetFramework)' == 'netstandard1.3' ">
+    <PackageReference Include="Microsoft.CSharp" Version="4.0.1" />
+    <PackageReference Include="System.Collections" Version="4.0.11" />
+    <PackageReference Include="System.Collections.Concurrent" Version="4.0.12" />
+    <PackageReference Include="System.Runtime.InteropServices" Version="4.1.0" />
+    <PackageReference Include="System.Linq" Version="4.1.0" />
+    <PackageReference Include="System.Linq.Expressions" Version="4.1.0" />
+    <PackageReference Include="System.Threading.Timer" Version="4.0.1" />
+    <PackageReference Include="System.Threading" Version="4.0.11" />
+    <PackageReference Include="System.Threading.ThreadPool" Version="4.0.10" />
+    <PackageReference Include="System.Globalization" Version="4.0.11" />
+    <PackageReference Include="System.Runtime.Extensions" Version="4.1.0" />
+    <PackageReference Include="System.Dynamic.Runtime" Version="4.0.11" />
+  </ItemGroup>
+
+</Project>
