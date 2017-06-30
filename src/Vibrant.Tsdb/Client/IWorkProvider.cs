@@ -7,18 +7,18 @@
 //{
 //   public interface IWorkProvider<TKey>
 //   {
-//      event Action<TsdbVolumeMoval<TKey>> MovalChangedOrAdded;
+//      //event Action<TsdbVolumeMoval<TKey>> MovalChangedOrAdded;
 
-//      event Action<TKey> MovalRemoved;
+//      //event Action<TKey> MovalRemoved;
 
-//      Task<IEnumerable<TsdbVolumeMoval<TKey>>> GetAllMovalsAsync( DateTime now );
+//      //Task<IEnumerable<TsdbVolumeMoval<TKey>>> GetAllMovalsAsync( DateTime now );
 
-//      Task<TsdbVolumeMoval<TKey>> GetMovalAsync( TsdbVolumeMoval<TKey> completedMoval );
+//      //Task<TsdbVolumeMoval<TKey>> GetMovalAsync( TsdbVolumeMoval<TKey> completedMoval );
 
 //      TimeSpan GetTemporaryMovalInterval();
 
 //      int GetTemporaryMovalBatchSize();
 
-//      int GetDynamicMovalBatchSize();
+//      //int GetDynamicMovalBatchSize();
 //   }
 //}

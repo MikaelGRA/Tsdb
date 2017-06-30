@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Vibrant.Tsdb.Exceptions;
 using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb.Client
@@ -61,11 +63,35 @@ namespace Vibrant.Tsdb.Client
       {
       }
 
+      public async Task MoveFromTemporaryStorageToPermanentStorageUntilCancelledAsync( int batchSize, TimeSpan movalInterval, CancellationToken cancellationToken = default( CancellationToken ) )
+      {
+         while( true )
+         {
+            try
+            {
+               await Task.Delay( movalInterval, cancellationToken ).ConfigureAwait( false );
+               await MoveFromTemporaryStorageAsync( batchSize ).ConfigureAwait( false );
+            }
+            catch( MissingTsdbServiceException )
+            {
+               throw;
+            }
+            catch( TaskCanceledException e ) when ( e.CancellationToken.IsCancellationRequested )
+            {
+               throw;
+            }
+            catch( Exception e )
+            {
+               _logger.Error( e, "An error ocurred while moving entries from temporary to permanent storage." );
+            }
+         }
+      }
+
       public async Task MoveFromTemporaryStorageAsync( int batchSize )
       {
          if( _temporaryStorage == null )
          {
-            throw new InvalidOperationException( "No temporary storage has been provided." );
+            throw new MissingTsdbServiceException( "No temporary storage has been provided." );
          }
 
          var sw = Stopwatch.StartNew();
@@ -129,7 +155,7 @@ namespace Vibrant.Tsdb.Client
          {
             if( _remotePublishSubscribe == null )
             {
-               throw new InvalidOperationException( "No remote publish subscribe store has been provided for the TsdbClient." );
+               throw new MissingTsdbServiceException( "No remote publish subscribe store has been provided for the TsdbClient." );
             }
 
             await _remotePublishSubscribe.PublishAsync( writtenItems, publicationType ).ConfigureAwait( false );
@@ -155,7 +181,7 @@ namespace Vibrant.Tsdb.Client
             {
                if( _temporaryStorage == null )
                {
-                  throw new InvalidOperationException( "No temporary storage has been provided." );
+                  throw new MissingTsdbServiceException( "No temporary storage has been provided." );
                }
 
                try
@@ -247,7 +273,7 @@ namespace Vibrant.Tsdb.Client
       {
          if( _remotePublishSubscribe == null )
          {
-            throw new InvalidOperationException( "No remote publish subscribe store has been provided for the TsdbClient." );
+            throw new MissingTsdbServiceException( "No remote publish subscribe store has been provided for the TsdbClient." );
          }
 
          return _remotePublishSubscribe.SubscribeAsync( ids, subscribe, callback );
@@ -257,7 +283,7 @@ namespace Vibrant.Tsdb.Client
       {
          if( _remotePublishSubscribe == null )
          {
-            throw new InvalidOperationException( "No remote publish subscribe store has been provided for the TsdbClient." );
+            throw new MissingTsdbServiceException( "No remote publish subscribe store has been provided for the TsdbClient." );
          }
 
          return _remotePublishSubscribe.SubscribeToAllAsync( subscribe, callback );
