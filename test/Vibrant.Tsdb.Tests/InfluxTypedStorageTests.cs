@@ -10,13 +10,13 @@ using Vibrant.Tsdb.Tests.Model;
 
 namespace Vibrant.Tsdb.Tests
 {
-   public class InfluxTaggedStorageTests : AbstractTypedStorageTests<InfluxTaggedStorage<string, BasicEntry, MeasureType>>
+   public class InfluxTypedStorageTests : AbstractTypedStorageTests<InfluxTypedStorage<string, BasicEntry, MeasureType>>
    {
       private static readonly string Endpoint;
       private static readonly string Database;
       private static readonly TestTypedKeyStorage KeyStorage;
 
-      static InfluxTaggedStorageTests()
+      static InfluxTypedStorageTests()
       {
          var builder = new ConfigurationBuilder()
             .AddJsonFile( "appsettings.json" )
@@ -41,9 +41,9 @@ namespace Vibrant.Tsdb.Tests
          } );
       }
 
-      public override InfluxTaggedStorage<string, BasicEntry, MeasureType> GetStorage( string tableName )
+      public override InfluxTypedStorage<string, BasicEntry, MeasureType> GetStorage( string tableName )
       {
-         return new InfluxTaggedStorage<string, BasicEntry, MeasureType>( new Uri( Endpoint ), Database, KeyStorage );
+         return new InfluxTypedStorage<string, BasicEntry, MeasureType>( new Uri( Endpoint ), Database, KeyStorage );
       }
    }
 }

@@ -9,7 +9,7 @@ using Vibrant.Tsdb.Exceptions;
 
 namespace Vibrant.Tsdb.InfluxDB
 {
-   public class InfluxTaggedStorage<TKey, TEntry, TMeasureType> : IStorage<TKey, TEntry>, IStorageSelector<TKey, TEntry>, ITypedStorage<TEntry, TMeasureType>, IDisposable
+   public class InfluxTypedStorage<TKey, TEntry, TMeasureType> : IStorage<TKey, TEntry>, IStorageSelector<TKey, TEntry>, ITypedStorage<TEntry, TMeasureType>, IDisposable
       where TEntry : IAggregatableEntry, IInfluxEntry, new()
       where TMeasureType : IMeasureType
    {
@@ -27,7 +27,7 @@ namespace Vibrant.Tsdb.InfluxDB
 
       private Task _createDatabase;
 
-      public InfluxTaggedStorage( Uri endpoint, string database, string username, string password, IConcurrencyControl concurrency, IKeyConverter<TKey> keyConverter, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
+      public InfluxTypedStorage( Uri endpoint, string database, string username, string password, IConcurrencyControl concurrency, IKeyConverter<TKey> keyConverter, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
       {
          _client = new InfluxClient( endpoint, username, password );
          _database = database;
@@ -42,28 +42,28 @@ namespace Vibrant.Tsdb.InfluxDB
          _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>( this ) };
       }
 
-      public InfluxTaggedStorage( Uri endpoint, string database, string username, string password, IKeyConverter<TKey> keyConverter, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
+      public InfluxTypedStorage( Uri endpoint, string database, string username, string password, IKeyConverter<TKey> keyConverter, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
          : this( endpoint, database, username, password, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), keyConverter, typeStorage )
       {
       }
 
-      public InfluxTaggedStorage( Uri endpoint, string database, string username, string password, IConcurrencyControl concurrency, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
+      public InfluxTypedStorage( Uri endpoint, string database, string username, string password, IConcurrencyControl concurrency, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
          : this( endpoint, database, username, password, concurrency, DefaultKeyConverter<TKey>.Current, typeStorage )
       {
       }
 
-      public InfluxTaggedStorage( Uri endpoint, string database, string username, string password, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
+      public InfluxTypedStorage( Uri endpoint, string database, string username, string password, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
          : this( endpoint, database, username, password, DefaultKeyConverter<TKey>.Current, typeStorage )
       {
       }
 
-      public InfluxTaggedStorage( Uri endpoint, string database, IConcurrencyControl concurrency, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
+      public InfluxTypedStorage( Uri endpoint, string database, IConcurrencyControl concurrency, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
          : this( endpoint, database, null, null, concurrency, DefaultKeyConverter<TKey>.Current, typeStorage )
       {
 
       }
 
-      public InfluxTaggedStorage( Uri endpoint, string database, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
+      public InfluxTypedStorage( Uri endpoint, string database, ITypedKeyStorage<TKey, TMeasureType> typeStorage )
          : this( endpoint, database, null, null, DefaultKeyConverter<TKey>.Current, typeStorage )
       {
 
@@ -131,7 +131,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, GroupMethod groupMethod, Sort sort = Sort.Descending )
+      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort = Sort.Descending )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -146,7 +146,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, GroupMethod groupMethod, Sort sort = Sort.Descending )
+      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort = Sort.Descending )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -161,7 +161,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, DateTime from, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, GroupMethod groupMethod, Sort sort = Sort.Descending )
+      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, DateTime from, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort = Sort.Descending )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -344,21 +344,21 @@ namespace Vibrant.Tsdb.InfluxDB
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
-      private string CreateGroupedSelectQuery( TMeasureType measureType, IFieldInfo[] fields, DateTime from, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, GroupMethod groupMethod, Sort sort )
+      private string CreateGroupedSelectQuery( TMeasureType measureType, IFieldInfo[] fields, DateTime from, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort )
       {
          StringBuilder sb = new StringBuilder();
          sb.Append( $"SELECT {CreateFieldQuery( fields, groupMethod )} FROM \"{measureType.GetName()}\" WHERE {CreateTagFilter( requiredTags )}{( requiredTags.Any() ? " AND" : "" )} '{from.ToIso8601()}' <= time AND time < '{to.ToIso8601()}' GROUP BY {CreateGroupBy( groupByTags )} ORDER BY time {GetQueryPart( sort )}" );
          return sb.ToString();
       }
 
-      private string CreateGroupedSelectQuery( TMeasureType measureType, IFieldInfo[] fields, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, GroupMethod groupMethod, Sort sort )
+      private string CreateGroupedSelectQuery( TMeasureType measureType, IFieldInfo[] fields, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort )
       {
          StringBuilder sb = new StringBuilder();
          sb.Append( $"SELECT {CreateFieldQuery( fields, groupMethod )} FROM \"{measureType.GetName()}\" WHERE {CreateTagFilter( requiredTags )}{( requiredTags.Any() ? " AND" : "" )} time < '{to.ToIso8601()}' GROUP BY {CreateGroupBy( groupByTags )} ORDER BY time {GetQueryPart( sort )}" );
          return sb.ToString();
       }
 
-      private string CreateGroupedSelectQuery( TMeasureType measureType, IFieldInfo[] fields, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, GroupMethod groupMethod, Sort sort )
+      private string CreateGroupedSelectQuery( TMeasureType measureType, IFieldInfo[] fields, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort )
       {
          StringBuilder sb = new StringBuilder();
          sb.Append( $"SELECT {CreateFieldQuery( fields, groupMethod )} FROM \"{measureType.GetName()}\" WHERE {CreateTagFilter( requiredTags )}{( requiredTags.Any() ? " AND" : "" )} time < '{_maxTo.ToIso8601()}' GROUP BY {CreateGroupBy( groupByTags )} ORDER BY time {GetQueryPart( sort )}" );
@@ -405,7 +405,7 @@ namespace Vibrant.Tsdb.InfluxDB
          return $"\"{ReservedNames.UniqueId}\" = '{_keyConverter.Convert( key )}'";
       }
 
-      private string CreateFieldQuery( IEnumerable<IFieldInfo> fields, GroupMethod groupMethod )
+      private string CreateFieldQuery( IEnumerable<IFieldInfo> fields, AggregationFunction groupMethod )
       {
          IFieldInfo fieldToCount = null;
          var aggregate = GetQueryPart( groupMethod );
@@ -446,17 +446,17 @@ namespace Vibrant.Tsdb.InfluxDB
          return sb.ToString();
       }
 
-      private string GetQueryPart( GroupMethod groupMethod )
+      private string GetQueryPart( AggregationFunction groupMethod )
       {
          switch( groupMethod )
          {
-            case GroupMethod.Average:
+            case AggregationFunction.Average:
                return "MEAN";
-            case GroupMethod.Sum:
+            case AggregationFunction.Sum:
                return "SUM";
-            case GroupMethod.Min:
+            case AggregationFunction.Min:
                return "MIN";
-            case GroupMethod.Max:
+            case AggregationFunction.Max:
                return "MAX";
             default:
                throw new ArgumentException( "Invalid group method specified.", nameof( groupMethod ) );

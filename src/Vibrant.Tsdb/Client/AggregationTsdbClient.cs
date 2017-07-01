@@ -27,7 +27,7 @@ namespace Vibrant.Tsdb.Client
          string measureTypeName,
          IEnumerable<KeyValuePair<string, string>> requiredTags,
          IEnumerable<string> groupByTags,
-         GroupMethod groupMethod,
+         AggregationFunction groupMethod,
          Sort sort = Sort.Descending )
       {
          var groupByTagsList = groupByTags.ToList(); // only iterate once
@@ -53,7 +53,7 @@ namespace Vibrant.Tsdb.Client
          DateTime to,
          IEnumerable<KeyValuePair<string, string>> requiredTags,
          IEnumerable<string> groupByTags,
-         GroupMethod groupMethod,
+         AggregationFunction groupMethod,
          Sort sort = Sort.Descending )
       {
          var groupByTagsList = groupByTags.ToList(); // only iterate once
@@ -80,7 +80,7 @@ namespace Vibrant.Tsdb.Client
          DateTime to,
          IEnumerable<KeyValuePair<string, string>> requiredTags,
          IEnumerable<string> groupByTags,
-         GroupMethod groupMethod,
+         AggregationFunction groupMethod,
          Sort sort = Sort.Descending )
       {
          var groupByTagsList = groupByTags.ToList(); // only iterate once
@@ -107,7 +107,7 @@ namespace Vibrant.Tsdb.Client
          string measureTypeName,
          Dictionary<string, string> requiredTags,
          List<string> groupByTagsList,
-         GroupMethod groupMethod,
+         AggregationFunction groupMethod,
          Sort sort )
       {
          var typedStorage = storage as ITypedStorage<TEntry, TMeasureType>;
@@ -128,7 +128,7 @@ namespace Vibrant.Tsdb.Client
          string measureTypeName,
          Dictionary<string, string> requiredTags,
          List<string> groupByTagsList,
-         GroupMethod groupMethod,
+         AggregationFunction groupMethod,
          Sort sort )
       {
          var typedStorage = storage as ITypedStorage<TEntry, TMeasureType>;
@@ -150,7 +150,7 @@ namespace Vibrant.Tsdb.Client
          string measureTypeName,
          Dictionary<string, string> requiredTags,
          List<string> groupByTagsList,
-         GroupMethod groupMethod,
+         AggregationFunction groupMethod,
          Sort sort )
       {
          var typedStorage = storage as ITypedStorage<TEntry, TMeasureType>;
@@ -170,7 +170,7 @@ namespace Vibrant.Tsdb.Client
          DateTime? to,
          IEnumerable<ITypedKey<TKey, TMeasureType>> typedKeys,
          List<string> groupByTagsList,
-         GroupMethod groupMethod,
+         AggregationFunction groupMethod,
          Sort sort )
       {
          // create lookup dictionary for keys to typed keys
@@ -209,7 +209,7 @@ namespace Vibrant.Tsdb.Client
 
       private async Task<MultiTaggedReadResult<TEntry, TMeasureType>> MergeTaggedResultsAsync(
          string measureTypeName,
-         GroupMethod groupMethod,
+         AggregationFunction groupMethod,
          Sort sort,
          List<MultiTaggedReadResult<TEntry, TMeasureType>> results )
       {
@@ -291,7 +291,7 @@ namespace Vibrant.Tsdb.Client
       private MultiTaggedReadResult<TEntry, TMeasureType> MergeTypedResults(
          TMeasureType measureType,
          IFieldInfo[] fields,
-         GroupMethod groupMethod,
+         AggregationFunction groupMethod,
          Sort sort,
          Dictionary<TagCollection, List<TypedReadResult<TKey, TEntry, TMeasureType>>> collectionsByTags )
       {
@@ -324,7 +324,7 @@ namespace Vibrant.Tsdb.Client
       private MultiTaggedReadResult<TEntry, TMeasureType> Merge(
          TMeasureType measureType,
          IFieldInfo[] fields,
-         GroupMethod groupMethod,
+         AggregationFunction groupMethod,
          Sort sort,
          Dictionary<TagCollection, List<TaggedReadResult<TEntry, TMeasureType>>> collectionsByTags )
       {
@@ -354,17 +354,17 @@ namespace Vibrant.Tsdb.Client
          return finalResult;
       }
 
-      private Func<IEnumerable<TEntry>, IFieldInfo[], TEntry> FindAggregationMethod( GroupMethod groupMethod )
+      private Func<IEnumerable<TEntry>, IFieldInfo[], TEntry> FindAggregationMethod( AggregationFunction groupMethod )
       {
          switch( groupMethod )
          {
-            case GroupMethod.Average:
+            case AggregationFunction.Average:
                return Average;
-            case GroupMethod.Sum:
+            case AggregationFunction.Sum:
                return Sum;
-            case GroupMethod.Min:
+            case AggregationFunction.Min:
                return Min;
-            case GroupMethod.Max:
+            case AggregationFunction.Max:
                return Max;
             default:
                throw new ArgumentException( "Invalid group method specified.", nameof( groupMethod ) );

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb
 {
-   public enum GroupMethod
+   public enum AggregationFunction
    {
       Average,
       Sum,

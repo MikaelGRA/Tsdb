@@ -25,7 +25,7 @@ namespace Vibrant.Tsdb.Tests
             await store.WriteAsync( written );
          }
 
-         var result = await store.ReadGroupsAsync( "Temperature", new Dictionary<string, string>(), new[] { "Placement" }, GroupMethod.Average );
+         var result = await store.ReadGroupsAsync( "Temperature", new Dictionary<string, string>(), new[] { "Placement" }, AggregationFunction.Average );
 
          await store.DeleteAsync( Ids );
 
@@ -64,7 +64,7 @@ namespace Vibrant.Tsdb.Tests
             await store.WriteAsync( written );
          }
 
-         var result = await store.ReadGroupsAsync( "Temperature", new [] { new KeyValuePair<string, string>( "Owner", "ABC") }, new[] { "Placement" }, GroupMethod.Average );
+         var result = await store.ReadGroupsAsync( "Temperature", new [] { new KeyValuePair<string, string>( "Owner", "ABC") }, new[] { "Placement" }, AggregationFunction.Average );
 
          await store.DeleteAsync( Ids );
       }
@@ -83,7 +83,7 @@ namespace Vibrant.Tsdb.Tests
             await store.WriteAsync( written );
          }
 
-         var result = await store.ReadGroupsAsync( "Temperature", new Dictionary<string, string>(), new[] { "Placement", "Owner" }, GroupMethod.Sum );
+         var result = await store.ReadGroupsAsync( "Temperature", new Dictionary<string, string>(), new[] { "Placement", "Owner" }, AggregationFunction.Sum );
 
          await store.DeleteAsync( Ids );
       }
