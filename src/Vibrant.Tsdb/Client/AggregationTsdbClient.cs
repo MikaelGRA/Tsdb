@@ -4,6 +4,8 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading.Tasks;
+using Vibrant.Tsdb.Client.Calculators;
+using Vibrant.Tsdb.Exceptions;
 using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb.Client
@@ -25,19 +27,20 @@ namespace Vibrant.Tsdb.Client
 
       public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync(
          string measureTypeName,
+         IEnumerable<AggregatedField> fields,
          IEnumerable<KeyValuePair<string, string>> requiredTags,
          IEnumerable<string> groupByTags,
-         AggregationFunction groupMethod,
          Sort sort = Sort.Descending )
       {
          var groupByTagsList = groupByTags.ToList(); // only iterate once
          var requiredTagsDictionary = requiredTags.ToDictionary( x => x.Key, x => x.Value );
-
+         var fieldArray = fields.ToArray();
+         
          // get the type information for each key
          var typedKeys = await _typedKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTagsDictionary ).ConfigureAwait( false );
 
          // get results per storage
-         var tasks = LookupStorages( typedKeys ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
+         var tasks = LookupStorages( typedKeys ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.Lookups, measureTypeName, fieldArray, requiredTagsDictionary, groupByTagsList, sort ) ).ToList();
 
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
@@ -45,25 +48,26 @@ namespace Vibrant.Tsdb.Client
          var results = tasks.Select( x => x.Result ).ToList();
 
          // perform final merging
-         return await MergeTaggedResultsAsync( measureTypeName, groupMethod, sort, results );
+         return await MergeTaggedResultsAsync( measureTypeName, fieldArray, sort, results );
       }
 
       public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync(
          string measureTypeName,
+         IEnumerable<AggregatedField> fields,
          DateTime to,
          IEnumerable<KeyValuePair<string, string>> requiredTags,
          IEnumerable<string> groupByTags,
-         AggregationFunction groupMethod,
          Sort sort = Sort.Descending )
       {
          var groupByTagsList = groupByTags.ToList(); // only iterate once
          var requiredTagsDictionary = requiredTags.ToDictionary( x => x.Key, x => x.Value );
+         var fieldArray = fields.ToArray();
 
          // get the type information for each key
          var typedKeys = await _typedKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTagsDictionary ).ConfigureAwait( false );
 
          // get results per storage
-         var tasks = LookupStorages( typedKeys, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.To.Value, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
+         var tasks = LookupStorages( typedKeys, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.To.Value, c.Lookups, measureTypeName, fieldArray, requiredTagsDictionary, groupByTagsList, sort ) ).ToList();
 
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
@@ -71,26 +75,27 @@ namespace Vibrant.Tsdb.Client
          var results = tasks.Select( x => x.Result ).ToList();
 
          // perform final merging
-         return await MergeTaggedResultsAsync( measureTypeName, groupMethod, sort, results );
+         return await MergeTaggedResultsAsync( measureTypeName, fieldArray, sort, results );
       }
 
       public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync(
          string measureTypeName,
+         IEnumerable<AggregatedField> fields,
          DateTime from,
          DateTime to,
          IEnumerable<KeyValuePair<string, string>> requiredTags,
          IEnumerable<string> groupByTags,
-         AggregationFunction groupMethod,
          Sort sort = Sort.Descending )
       {
          var groupByTagsList = groupByTags.ToList(); // only iterate once
          var requiredTagsDictionary = requiredTags.ToDictionary( x => x.Key, x => x.Value );
+         var fieldArray = fields.ToArray();
 
          // get the type information for each key
          var typedKeys = await _typedKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTagsDictionary ).ConfigureAwait( false );
 
          // get results per storage
-         var tasks = LookupStorages( typedKeys, from, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.From.Value, c.To.Value, c.Lookups, measureTypeName, requiredTagsDictionary, groupByTagsList, groupMethod, sort ) ).ToList();
+         var tasks = LookupStorages( typedKeys, from, to ).Select( c => ReadGroupsForStoreAsync( c.Storage, c.From.Value, c.To.Value, c.Lookups, measureTypeName, fieldArray, requiredTagsDictionary, groupByTagsList, sort ) ).ToList();
 
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
@@ -98,26 +103,26 @@ namespace Vibrant.Tsdb.Client
          var results = tasks.Select( x => x.Result ).ToList();
 
          // perform final merging
-         return await MergeTaggedResultsAsync( measureTypeName, groupMethod, sort, results );
+         return await MergeTaggedResultsAsync( measureTypeName, fieldArray, sort, results );
       }
 
       private Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsForStoreAsync(
          IStorage<TKey, TEntry> storage,
          IEnumerable<ITypedKey<TKey, TMeasureType>> typedKeys,
          string measureTypeName,
+         AggregatedField[] fields,
          Dictionary<string, string> requiredTags,
          List<string> groupByTagsList,
-         AggregationFunction groupMethod,
          Sort sort )
       {
          var typedStorage = storage as ITypedStorage<TEntry, TMeasureType>;
          if( typedStorage != null )
          {
-            return typedStorage.ReadGroupsAsync( measureTypeName, requiredTags, groupByTagsList, groupMethod, sort );
+            return typedStorage.ReadGroupsAsync( measureTypeName, fields, requiredTags, groupByTagsList, sort );
          }
          else
          {
-            return ReadGroupsForUnsupportedStoreAsync( storage, null, null, typedKeys, groupByTagsList, groupMethod, sort );
+            return ReadGroupsForUnsupportedStoreAsync( storage, null, null, fields, typedKeys, groupByTagsList, sort );
          }
       }
 
@@ -126,19 +131,19 @@ namespace Vibrant.Tsdb.Client
          DateTime to,
          IEnumerable<ITypedKey<TKey, TMeasureType>> typedKeys,
          string measureTypeName,
+         AggregatedField[] fields,
          Dictionary<string, string> requiredTags,
          List<string> groupByTagsList,
-         AggregationFunction groupMethod,
          Sort sort )
       {
          var typedStorage = storage as ITypedStorage<TEntry, TMeasureType>;
          if( typedStorage != null )
          {
-            return typedStorage.ReadGroupsAsync( measureTypeName, to, requiredTags, groupByTagsList, groupMethod, sort );
+            return typedStorage.ReadGroupsAsync( measureTypeName, fields, to, requiredTags, groupByTagsList, sort );
          }
          else
          {
-            return ReadGroupsForUnsupportedStoreAsync( storage, null, to, typedKeys, groupByTagsList, groupMethod, sort );
+            return ReadGroupsForUnsupportedStoreAsync( storage, null, to, fields, typedKeys, groupByTagsList, sort );
          }
       }
 
@@ -148,19 +153,19 @@ namespace Vibrant.Tsdb.Client
          DateTime to,
          IEnumerable<ITypedKey<TKey, TMeasureType>> typedKeys,
          string measureTypeName,
+         AggregatedField[] fields,
          Dictionary<string, string> requiredTags,
          List<string> groupByTagsList,
-         AggregationFunction groupMethod,
          Sort sort )
       {
          var typedStorage = storage as ITypedStorage<TEntry, TMeasureType>;
          if( typedStorage != null )
          {
-            return typedStorage.ReadGroupsAsync( measureTypeName, from, to, requiredTags, groupByTagsList, groupMethod, sort );
+            return typedStorage.ReadGroupsAsync( measureTypeName, fields, from, to, requiredTags, groupByTagsList, sort );
          }
          else
          {
-            return ReadGroupsForUnsupportedStoreAsync( storage, from, to, typedKeys, groupByTagsList, groupMethod, sort );
+            return ReadGroupsForUnsupportedStoreAsync( storage, from, to, fields, typedKeys, groupByTagsList, sort );
          }
       }
 
@@ -168,16 +173,16 @@ namespace Vibrant.Tsdb.Client
          IStorage<TKey, TEntry> storage,
          DateTime? from,
          DateTime? to,
+         AggregatedField[] fields,
          IEnumerable<ITypedKey<TKey, TMeasureType>> typedKeys,
          List<string> groupByTagsList,
-         AggregationFunction groupMethod,
          Sort sort )
       {
          // create lookup dictionary for keys to typed keys
          var lookups = typedKeys.ToDictionary( x => x.Key );
          var keys = lookups.Keys.ToList();
          var measureType = lookups.First().Value.GetMeasureType();
-         var fields = measureType.GetFields().ToArray();
+         var calculators = CreateFieldCalculators( fields, measureType.GetFields().ToDictionary( x => x.Key ) );
 
          // get 'traditional results'
          MultiReadResult<TKey, TEntry> result;
@@ -204,12 +209,12 @@ namespace Vibrant.Tsdb.Client
          var groupedResults = GroupByTags( groupByTagsList, typedResults );
 
          // construct final result from previously grouped results
-         return MergeTypedResults( measureType, fields, groupMethod, sort, groupedResults );
+         return MergeTypedResults( measureType, calculators, sort, groupedResults );
       }
 
       private async Task<MultiTaggedReadResult<TEntry, TMeasureType>> MergeTaggedResultsAsync(
          string measureTypeName,
-         AggregationFunction groupMethod,
+         AggregatedField[] fields,
          Sort sort,
          List<MultiTaggedReadResult<TEntry, TMeasureType>> results )
       {
@@ -248,8 +253,8 @@ namespace Vibrant.Tsdb.Client
             if( anyResults )
             {
                // need fields and aggregate method
-               var fields = measureType.GetFields().ToArray();
-               return Merge( measureType, fields, groupMethod, sort, groupings );
+               var calculators = CreateFieldCalculators( fields, measureType.GetFields().ToDictionary( x => x.Key ) );
+               return Merge( measureType, calculators, sort, groupings );
             }
             else
             {
@@ -290,13 +295,11 @@ namespace Vibrant.Tsdb.Client
 
       private MultiTaggedReadResult<TEntry, TMeasureType> MergeTypedResults(
          TMeasureType measureType,
-         IFieldInfo[] fields,
-         AggregationFunction groupMethod,
+         IFieldCalculator[] calculators,
          Sort sort,
          Dictionary<TagCollection, List<TypedReadResult<TKey, TEntry, TMeasureType>>> collectionsByTags )
       {
          // construct final result from previously grouped results
-         var aggregate = FindAggregationMethod( groupMethod );
          var finalResults = new Dictionary<TagCollection, TaggedReadResult<TEntry, TMeasureType>>();
          foreach( var collections in collectionsByTags )
          {
@@ -310,7 +313,7 @@ namespace Vibrant.Tsdb.Client
                newCollection = MergeSort.Sort(
                   collections: collections.Value.Select( x => x.Entries ),
                   comparer: EntryComparer.GetComparer<TKey, TEntry>( sort ),
-                  resolveConflict: x => aggregate( x, fields ) );
+                  resolveConflict: x => Aggregate( x, calculators ) );
             }
 
             // need tag information RIGHT HERE
@@ -323,13 +326,11 @@ namespace Vibrant.Tsdb.Client
 
       private MultiTaggedReadResult<TEntry, TMeasureType> Merge(
          TMeasureType measureType,
-         IFieldInfo[] fields,
-         AggregationFunction groupMethod,
+         IFieldCalculator[] calculators,
          Sort sort,
          Dictionary<TagCollection, List<TaggedReadResult<TEntry, TMeasureType>>> collectionsByTags )
       {
          // construct final result from previously grouped results
-         var aggregate = FindAggregationMethod( groupMethod );
          var finalResults = new Dictionary<TagCollection, TaggedReadResult<TEntry, TMeasureType>>();
          foreach( var collections in collectionsByTags )
          {
@@ -343,7 +344,7 @@ namespace Vibrant.Tsdb.Client
                newCollection = MergeSort.Sort(
                   collections: collections.Value.Select( x => x.Entries ),
                   comparer: EntryComparer.GetComparer<TKey, TEntry>( sort ),
-                  resolveConflict: x => aggregate( x, fields ) );
+                  resolveConflict: x => Aggregate( x, calculators ) );
             }
 
             // need tag information RIGHT HERE
@@ -354,21 +355,41 @@ namespace Vibrant.Tsdb.Client
          return finalResult;
       }
 
-      private Func<IEnumerable<TEntry>, IFieldInfo[], TEntry> FindAggregationMethod( AggregationFunction groupMethod )
+      private IFieldCalculator[] CreateFieldCalculators( AggregatedField[] fieldsToAggregate, Dictionary<string, IFieldInfo> fieldInfos )
       {
-         switch( groupMethod )
+         var len = fieldsToAggregate.Length;
+         var calculators = new IFieldCalculator[ len ];
+         for( int i = 0 ; i < len ; i++ )
          {
-            case AggregationFunction.Average:
-               return Average;
-            case AggregationFunction.Sum:
-               return Sum;
-            case AggregationFunction.Min:
-               return Min;
-            case AggregationFunction.Max:
-               return Max;
-            default:
-               throw new ArgumentException( "Invalid group method specified.", nameof( groupMethod ) );
+            var fieldToAggregate = fieldsToAggregate[ i ];
+
+
+            IFieldInfo fieldInfo;
+            if( !fieldInfos.TryGetValue( fieldToAggregate.Field, out fieldInfo ) )
+            {
+               throw new TsdbException( $"The field with name '{fieldToAggregate.Field}' does not exist." );
+            }
+
+            switch( fieldToAggregate.Function )
+            {
+               case AggregationFunction.Average:
+                  calculators[ i ] = new AverageFieldCalculator( fieldInfo );
+                  break;
+               case AggregationFunction.Sum:
+                  calculators[ i ] = new SumFieldCalculator( fieldInfo );
+                  break;
+               case AggregationFunction.Min:
+                  calculators[ i ] = new MinFieldCalculator( fieldInfo );
+                  break;
+               case AggregationFunction.Max:
+                  calculators[ i ] = new MaxFieldCalculator( fieldInfo );
+                  break;
+               default:
+                  throw new TsdbException( "Invalid aggregation function specified." );
+            }
          }
+
+         return calculators;
       }
 
       private IEnumerable<StorageLookupResult<TKey, List<ITypedKey<TKey, TMeasureType>>, TEntry>> LookupStorages( IEnumerable<ITypedKey<TKey, TMeasureType>> taggedIds )
@@ -460,18 +481,18 @@ namespace Vibrant.Tsdb.Client
 
          return result.Values;
       }
-      
-      private static dynamic[] CreateDefaultValues( IFieldInfo[] fields )
+
+      private static dynamic[] CreateDefaultValues( IFieldCalculator[] fields )
       {
          dynamic[] array = new dynamic[ fields.Length ];
          for( int i = 0 ; i < fields.Length ; i++ )
          {
-            array[ i ] = TypeHelper.GetDefaultValue( fields[ i ].ValueType );
+            array[ i ] = fields[ i ].CreateInitialValue();
          }
          return array;
       }
 
-      private static TEntry Max( IEnumerable<TEntry> entries, IFieldInfo[] fields )
+      private static TEntry Aggregate( IEnumerable<TEntry> entries, IFieldCalculator[] fieldCalculators )
       {
          // we need count and for each field
          int count = 0;
@@ -479,145 +500,9 @@ namespace Vibrant.Tsdb.Client
          bool firstIteration = true;
 
          // calculate
-         dynamic[] maxs = new dynamic[ fields.Length ];
+         dynamic[] sums = CreateDefaultValues( fieldCalculators );
 
-         int fieldLen = fields.Length;
-         foreach( var entry in entries )
-         {
-            if( firstIteration )
-            {
-               timestamp = entry.GetTimestamp();
-               firstIteration = false;
-            }
-            count += entry.GetCount();
-
-            for( int i = 0 ; i < fieldLen ; i++ )
-            {
-               var field = fields[ i ];
-               dynamic value = entry.GetField( field.Key );
-
-               var max = maxs[ i ];
-               if( max == null || value > max )
-               {
-                  maxs[ i ] = value;
-               }
-            }
-         }
-
-         // create result
-         TEntry newEntry = new TEntry();
-         newEntry.SetCount( count );
-         newEntry.SetTimestamp( timestamp );
-
-         for( int i = 0 ; i < fieldLen ; i++ )
-         {
-            var field = fields[ i ];
-            newEntry.SetField( field.Key, (object)maxs[ i ] );
-         }
-
-         return newEntry;
-      }
-
-      private static TEntry Min( IEnumerable<TEntry> entries, IFieldInfo[] fields )
-      {
-         // we need count and for each field
-         int count = 0;
-         DateTime timestamp = default( DateTime );
-         bool firstIteration = true;
-
-         // calculate
-         dynamic[] mins = new dynamic[ fields.Length ];
-
-         int fieldLen = fields.Length;
-         foreach( var entry in entries )
-         {
-            if( firstIteration )
-            {
-               timestamp = entry.GetTimestamp();
-               firstIteration = false;
-            }
-            count += entry.GetCount();
-
-            for( int i = 0 ; i < fieldLen ; i++ )
-            {
-               var field = fields[ i ];
-               dynamic value = entry.GetField( field.Key );
-
-               var min = mins[ i ];
-               if( min == null || value < min )
-               {
-                  mins[ i ] = value;
-               }
-            }
-         }
-
-         // create result
-         TEntry newEntry = new TEntry();
-         newEntry.SetCount( count );
-         newEntry.SetTimestamp( timestamp );
-
-         for( int i = 0 ; i < fieldLen ; i++ )
-         {
-            var field = fields[ i ];
-            newEntry.SetField( field.Key, (object)mins[ i ] );
-         }
-
-         return newEntry;
-      }
-
-      private static TEntry Sum( IEnumerable<TEntry> entries, IFieldInfo[] fields )
-      {
-         // we need count and for each field
-         int count = 0;
-         DateTime timestamp = default( DateTime );
-         bool firstIteration = true;
-
-         // calculate
-         dynamic[] sums = CreateDefaultValues( fields );
-
-         int fieldLen = fields.Length;
-         foreach( var entry in entries )
-         {
-            if( firstIteration )
-            {
-               timestamp = entry.GetTimestamp();
-               firstIteration = false;
-            }
-            count += entry.GetCount();
-
-            for( int i = 0 ; i < fieldLen ; i++ )
-            {
-               var field = fields[ i ];
-               dynamic value = entry.GetField( field.Key );
-               sums[ i ] += value;
-            }
-         }
-
-         // create result
-         TEntry newEntry = new TEntry();
-         newEntry.SetCount( count );
-         newEntry.SetTimestamp( timestamp );
-
-         for( int i = 0 ; i < fieldLen ; i++ )
-         {
-            var field = fields[ i ];
-            newEntry.SetField( field.Key, (object)sums[ i ] );
-         }
-
-         return newEntry;
-      }
-
-      private static TEntry Average( IEnumerable<TEntry> entries, IFieldInfo[] fields )
-      {
-         // we need count and for each field
-         int count = 0;
-         DateTime timestamp = default( DateTime );
-         bool firstIteration = true;
-
-         // calculate
-         dynamic[] sums = CreateDefaultValues( fields );
-
-         int fieldLen = fields.Length;
+         int fieldLen = fieldCalculators.Length;
          foreach( var entry in entries )
          {
             if( firstIteration )
@@ -630,9 +515,9 @@ namespace Vibrant.Tsdb.Client
 
             for( int i = 0 ; i < fieldLen ; i++ )
             {
-               var field = fields[ i ];
-               dynamic value = entry.GetField( field.Key );
-               sums[ i ] += value * entryCount;
+               var calculator = fieldCalculators[ i ];
+               dynamic value = entry.GetField( calculator.Field.Key );
+               calculator.Aggregate( ref sums[ i ], value, entryCount );
             }
          }
 
@@ -643,11 +528,218 @@ namespace Vibrant.Tsdb.Client
 
          for( int i = 0 ; i < fieldLen ; i++ )
          {
-            var field = fields[ i ];
-            newEntry.SetField( field.Key, (object)( sums[ i ] / count ) );
+            var calculator = fieldCalculators[ i ];
+            calculator.Complete( ref sums[ i ], count );
+            newEntry.SetField( calculator.Field.Key, (object)sums[ i ] );
          }
 
          return newEntry;
       }
+
+      //private Func<IEnumerable<TEntry>, IFieldInfo[], TEntry> FindAggregationMethod( AggregationFunction groupMethod )
+      //{
+      //   switch( groupMethod )
+      //   {
+      //      case AggregationFunction.Average:
+      //         return Average;
+      //      case AggregationFunction.Sum:
+      //         return Sum;
+      //      case AggregationFunction.Min:
+      //         return Min;
+      //      case AggregationFunction.Max:
+      //         return Max;
+      //      default:
+      //         throw new ArgumentException( "Invalid group method specified.", nameof( groupMethod ) );
+      //   }
+      //}
+
+      //private static dynamic[] CreateDefaultValues( IFieldInfo[] fields )
+      //{
+      //   dynamic[] array = new dynamic[ fields.Length ];
+      //   for( int i = 0 ; i < fields.Length ; i++ )
+      //   {
+      //      array[ i ] = TypeHelper.GetDefaultValue( fields[ i ].ValueType );
+      //   }
+      //   return array;
+      //}
+
+      //private static TEntry Max( IEnumerable<TEntry> entries, IFieldInfo[] fields )
+      //{
+      //   // we need count and for each field
+      //   int count = 0;
+      //   DateTime timestamp = default( DateTime );
+      //   bool firstIteration = true;
+
+      //   // calculate
+      //   dynamic[] maxs = new dynamic[ fields.Length ];
+
+      //   int fieldLen = fields.Length;
+      //   foreach( var entry in entries )
+      //   {
+      //      if( firstIteration )
+      //      {
+      //         timestamp = entry.GetTimestamp();
+      //         firstIteration = false;
+      //      }
+      //      count += entry.GetCount();
+
+      //      for( int i = 0 ; i < fieldLen ; i++ )
+      //      {
+      //         var field = fields[ i ];
+      //         dynamic value = entry.GetField( field.Key );
+
+      //         var max = maxs[ i ];
+      //         if( max == null || value > max )
+      //         {
+      //            maxs[ i ] = value;
+      //         }
+      //      }
+      //   }
+
+      //   // create result
+      //   TEntry newEntry = new TEntry();
+      //   newEntry.SetCount( count );
+      //   newEntry.SetTimestamp( timestamp );
+
+      //   for( int i = 0 ; i < fieldLen ; i++ )
+      //   {
+      //      var field = fields[ i ];
+      //      newEntry.SetField( field.Key, (object)maxs[ i ] );
+      //   }
+
+      //   return newEntry;
+      //}
+
+      //private static TEntry Min( IEnumerable<TEntry> entries, IFieldInfo[] fields )
+      //{
+      //   // we need count and for each field
+      //   int count = 0;
+      //   DateTime timestamp = default( DateTime );
+      //   bool firstIteration = true;
+
+      //   // calculate
+      //   dynamic[] mins = new dynamic[ fields.Length ];
+
+      //   int fieldLen = fields.Length;
+      //   foreach( var entry in entries )
+      //   {
+      //      if( firstIteration )
+      //      {
+      //         timestamp = entry.GetTimestamp();
+      //         firstIteration = false;
+      //      }
+      //      count += entry.GetCount();
+
+      //      for( int i = 0 ; i < fieldLen ; i++ )
+      //      {
+      //         var field = fields[ i ];
+      //         dynamic value = entry.GetField( field.Key );
+
+      //         var min = mins[ i ];
+      //         if( min == null || value < min )
+      //         {
+      //            mins[ i ] = value;
+      //         }
+      //      }
+      //   }
+
+      //   // create result
+      //   TEntry newEntry = new TEntry();
+      //   newEntry.SetCount( count );
+      //   newEntry.SetTimestamp( timestamp );
+
+      //   for( int i = 0 ; i < fieldLen ; i++ )
+      //   {
+      //      var field = fields[ i ];
+      //      newEntry.SetField( field.Key, (object)mins[ i ] );
+      //   }
+
+      //   return newEntry;
+      //}
+
+      //private static TEntry Sum( IEnumerable<TEntry> entries, IFieldInfo[] fields )
+      //{
+      //   // we need count and for each field
+      //   int count = 0;
+      //   DateTime timestamp = default( DateTime );
+      //   bool firstIteration = true;
+
+      //   // calculate
+      //   dynamic[] sums = CreateDefaultValues( fields );
+
+      //   int fieldLen = fields.Length;
+      //   foreach( var entry in entries )
+      //   {
+      //      if( firstIteration )
+      //      {
+      //         timestamp = entry.GetTimestamp();
+      //         firstIteration = false;
+      //      }
+      //      count += entry.GetCount();
+
+      //      for( int i = 0 ; i < fieldLen ; i++ )
+      //      {
+      //         var field = fields[ i ];
+      //         dynamic value = entry.GetField( field.Key );
+      //         sums[ i ] += value;
+      //      }
+      //   }
+
+      //   // create result
+      //   TEntry newEntry = new TEntry();
+      //   newEntry.SetCount( count );
+      //   newEntry.SetTimestamp( timestamp );
+
+      //   for( int i = 0 ; i < fieldLen ; i++ )
+      //   {
+      //      var field = fields[ i ];
+      //      newEntry.SetField( field.Key, (object)sums[ i ] );
+      //   }
+
+      //   return newEntry;
+      //}
+
+      //private static TEntry Average( IEnumerable<TEntry> entries, IFieldInfo[] fields )
+      //{
+      //   // we need count and for each field
+      //   int count = 0;
+      //   DateTime timestamp = default( DateTime );
+      //   bool firstIteration = true;
+
+      //   // calculate
+      //   dynamic[] sums = CreateDefaultValues( fields );
+
+      //   int fieldLen = fields.Length;
+      //   foreach( var entry in entries )
+      //   {
+      //      if( firstIteration )
+      //      {
+      //         timestamp = entry.GetTimestamp();
+      //         firstIteration = false;
+      //      }
+      //      var entryCount = entry.GetCount();
+      //      count += entryCount;
+
+      //      for( int i = 0 ; i < fieldLen ; i++ )
+      //      {
+      //         var field = fields[ i ];
+      //         dynamic value = entry.GetField( field.Key );
+      //         sums[ i ] += value * entryCount;
+      //      }
+      //   }
+
+      //   // create result
+      //   TEntry newEntry = new TEntry();
+      //   newEntry.SetCount( count );
+      //   newEntry.SetTimestamp( timestamp );
+
+      //   for( int i = 0 ; i < fieldLen ; i++ )
+      //   {
+      //      var field = fields[ i ];
+      //      newEntry.SetField( field.Key, (object)( sums[ i ] / count ) );
+      //   }
+
+      //   return newEntry;
+      //}
    }
 }

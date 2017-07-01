@@ -151,10 +151,11 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          // make optional or nullable...
          //var result = client.ReadLatestAsync( _dataSources.Select( x => x.Id ), 10 ).Result;
-         var result = aggregationFunctions.ReadGroupsAsync( "Temperature", /*from, to,*/ new Dictionary<string, string>(), new[] { "Placement" }, AggregationFunction.Average ).Result;
+         var fields = AggregationParameters.Fields( new AggregatedField( "Value", AggregationFunction.Average ) );
+         var result = aggregationFunctions.ReadGroupsAsync( "Temperature", fields, from, to, AggregationParameters.NoTagRequirements, new[] { "Placement" } ).Result;
          Console.WriteLine( result.Sum( x => x.Entries.Count ) );
 
-         result = aggregationFunctions.ReadGroupsAsync( "Temperature", /*from, to,*/ new Dictionary<string, string>(), new[] { "Placement" }, AggregationFunction.Average ).Result;
+         result = aggregationFunctions.ReadGroupsAsync( "Temperature", fields, from, to, AggregationParameters.NoTagRequirements, AggregationParameters.NoGroupings ).Result;
          Console.WriteLine( result.Sum( x => x.Entries.Count ) );
       }
 

@@ -34,7 +34,7 @@ namespace Vibrant.Tsdb.InfluxDB
 
          _client.DefaultQueryOptions.Precision = TimestampPrecision.Nanosecond;
          _client.DefaultWriteOptions.Precision = TimestampPrecision.Nanosecond;
-         
+
          _keyConverter = keyConverter;
          _cc = concurrency;
          _typeStorage = typeStorage;
@@ -131,7 +131,28 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort = Sort.Descending )
+      private FieldQueryInfo[] GetFieldQueryInfos( TMeasureType measureType, AggregatedField[] aggregatedFields )
+      {
+         var fields = measureType.GetFields().ToDictionary( x => x.Key );
+
+         var fieldQueryInfos = new FieldQueryInfo[ aggregatedFields.Length ];
+         for( int i = 0 ; i < aggregatedFields.Length ; i++ )
+         {
+            var aggregatedField = aggregatedFields[ i ];
+
+            IFieldInfo fieldInfo;
+            if( !fields.TryGetValue( aggregatedField.Field, out fieldInfo ) )
+            {
+               throw new TsdbException( $"The field with the name '{aggregatedField.Field}' does not exist on the measure type '{measureType.GetName()}'." );
+            }
+
+            fieldQueryInfos[ i ] = new FieldQueryInfo( aggregatedField, fieldInfo );
+         }
+
+         return fieldQueryInfos;
+      }
+
+      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, IEnumerable<AggregatedField> fields, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, Sort sort = Sort.Descending )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -139,14 +160,14 @@ namespace Vibrant.Tsdb.InfluxDB
             requiredTags = requiredTags.ToList();
             groupByTags = groupByTags.ToList();
             var measureType = await _typeStorage.GetMeasureTypeAsync( measureTypeName ).ConfigureAwait( false );
-            var fields = measureType.GetFields().ToArray();
+            var fieldQueryInfos = GetFieldQueryInfos( measureType, fields.ToArray() );
 
-            var resultSet = await _client.ReadAsync<DynamicInfluxRow>( _database, CreateGroupedSelectQuery( measureType, fields, requiredTags, groupByTags, groupMethod, sort ) ).ConfigureAwait( false );
-            return Convert( measureType, fields, resultSet, sort );
+            var resultSet = await _client.ReadAsync<DynamicInfluxRow>( _database, CreateGroupedSelectQuery( measureType, fieldQueryInfos, requiredTags, groupByTags, sort ) ).ConfigureAwait( false );
+            return Convert( measureType, fieldQueryInfos, resultSet, sort );
          }
       }
 
-      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort = Sort.Descending )
+      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, IEnumerable<AggregatedField> fields, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, Sort sort = Sort.Descending )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -154,14 +175,14 @@ namespace Vibrant.Tsdb.InfluxDB
             requiredTags = requiredTags.ToList();
             groupByTags = groupByTags.ToList();
             var measureType = await _typeStorage.GetMeasureTypeAsync( measureTypeName ).ConfigureAwait( false );
-            var fields = measureType.GetFields().ToArray();
+            var fieldQueryInfos = GetFieldQueryInfos( measureType, fields.ToArray() );
 
-            var resultSet = await _client.ReadAsync<DynamicInfluxRow>( _database, CreateGroupedSelectQuery( measureType, fields, to, requiredTags, groupByTags, groupMethod, sort ) ).ConfigureAwait( false );
-            return Convert( measureType, fields, resultSet, sort );
+            var resultSet = await _client.ReadAsync<DynamicInfluxRow>( _database, CreateGroupedSelectQuery( measureType, fieldQueryInfos, to, requiredTags, groupByTags, sort ) ).ConfigureAwait( false );
+            return Convert( measureType, fieldQueryInfos, resultSet, sort );
          }
       }
 
-      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, DateTime from, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort = Sort.Descending )
+      public async Task<MultiTaggedReadResult<TEntry, TMeasureType>> ReadGroupsAsync( string measureTypeName, IEnumerable<AggregatedField> fields, DateTime from, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, Sort sort = Sort.Descending )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
          {
@@ -169,10 +190,10 @@ namespace Vibrant.Tsdb.InfluxDB
             requiredTags = requiredTags.ToList();
             groupByTags = groupByTags.ToList();
             var measureType = await _typeStorage.GetMeasureTypeAsync( measureTypeName ).ConfigureAwait( false );
-            var fields = measureType.GetFields().ToArray();
+            var fieldQueryInfos = GetFieldQueryInfos( measureType, fields.ToArray() );
 
-            var resultSet = await _client.ReadAsync<DynamicInfluxRow>( _database, CreateGroupedSelectQuery( measureType, fields, from, to, requiredTags, groupByTags, groupMethod, sort ) ).ConfigureAwait( false );
-            return Convert( measureType, fields, resultSet, sort );
+            var resultSet = await _client.ReadAsync<DynamicInfluxRow>( _database, CreateGroupedSelectQuery( measureType, fieldQueryInfos, from, to, requiredTags, groupByTags, sort ) ).ConfigureAwait( false );
+            return Convert( measureType, fieldQueryInfos, resultSet, sort );
          }
       }
 
@@ -344,24 +365,24 @@ namespace Vibrant.Tsdb.InfluxDB
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
-      private string CreateGroupedSelectQuery( TMeasureType measureType, IFieldInfo[] fields, DateTime from, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort )
+      private string CreateGroupedSelectQuery( TMeasureType measureType, FieldQueryInfo[] fields, DateTime from, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, Sort sort )
       {
          StringBuilder sb = new StringBuilder();
-         sb.Append( $"SELECT {CreateFieldQuery( fields, groupMethod )} FROM \"{measureType.GetName()}\" WHERE {CreateTagFilter( requiredTags )}{( requiredTags.Any() ? " AND" : "" )} '{from.ToIso8601()}' <= time AND time < '{to.ToIso8601()}' GROUP BY {CreateGroupBy( groupByTags )} ORDER BY time {GetQueryPart( sort )}" );
+         sb.Append( $"SELECT {CreateFieldQuery( fields )} FROM \"{measureType.GetName()}\" WHERE {CreateTagFilter( requiredTags )}{( requiredTags.Any() ? " AND" : "" )} '{from.ToIso8601()}' <= time AND time < '{to.ToIso8601()}' GROUP BY {CreateGroupBy( groupByTags )} ORDER BY time {GetQueryPart( sort )}" );
          return sb.ToString();
       }
 
-      private string CreateGroupedSelectQuery( TMeasureType measureType, IFieldInfo[] fields, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort )
+      private string CreateGroupedSelectQuery( TMeasureType measureType, FieldQueryInfo[] fields, DateTime to, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, Sort sort )
       {
          StringBuilder sb = new StringBuilder();
-         sb.Append( $"SELECT {CreateFieldQuery( fields, groupMethod )} FROM \"{measureType.GetName()}\" WHERE {CreateTagFilter( requiredTags )}{( requiredTags.Any() ? " AND" : "" )} time < '{to.ToIso8601()}' GROUP BY {CreateGroupBy( groupByTags )} ORDER BY time {GetQueryPart( sort )}" );
+         sb.Append( $"SELECT {CreateFieldQuery( fields )} FROM \"{measureType.GetName()}\" WHERE {CreateTagFilter( requiredTags )}{( requiredTags.Any() ? " AND" : "" )} time < '{to.ToIso8601()}' GROUP BY {CreateGroupBy( groupByTags )} ORDER BY time {GetQueryPart( sort )}" );
          return sb.ToString();
       }
 
-      private string CreateGroupedSelectQuery( TMeasureType measureType, IFieldInfo[] fields, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, AggregationFunction groupMethod, Sort sort )
+      private string CreateGroupedSelectQuery( TMeasureType measureType, FieldQueryInfo[] fields, IEnumerable<KeyValuePair<string, string>> requiredTags, IEnumerable<string> groupByTags, Sort sort )
       {
          StringBuilder sb = new StringBuilder();
-         sb.Append( $"SELECT {CreateFieldQuery( fields, groupMethod )} FROM \"{measureType.GetName()}\" WHERE {CreateTagFilter( requiredTags )}{( requiredTags.Any() ? " AND" : "" )} time < '{_maxTo.ToIso8601()}' GROUP BY {CreateGroupBy( groupByTags )} ORDER BY time {GetQueryPart( sort )}" );
+         sb.Append( $"SELECT {CreateFieldQuery( fields )} FROM \"{measureType.GetName()}\" WHERE {CreateTagFilter( requiredTags )}{( requiredTags.Any() ? " AND" : "" )} time < '{_maxTo.ToIso8601()}' GROUP BY {CreateGroupBy( groupByTags )} ORDER BY time {GetQueryPart( sort )}" );
          return sb.ToString();
       }
 
@@ -405,19 +426,18 @@ namespace Vibrant.Tsdb.InfluxDB
          return $"\"{ReservedNames.UniqueId}\" = '{_keyConverter.Convert( key )}'";
       }
 
-      private string CreateFieldQuery( IEnumerable<IFieldInfo> fields, AggregationFunction groupMethod )
+      private string CreateFieldQuery( FieldQueryInfo[] fields )
       {
          IFieldInfo fieldToCount = null;
-         var aggregate = GetQueryPart( groupMethod );
          var sb = new StringBuilder();
          foreach( var field in fields )
          {
-            fieldToCount = field;
-            sb.Append( aggregate );
+            fieldToCount = field.FieldInfo;
+            sb.Append( GetQueryPart( field.AggregatedField.Function ) );
             sb.Append( "(\"" );
-            sb.Append( field.Key );
+            sb.Append( field.FieldInfo.Key );
             sb.Append( "\") AS " );
-            sb.Append( field.Key );
+            sb.Append( field.FieldInfo.Key );
             sb.Append( ", " );
          }
          sb.Append( "COUNT(\"" );
@@ -475,7 +495,7 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
-      private MultiTaggedReadResult<TEntry, TMeasureType> Convert( TMeasureType measureType, IFieldInfo[] fields, InfluxResultSet<DynamicInfluxRow> resultSet, Sort sort )
+      private MultiTaggedReadResult<TEntry, TMeasureType> Convert( TMeasureType measureType, FieldQueryInfo[] fields, InfluxResultSet<DynamicInfluxRow> resultSet, Sort sort )
       {
          var output = new Dictionary<TagCollection, TaggedReadResult<TEntry, TMeasureType>>();
 
@@ -495,7 +515,7 @@ namespace Vibrant.Tsdb.InfluxDB
                   entry.SetCount( (int)(long)row.GetField( ReservedNames.Count ) );
                   for( int i = 0 ; i < fields.Length ; i++ )
                   {
-                     var name = fields[ i ].Key;
+                     var name = fields[ i ].FieldInfo.Key;
                      entry.SetField( name, row.GetField( name ) );
                   }
                   entries.Add( (TEntry)entry );
