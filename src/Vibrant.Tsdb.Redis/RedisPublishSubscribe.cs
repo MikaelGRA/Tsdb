@@ -46,6 +46,8 @@ namespace Vibrant.Tsdb.Redis
 
       protected override async Task OnPublished( IEnumerable<ISerie<TKey, TEntry>> series, PublicationType publish )
       {
+         await WaitWhileDisconnectedAsync().ConfigureAwait( false );
+
          var tasks = new List<Task>();
          if( publish.HasFlag( PublicationType.LatestPerCollection ) )
          {
@@ -74,8 +76,10 @@ namespace Vibrant.Tsdb.Redis
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      protected override Task OnSubscribed( IEnumerable<TKey> ids, SubscriptionType subscribe )
+      protected override async Task OnSubscribed( IEnumerable<TKey> ids, SubscriptionType subscribe )
       {
+         await WaitWhileDisconnectedAsync().ConfigureAwait( false );
+
          List<Task> tasks = new List<Task>();
          foreach( var id in ids )
          {
@@ -91,7 +95,7 @@ namespace Vibrant.Tsdb.Redis
                   throw new ArgumentException( nameof( subscribe ) );
             }
          }
-         return Task.WhenAll( tasks );
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
       protected override Task OnUnsubscribed( IEnumerable<TKey> ids, SubscriptionType subscribe )
@@ -104,14 +108,18 @@ namespace Vibrant.Tsdb.Redis
          return Task.WhenAll( tasks );
       }
 
-      protected override Task OnSubscribedToAll( SubscriptionType subscribe )
+      protected override async Task OnSubscribedToAll( SubscriptionType subscribe )
       {
+         await WaitWhileDisconnectedAsync().ConfigureAwait( false );
+
          switch( subscribe )
          {
             case SubscriptionType.LatestPerCollection:
-               return _connection.SubscribeAsync<TKey, TEntry>( "*", _keyConverter, subscribe, PublishToAllForLatestEntriesWithSameId );
+               await _connection.SubscribeAsync<TKey, TEntry>( "*", _keyConverter, subscribe, PublishToAllForLatestEntriesWithSameId ).ConfigureAwait( false );
+               return;
             case SubscriptionType.AllFromCollections:
-               return _connection.SubscribeAsync<TKey, TEntry>( "*", _keyConverter, subscribe, PublishToAllForAllEntriesWithSameId );
+               await _connection.SubscribeAsync<TKey, TEntry>( "*", _keyConverter, subscribe, PublishToAllForAllEntriesWithSameId ).ConfigureAwait( false );
+               return;
             default:
                throw new ArgumentException( nameof( subscribe ) );
          }
@@ -174,6 +182,11 @@ namespace Vibrant.Tsdb.Redis
       private void Shutdown()
       {
          _connection.Close( allowCommandsToComplete: false );
+
+         if( !_waitWhileDisconnected.Task.IsCompleted )
+         {
+            _waitWhileDisconnected.TrySetCanceled();
+         }
 
          Interlocked.Exchange( ref _state, RedisConnectionState.Disposed );
       }

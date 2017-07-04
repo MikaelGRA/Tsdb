@@ -14,6 +14,7 @@ namespace Vibrant.Tsdb.Redis
       public event Action<Exception> ConnectionFailed;
       public event Action<Exception> ErrorMessage;
 
+      private object _sync = new object();
       private ITsdbLogger _logger;
       private LoadedLuaScript _publishLatestScript;
       private ISubscriber _redisSubscriber;
@@ -128,17 +129,20 @@ namespace Vibrant.Tsdb.Redis
 
       public void Close( bool allowCommandsToComplete = true )
       {
-         if( _redisSubscriber != null )
+         lock( _sync )
          {
-            _redisSubscriber.UnsubscribeAll();
-            _redisSubscriber = null;
-         }
+            if( _redisSubscriber != null )
+            {
+               _redisSubscriber.UnsubscribeAll();
+               _redisSubscriber = null;
+            }
 
-         if( _connection != null )
-         {
-            _connection.Close( allowCommandsToComplete );
-            _connection.Dispose();
-            _connection = null;
+            if( _connection != null )
+            {
+               _connection.Close( allowCommandsToComplete );
+               _connection.Dispose();
+               _connection = null;
+            }
          }
       }
 
@@ -172,7 +176,7 @@ namespace Vibrant.Tsdb.Redis
       private async void OnConnectionRestored( object sender, ConnectionFailedEventArgs args )
       {
          // Workaround for StackExchange.Redis/issues/61 that sometimes Redis connection is not connected in ConnectionRestored event 
-         while( !_connection.GetDatabase( 0 ).IsConnected( _prefix + ".someKey" ) )
+         while( !_connection.GetDatabase( 0 ).IsConnected( _prefix ) )
          {
             await Task.Delay( 200 ).ConfigureAwait( false );
          }
