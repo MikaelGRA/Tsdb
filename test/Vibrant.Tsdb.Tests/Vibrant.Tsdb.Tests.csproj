@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp1.0</TargetFramework>
+    <TargetFramework>net461</TargetFramework>
     <AssemblyName>Vibrant.Tsdb.Tests</AssemblyName>
     <PackageId>Vibrant.Tsdb.Tests</PackageId>
     <GenerateRuntimeConfigurationFiles>true</GenerateRuntimeConfigurationFiles>
@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Vibrant.Tsdb.Ats\Vibrant.Tsdb.Ats.csproj" />
+    <ProjectReference Include="..\..\src\Vibrant.Tsdb.CosmosTables\Vibrant.Tsdb.CosmosTables.csproj" />
     <ProjectReference Include="..\..\src\Vibrant.Tsdb.Sql\Vibrant.Tsdb.Sql.csproj" />
     <ProjectReference Include="..\..\src\Vibrant.Tsdb.Redis\Vibrant.Tsdb.Redis.csproj" />
     <ProjectReference Include="..\..\src\Vibrant.Tsdb\Vibrant.Tsdb.csproj" />
@@ -29,14 +30,21 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="15.0.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
-    <PackageReference Include="xunit" Version="2.2.0" />
+    <PackageReference Include="Microsoft.VisualStudio.SlowCheetah" Version="3.0.61" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.3.1" />
+    <PackageReference Include="xunit" Version="2.3.1" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="1.0.2" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="1.0.2" />
   </ItemGroup>
 
   <ItemGroup>
     <Service Include="{82a7f48d-3b50-4b1e-b82e-3ada8210c358}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <TransformOnBuild>true</TransformOnBuild>
+    </None>
   </ItemGroup>
 
 </Project>

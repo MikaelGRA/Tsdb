@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+   <PropertyGroup>
+      <Description>An easy-to-use timeseries database client that allows storing of masses of simple of data structures identified by a string id and a timestamp.</Description>
+      <Copyright>Copyright (c) 2015-2017 MikaelGRA</Copyright>
+      <AssemblyTitle>Cosmos Table storage for TSDB client</AssemblyTitle>
+      <Version>7.0.0-beta1</Version>
+      <Authors>MikaelGRA</Authors>
+      <TargetFrameworks>netstandard2.0</TargetFrameworks>
+      <AssemblyName>Vibrant.Tsdb.CosmosTables</AssemblyName>
+      <PackageId>Vibrant.Tsdb.CosmosTables</PackageId>
+      <PackageTags>time;nosql;timeseries;data;azure;azure table storage</PackageTags>
+      <PackageReleaseNotes>https://github.com/MikaelGRA/Tsdb/blob/master/CHANGELOG.md</PackageReleaseNotes>
+      <PackageProjectUrl>https://github.com/MikaelGRA/Tsdb</PackageProjectUrl>
+      <PackageLicenseUrl>https://github.com/MikaelGRA/Tsdb/blob/master/LICENSE</PackageLicenseUrl>
+      <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+   </PropertyGroup>
+
+   <ItemGroup>
+      <ProjectReference Include="..\Vibrant.Tsdb\Vibrant.Tsdb.csproj" />
+   </ItemGroup>
+
+   <ItemGroup>
+      <PackageReference Include="Microsoft.Azure.CosmosDB.Table" Version="1.0.0" />
+      <PackageReference Include="Microsoft.Azure.Storage.Common" Version="8.6.0-preview" />
+   </ItemGroup>
+
+   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+      <GenerateDocumentationFile>true</GenerateDocumentationFile>
+   </PropertyGroup>
+
+</Project>

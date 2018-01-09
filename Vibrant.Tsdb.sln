@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26430.4
+VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4AC69C99-B5CF-499D-93E8-2093E22AAA9C}"
 EndProject
@@ -24,6 +24,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vibrant.Tsdb.InfluxDB", "src\Vibrant.Tsdb.InfluxDB\Vibrant.Tsdb.InfluxDB.csproj", "{0316DF2D-12B8-4DDC-85F6-73D0C143A364}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vibrant.Tsdb.Files", "src\Vibrant.Tsdb.Files\Vibrant.Tsdb.Files.csproj", "{48BA975B-5AFC-4430-A650-C0E33820F2BA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Vibrant.Tsdb.CosmosTables", "src\Vibrant.Tsdb.CosmosTables\Vibrant.Tsdb.CosmosTables.csproj", "{948A3E9C-1D73-4BAF-9FB8-28E968673404}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -63,6 +65,10 @@ Global
 		{48BA975B-5AFC-4430-A650-C0E33820F2BA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{48BA975B-5AFC-4430-A650-C0E33820F2BA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{48BA975B-5AFC-4430-A650-C0E33820F2BA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{948A3E9C-1D73-4BAF-9FB8-28E968673404}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{948A3E9C-1D73-4BAF-9FB8-28E968673404}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{948A3E9C-1D73-4BAF-9FB8-28E968673404}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{948A3E9C-1D73-4BAF-9FB8-28E968673404}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -76,5 +82,9 @@ Global
 		{EF40C55F-0356-4CD8-9BFC-661CC9134F5F} = {4AC69C99-B5CF-499D-93E8-2093E22AAA9C}
 		{0316DF2D-12B8-4DDC-85F6-73D0C143A364} = {4AC69C99-B5CF-499D-93E8-2093E22AAA9C}
 		{48BA975B-5AFC-4430-A650-C0E33820F2BA} = {4AC69C99-B5CF-499D-93E8-2093E22AAA9C}
+		{948A3E9C-1D73-4BAF-9FB8-28E968673404} = {4AC69C99-B5CF-499D-93E8-2093E22AAA9C}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EA061D43-ACF1-48F6-852A-45E1DF5F0E69}
 	EndGlobalSection
 EndGlobal

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Vibrant.InfluxDB.Client;
 using Vibrant.InfluxDB.Client.Rows;
 using Vibrant.Tsdb.Ats;
+using Vibrant.Tsdb.CosmosTables;
 using Vibrant.Tsdb.Files;
 using Vibrant.Tsdb.InfluxDB;
 using Vibrant.Tsdb.Redis;
@@ -13,7 +14,7 @@ using Vibrant.Tsdb.Sql;
 
 namespace Vibrant.Tsdb.Tests.Entries
 {
-   public class BasicEntry : IEntry, IAtsEntry, ISqlEntry, IRedisEntry, IInfluxEntry, IFileEntry, IAggregatableEntry
+   public class BasicEntry : IEntry, IAtsEntry, ICosmosTablesEntry, ISqlEntry, IRedisEntry, IInfluxEntry, IFileEntry, IAggregatableEntry
    {
       private static readonly KeyValuePair<string, string>[] _empty = new KeyValuePair<string, string>[ 0 ];
 
