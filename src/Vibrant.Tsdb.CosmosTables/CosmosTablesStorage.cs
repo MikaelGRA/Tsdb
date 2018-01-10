@@ -16,6 +16,8 @@ namespace Vibrant.Tsdb.CosmosTables
    public class CosmosTablesStorage<TKey, TEntry> : IStorage<TKey, TEntry>, IStorageSelector<TKey, TEntry>, IDisposable
      where TEntry : ICosmosTablesEntry, new()
    {
+      private static string IndexingPolicy = "{\"automatic\":false,\"indexingMode\":\"None\",\"includedPaths\":[],\"excludedPaths\":[]}";
+
       public const int DefaultReadParallelism = 50 * 3;
       public const int DefaultWriteParallelism = 50 * 3;
       public const int DefaultThroughputUnits = 1000;
@@ -43,8 +45,8 @@ namespace Vibrant.Tsdb.CosmosTables
             MaxConnectionLimit = 1000,
             MaxRetryAttemptsOnThrottledRequests = 5,
             MaxRetryWaitTimeInSeconds = 10,
-            UseDirectMode = true,
-            UseTcpProtocol = true
+            UseDirectMode = false,
+            UseTcpProtocol = false
          };
          _client = _account.CreateCloudTableClient( policy, ConsistencyLevel.Eventual );
          _partitioningProvider = partitioningProvider;
@@ -973,6 +975,7 @@ namespace Vibrant.Tsdb.CosmosTables
             else
             {
                table = _client.GetTableReference( fullTableName );
+               //table.CreateIfNotExistsAsync( _client.DefaultRequestOptions, new OperationContext(), IndexingPolicy, _throughputUnits, default( CancellationToken ) ).Wait();
                table.CreateIfNotExistsAsync( IndexingMode.None, _throughputUnits, default( CancellationToken ) ).Wait();
 
                _tables.Add( fullTableName, table );
