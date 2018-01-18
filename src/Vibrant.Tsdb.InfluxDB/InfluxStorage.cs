@@ -34,7 +34,7 @@ namespace Vibrant.Tsdb.InfluxDB
 
          _client.DefaultQueryOptions.Precision = TimestampPrecision.Nanosecond;
          _client.DefaultWriteOptions.Precision = TimestampPrecision.Nanosecond;
-         
+
          _keyConverter = keyConverter;
          _cc = concurrency;
 
@@ -140,6 +140,27 @@ namespace Vibrant.Tsdb.InfluxDB
             await CreateDatabase().ConfigureAwait( false );
             var resultSet = await _client.ReadAsync<TEntry>( _database, CreateLatestSelectQuery( ids, count ) ).ConfigureAwait( false );
             return Convert( ids, resultSet, Sort.Descending );
+         }
+      }
+
+      public async Task<MultiReadResult<TKey, TEntry>> ReadLatestSinceAsync( IEnumerable<TKey> ids, DateTime to, int count, Sort sort = Sort.Descending )
+      {
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
+         {
+            await CreateDatabase().ConfigureAwait( false );
+            var resultSet = await _client.ReadAsync<TEntry>( _database, CreateLatestSinceSelectQuery( ids, to, count ) ).ConfigureAwait( false );
+            if( sort == Sort.Ascending )
+            {
+               foreach( var result in resultSet.Results )
+               {
+                  foreach( var serie in result.Series )
+                  {
+                     serie.Rows.Reverse();
+                  }
+               }
+            }
+
+            return Convert( ids, resultSet, sort );
          }
       }
 
@@ -311,6 +332,16 @@ namespace Vibrant.Tsdb.InfluxDB
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }
 
+      private string CreateLatestSinceSelectQuery( IEnumerable<TKey> ids, DateTime to, int count )
+      {
+         StringBuilder sb = new StringBuilder();
+         foreach( var id in ids )
+         {
+            sb.Append( $"SELECT * FROM \"{_keyConverter.Convert( id )}\" WHERE time < '{to.ToIso8601()}' ORDER BY time DESC LIMIT {count};" );
+         }
+         return sb.Remove( sb.Length - 1, 1 ).ToString();
+      }
+
       private string GetQuery( Sort sort )
       {
          if( sort == Sort.Ascending )
@@ -383,7 +414,7 @@ namespace Vibrant.Tsdb.InfluxDB
                ReadResult<TKey, TEntry> r;
                if( results.TryGetValue( serie.Name, out r ) )
                {
-                  results[ serie.Name ] = new ReadResult<TKey, TEntry>( r.Key, sort, (List<TEntry>)serie.Rows );
+                  results[ serie.Name ] = new ReadResult<TKey, TEntry>( r.Key, sort, serie.Rows );
                }
             }
          }

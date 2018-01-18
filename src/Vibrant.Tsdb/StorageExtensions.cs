@@ -38,6 +38,13 @@ namespace Vibrant.Tsdb
          return mr.FindResult( id );
       }
 
+      public async static Task<ReadResult<TKey, TEntry>> ReadLatestSinceAsync<TKey, TEntry>( this IStorage<TKey, TEntry> storage, TKey id, DateTime to, int count, Sort sort = Sort.Descending )
+         where TEntry : IEntry
+      {
+         var mr = await storage.ReadLatestSinceAsync( new[] { id }, to, count, sort ).ConfigureAwait( false );
+         return mr.FindResult( id );
+      }
+
       public async static Task<ReadResult<TKey, TEntry>> ReadAsync<TKey, TEntry>( this IStorage<TKey, TEntry> storage, TKey id, Sort sort = Sort.Descending )
          where TEntry : IEntry
       {

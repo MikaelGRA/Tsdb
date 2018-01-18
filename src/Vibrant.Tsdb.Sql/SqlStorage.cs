@@ -83,6 +83,11 @@ namespace Vibrant.Tsdb.Sql
          return RetrieveLatestForIds( ids, count );
       }
 
+      public Task<MultiReadResult<TKey, TEntry>> ReadLatestSinceAsync( IEnumerable<TKey> ids, DateTime to, int count, Sort sort = Sort.Descending )
+      {
+         return RetrieveLatestSinceForIds( ids, to, count, sort );
+      }
+
       public Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
       {
          return RetrieveForIds( ids, sort );
@@ -283,6 +288,46 @@ namespace Vibrant.Tsdb.Sql
                   await Task.WhenAll( tasks ).ConfigureAwait( false );
 
                   return CreateReadResult( tasks.SelectMany( x => x.Result ), ids, Sort.Descending );
+               }
+            }
+         }
+      }
+
+      private async Task<MultiReadResult<TKey, TEntry>> RetrieveLatestSinceForIds( IEnumerable<TKey> ids, DateTime to, int count, Sort sort )
+      {
+         await CreateTable().ConfigureAwait( false );
+
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
+         {
+            using( var connection = new SqlConnection( _connectionString ) )
+            {
+               await connection.OpenAsync().ConfigureAwait( false );
+
+
+               using( var tx = connection.BeginTransaction( IsolationLevel.ReadCommitted ) )
+               {
+                  List<Task<IEnumerable<SqlEntry>>> tasks = new List<Task<IEnumerable<SqlEntry>>>();
+
+                  foreach( var id in ids )
+                  {
+                     var query = Sql.GetLatestSinceQuery( _tableName, _keyConverter.Convert( id ), to, count, sort );
+
+                     tasks.Add( connection.QueryAsync<SqlEntry>(
+                        sql: query.Sql,
+                        param: query.Args,
+                        transaction: tx ) );
+                  }
+
+                  await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+                  var allEntries = tasks.SelectMany( x => x.Result );
+
+                  if( sort == Sort.Ascending )
+                  {
+                     allEntries = allEntries.Reverse();
+                  }
+
+                  return CreateReadResult( allEntries, ids, sort );
                }
             }
          }

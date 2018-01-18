@@ -66,7 +66,7 @@ namespace Vibrant.Tsdb.Tests.Entries
          writer.Write( Value );
       }
 
-      void IInfluxRow.SetTimestamp( DateTime? value )
+      void IInfluxRow<DateTime?>.SetTimestamp( DateTime? value )
       {
          if( value.HasValue )
          {
@@ -74,36 +74,36 @@ namespace Vibrant.Tsdb.Tests.Entries
          }
       }
 
-      DateTime? IInfluxRow.GetTimestamp()
+      DateTime? IInfluxRow<DateTime?>.GetTimestamp()
       {
          return Timestamp;
       }
 
-      void IInfluxRow.SetField( string name, object value )
+      void IInfluxRow<DateTime?>.SetField( string name, object value )
       {
          Fields[ name ] = value;
       }
 
-      object IInfluxRow.GetField( string name )
+      object IInfluxRow<DateTime?>.GetField( string name )
       {
          return Fields[ name ];
       }
 
-      void IInfluxRow.SetTag( string name, string value )
+      void IInfluxRow<DateTime?>.SetTag( string name, string value )
       {
       }
 
-      string IInfluxRow.GetTag( string name )
+      string IInfluxRow<DateTime?>.GetTag( string name )
       {
          return null;
       }
 
-      IEnumerable<KeyValuePair<string, string>> IInfluxRow.GetAllTags()
+      IEnumerable<KeyValuePair<string, string>> IInfluxRow<DateTime?>.GetAllTags()
       {
          return _empty;
       }
 
-      IEnumerable<KeyValuePair<string, object>> IInfluxRow.GetAllFields()
+      IEnumerable<KeyValuePair<string, object>> IInfluxRow<DateTime?>.GetAllFields()
       {
          return Fields;
       }

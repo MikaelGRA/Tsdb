@@ -194,5 +194,25 @@ END
       {
          return $"SELECT TOP {count} [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id ORDER BY [Id] ASC, [Timestamp] DESC";
       }
+
+      public static Query GetLatestSinceQuery( string tableName, string id, DateTime to, int count, Sort sort )
+      {
+         if( sort == Sort.Ascending )
+         {
+            return new Query
+            {
+               Sql = $"SELECT TOP {count} [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] < @To ORDER BY [Id] ASC, [Timestamp] DESC",
+               Args = new { Id = id, To = to }
+            };
+         }
+         else
+         {
+            return new Query
+            {
+               Sql = $"SELECT TOP {count} [Id], [Timestamp], [Data] FROM [dbo].[{tableName}] WHERE [Id] = @Id AND [Timestamp] < @To ORDER BY [Id] ASC, [Timestamp] DESC",
+               Args = new { Id = id, To = to }
+            };
+         }
+      }
    }
 }

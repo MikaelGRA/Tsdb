@@ -230,12 +230,36 @@ namespace Vibrant.Tsdb.Client
          return tasks.Select( x => x.Result ).Combine();
       }
 
+      public async Task<MultiReadResult<TKey, TEntry>> ReadLatestSinceAsync( IEnumerable<TKey> ids, DateTime to, int count, Sort sort = Sort.Descending )
+      {
+         var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
+         tasks.AddRange( ids.Select( x => ReadLatestSinceInternal( x, to, count, sort ) ) );
+         await Task.WhenAll( tasks ).ConfigureAwait( false );
+
+         return tasks.Select( x => x.Result ).Combine();
+      }
+
       private async Task<ReadResult<TKey, TEntry>> ReadLatestInternal( TKey key, int count )
       {
          var storages = _storageSelector.GetStorage( key, null, null );
          foreach( var storage in storages )
          {
             var rr = await storage.Storage.ReadLatestAsync( key, count );
+            if( rr.Entries.Count > 0 )
+            {
+               return rr;
+            }
+         }
+
+         return new ReadResult<TKey, TEntry>( key, Sort.Descending );
+      }
+
+      private async Task<ReadResult<TKey, TEntry>> ReadLatestSinceInternal( TKey key, DateTime to, int count, Sort sort )
+      {
+         var storages = _storageSelector.GetStorage( key, null, to );
+         foreach( var storage in storages )
+         {
+            var rr = await storage.Storage.ReadLatestSinceAsync( key, to, count, sort );
             if( rr.Entries.Count > 0 )
             {
                return rr;

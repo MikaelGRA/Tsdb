@@ -210,6 +210,30 @@ namespace Vibrant.Tsdb.InfluxDB
          }
       }
 
+      public async Task<MultiReadResult<TKey, TEntry>> ReadLatestSinceAsync( IEnumerable<TKey> ids, DateTime to, int count, Sort sort = Sort.Descending )
+      {
+         using( await _cc.ReadAsync().ConfigureAwait( false ) )
+         {
+            await CreateDatabase().ConfigureAwait( false );
+            List<TKey> keys = ids.ToList();
+
+            var typedKeys = await _typeStorage.GetTaggedKeysOrThrowAsync( keys ).ConfigureAwait( false );
+            var resultSet = await _client.ReadAsync<TEntry>( _database, CreateLatestSinceSelectQuery( typedKeys, to, count ) ).ConfigureAwait( false );
+            if( sort == Sort.Ascending )
+            {
+               foreach( var result in resultSet.Results )
+               {
+                  foreach( var serie in result.Series )
+                  {
+                     serie.Rows.Reverse();
+                  }
+               }
+            }
+
+            return Convert( keys, resultSet, sort );
+         }
+      }
+
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )
       {
          using( await _cc.ReadAsync().ConfigureAwait( false ) )
@@ -328,6 +352,17 @@ namespace Vibrant.Tsdb.InfluxDB
          {
             var measureType = id.GetMeasureType();
             sb.Append( $"SELECT {CreateDefaultFieldQuery( measureType.GetFields() )} FROM \"{measureType.GetName()}\" WHERE {CreateDefaultTagFilter( id.Key )} AND time < '{_maxTo.ToIso8601()}' ORDER BY time DESC LIMIT {count};" );
+         }
+         return sb.Remove( sb.Length - 1, 1 ).ToString();
+      }
+
+      private string CreateLatestSinceSelectQuery( IEnumerable<ITypedKey<TKey, TMeasureType>> ids, DateTime to, int count )
+      {
+         StringBuilder sb = new StringBuilder();
+         foreach( var id in ids )
+         {
+            var measureType = id.GetMeasureType();
+            sb.Append( $"SELECT {CreateDefaultFieldQuery( measureType.GetFields() )} FROM \"{measureType.GetName()}\" WHERE {CreateDefaultTagFilter( id.Key )} AND time < '{to.ToIso8601()}' ORDER BY time DESC LIMIT {count};" );
          }
          return sb.Remove( sb.Length - 1, 1 ).ToString();
       }

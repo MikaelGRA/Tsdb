@@ -229,5 +229,61 @@ namespace Vibrant.Tsdb.Tests
          Assert.Equal( serie.Entries[ 0 ].Value, read.Entries[ 0 ].Value );
          Assert.Equal( serie.Entries[ 1 ].Value, read.Entries[ 1 ].Value );
       }
+
+      [Fact]
+      public async Task Should_Read_Two_Latest_Since1()
+      {
+         var store = GetStorage( "Table11" );
+
+         var from = new DateTime( 2015, 12, 31, 0, 0, 0, DateTimeKind.Utc );
+         var to = from.AddMilliseconds( 35 );
+
+         var serie = new Serie<string, BasicEntry>( "row5", new[]
+         {
+            new BasicEntry { Timestamp = from.AddMilliseconds( 40 ), Value = 60 },
+            new BasicEntry { Timestamp = from.AddMilliseconds( 30 ), Value = 53.13 },
+            new BasicEntry { Timestamp = from.AddMilliseconds( 20 ), Value = 13.37 },
+            new BasicEntry { Timestamp = from.AddMilliseconds( 10 ), Value = 37.13 },
+            new BasicEntry { Timestamp = from, Value = 153.10 },
+         } );
+
+         await store.WriteAsync( serie );
+
+         var read = await store.ReadLatestSinceAsync( "row5", to, 2, Sort.Descending );
+
+         await store.DeleteAsync( "row5" );
+
+         Assert.Equal( 2, read.Entries.Count );
+         Assert.Equal( serie.Entries[ 1 ].Value, read.Entries[ 0 ].Value );
+         Assert.Equal( serie.Entries[ 2 ].Value, read.Entries[ 1 ].Value );
+      }
+
+      [Fact]
+      public async Task Should_Read_Two_Latest_Since2()
+      {
+         var store = GetStorage( "Table12" );
+
+         var from = new DateTime( 2015, 12, 31, 0, 0, 0, DateTimeKind.Utc );
+         var to = from.AddMilliseconds( 35 );
+
+         var serie = new Serie<string, BasicEntry>( "row5", new[]
+         {
+            new BasicEntry { Timestamp = from.AddMilliseconds( 40 ), Value = 60 },
+            new BasicEntry { Timestamp = from.AddMilliseconds( 30 ), Value = 53.13 },
+            new BasicEntry { Timestamp = from.AddMilliseconds( 20 ), Value = 13.37 },
+            new BasicEntry { Timestamp = from.AddMilliseconds( 10 ), Value = 37.13 },
+            new BasicEntry { Timestamp = from, Value = 153.10 },
+         } );
+
+         await store.WriteAsync( serie );
+
+         var read = await store.ReadLatestSinceAsync( "row5", to, 2, Sort.Ascending );
+
+         await store.DeleteAsync( "row5" );
+
+         Assert.Equal( 2, read.Entries.Count );
+         Assert.Equal( serie.Entries[ 2 ].Value, read.Entries[ 0 ].Value );
+         Assert.Equal( serie.Entries[ 1 ].Value, read.Entries[ 1 ].Value );
+      }
    }
 }
