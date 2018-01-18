@@ -17,6 +17,8 @@ namespace Vibrant.Tsdb
 
       Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids, int count );
 
+      Task<MultiReadResult<TKey, TEntry>> ReadLatestSinceAsync( IEnumerable<TKey> ids, DateTime to, int count, Sort sort = Sort.Descending );
+
       Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending );
 
       Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending );

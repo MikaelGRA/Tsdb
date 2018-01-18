@@ -105,7 +105,7 @@ namespace Vibrant.Tsdb.CosmosTables
 
       public Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
       {
-         return ReadUntilInternal( ids, to, sort );
+         return ReadUntilInternal( ids, to, null, sort );
       }
 
       public Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
@@ -116,6 +116,11 @@ namespace Vibrant.Tsdb.CosmosTables
       public Task<MultiReadResult<TKey, TEntry>> ReadLatestAsync( IEnumerable<TKey> ids, int count )
       {
          return ReadLatestInternal( ids, count );
+      }
+
+      public Task<MultiReadResult<TKey, TEntry>> ReadLatestSinceAsync( IEnumerable<TKey> ids, DateTime to, int count, Sort sort = Sort.Descending )
+      {
+         return ReadUntilInternal( ids, to, count, sort );
       }
 
       public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> series )
@@ -293,25 +298,25 @@ namespace Vibrant.Tsdb.CosmosTables
          return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
 
-      private async Task<MultiReadResult<TKey, TEntry>> ReadUntilInternal( IEnumerable<TKey> ids, DateTime to, Sort sort )
+      private async Task<MultiReadResult<TKey, TEntry>> ReadUntilInternal( IEnumerable<TKey> ids, DateTime to, int? count, Sort sort )
       {
          var tasks = new List<Task<ReadResult<TKey, TEntry>>>();
          foreach( var id in ids )
          {
-            tasks.Add( ReadUntilInternal( id, to, sort ) );
+            tasks.Add( ReadUntilInternal( id, to, count, sort ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
          return new MultiReadResult<TKey, TEntry>( tasks.Select( x => x.Result ) );
       }
 
-      private async Task<ReadResult<TKey, TEntry>> ReadUntilInternal( TKey id, DateTime to, Sort sort )
+      private async Task<ReadResult<TKey, TEntry>> ReadUntilInternal( TKey id, DateTime to, int? count, Sort sort )
       {
          var query = new TableQuery<TsdbTableEntity>()
             .Where( CreateBeforeFilter( id, to ) );
 
          var currentTable = _tableProvider.GetTable( to );
-         var entries = await ReadWithUnknownEnd( query, currentTable, sort, null ).ConfigureAwait( false );
+         var entries = await ReadWithUnknownEnd( query, currentTable, sort, count ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
