@@ -319,13 +319,18 @@ namespace Vibrant.Tsdb.Ats
          return new MultiReadResult<TKey, TEntry>( tasks.Select( x => x.Result ) );
       }
 
+      protected virtual bool AllowIterablePartioningProvider( TKey key )
+      {
+         return true;
+      }
+
       private async Task<ReadResult<TKey, TEntry>> ReadRangeInternal( TKey id, DateTime from, DateTime to, Sort sort )
       {
          // there's twos ways to accomplish this take:
          //  1. Super fast (iterate partitions and create query for each)
          //  2. Normal (use single query)
 
-         if( _partitioningProvider is IIterablePartitionProvider<TKey> )
+         if( _partitioningProvider is IIterablePartitionProvider<TKey> && AllowIterablePartioningProvider( id ) )
          {
             // use method 1 (Super fast)
             var tasks = new List<Task<List<TEntry>>>();
