@@ -58,12 +58,24 @@ namespace Vibrant.Tsdb.Tests.Entries
 
       public void Read( BinaryReader reader )
       {
-         Value = reader.ReadDouble();
+         var count = reader.ReadByte();
+         for( int i = 0 ; i < count ; i++ )
+         {
+            var key = reader.ReadString();
+            var value = reader.ReadPrimitive();
+            Fields.Add( key, value );
+         }
       }
 
       public void Write( BinaryWriter writer )
       {
-         writer.Write( Value );
+         // data
+         writer.Write( (byte)Fields.Count );
+         foreach( var field in Fields )
+         {
+            writer.Write( field.Key );
+            writer.WritePrimitive( field.Value );
+         }
       }
 
       void IInfluxRow<DateTime?>.SetTimestamp( DateTime? value )

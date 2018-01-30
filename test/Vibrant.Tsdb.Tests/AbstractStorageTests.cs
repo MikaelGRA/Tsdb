@@ -71,6 +71,25 @@ namespace Vibrant.Tsdb.Tests
          return serie;
       }
 
+      protected static Serie<string, BasicEntry> CreateByteArrayRows( string id, DateTime startTime, byte[] arr, int count )
+      {
+         var serie = new Serie<string, BasicEntry>( id );
+
+         DateTime current = startTime;
+         for( int i = 0 ; i < count ; i++ )
+         {
+            var entry = new BasicEntry();
+            entry.Timestamp = current;
+            entry.Fields[ "Data" ] = arr;
+
+            current = current.AddSeconds( 1 );
+
+            serie.Entries.Add( entry );
+         }
+
+         return serie;
+      }
+
       public abstract TStorage GetStorage( string tableName );
 
       [Theory]
@@ -284,6 +303,29 @@ namespace Vibrant.Tsdb.Tests
          Assert.Equal( 2, read.Entries.Count );
          Assert.Equal( serie.Entries[ 2 ].Value, read.Entries[ 0 ].Value );
          Assert.Equal( serie.Entries[ 1 ].Value, read.Entries[ 1 ].Value );
+      }
+
+      [Fact]
+      public async Task Should_Write_And_Delete_ByteArray_Rows()
+      {
+         var store = GetStorage( "Table13" );
+
+         int count = 250;
+
+         var from = new DateTime( 2015, 12, 31, 0, 0, 0, DateTimeKind.Utc );
+         var to = from.AddSeconds( count );
+
+         var written = CreateByteArrayRows( "lul", from, new byte[] { 1, 2, 3 }, count );
+
+         await store.WriteAsync( written );
+
+         var read1 = await store.ReadAsync( "lul", from, to );
+
+         await store.DeleteAsync( "lul", from, to );
+
+         var read = await store.ReadAsync( "lul", from, to );
+
+         Assert.Equal( 0, read.Entries.Count );
       }
    }
 }

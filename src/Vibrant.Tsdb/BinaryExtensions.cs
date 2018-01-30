@@ -92,6 +92,14 @@ namespace Vibrant.Tsdb
          writer.Write( value );
       }
 
+      public static void WritePrimitive( this BinaryWriter writer, byte[] value )
+      {
+         writer.Write( (byte)TypeCode.Object );
+         writer.Write( (byte)1 ); // subtype, only 1 supported at the moment
+         writer.Write( value.Length );
+         writer.Write( value );
+      }
+
       public static void WritePrimitive( this BinaryWriter writer, DateTime value )
       {
          writer.Write( (byte)TypeCode.DateTime );
@@ -149,8 +157,13 @@ namespace Vibrant.Tsdb
             case TypeCode.String:
                writer.Write( (string)value );
                break;
-            case TypeCode.Empty:
             case TypeCode.Object:
+               writer.Write( (byte)1 );
+               var arr = (byte[])value;
+               writer.Write( arr.Length );
+               writer.Write( arr );
+               break;
+            case TypeCode.Empty:
             default:
                throw new ArgumentException( $"The specified type of value ({value.GetType().Name}) is not supported." );
          }
@@ -191,6 +204,11 @@ namespace Vibrant.Tsdb
                return reader.ReadString();
             case TypeCode.DateTime:
                return new DateTime( reader.ReadInt64(), DateTimeKind.Utc );
+            case TypeCode.Object:
+               var subtype = reader.ReadByte();
+               var len = reader.ReadInt32();
+               var arr = reader.ReadBytes( len );
+               return arr;
             default:
                throw new InvalidOperationException();
          }
