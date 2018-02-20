@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb.CosmosTables.Serialization
 {
@@ -13,13 +14,13 @@ namespace Vibrant.Tsdb.CosmosTables.Serialization
 
       public static BinaryReader CreateReader( Stream stream )
       {
-         var reader = new BinaryReader( stream, Encoding.ASCII );
+         var reader = new BinaryReader( stream, TsdbEncodings.Default );
          return reader;
       }
 
       public static BinaryWriter CreateWriter( Stream stream )
       {
-         var writer = new BinaryWriter( stream, Encoding.ASCII );
+         var writer = new BinaryWriter( stream, TsdbEncodings.Default );
          return writer;
       }
 

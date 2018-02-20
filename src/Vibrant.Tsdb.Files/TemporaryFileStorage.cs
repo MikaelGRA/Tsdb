@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Vibrant.Tsdb;
 using Vibrant.Tsdb.Exceptions;
+using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb.Files
 {
@@ -58,7 +59,7 @@ namespace Vibrant.Tsdb.Files
             foreach( var fi in _directory.EnumerateFiles( "*.dat" ) )
             {
                using( var fs = fi.Open( FileMode.Open, FileAccess.Read ) )
-               using( var reader = new BinaryReader( fs, Encoding.ASCII, true ) )
+               using( var reader = new BinaryReader( fs, TsdbEncodings.Default, true ) )
                {
 
                   while( reader.PeekChar() != -1 && read < count )
@@ -118,7 +119,7 @@ namespace Vibrant.Tsdb.Files
             fileStream.Seek( 0, SeekOrigin.End );
 
             // Create the writer
-            BinaryWriter writer = new BinaryWriter( fileStream, Encoding.ASCII, true );
+            BinaryWriter writer = new BinaryWriter( fileStream, TsdbEncodings.Default, true );
 
             bool disposed = false;
 
@@ -148,7 +149,7 @@ namespace Vibrant.Tsdb.Files
                      // create a new file reference...
                      fileInfo = CreateCurrentFile();
                      fileStream = fileInfo.Open( FileMode.OpenOrCreate, FileAccess.ReadWrite );
-                     writer = new BinaryWriter( fileStream, Encoding.ASCII, true );
+                     writer = new BinaryWriter( fileStream, TsdbEncodings.Default, true );
                      startFileSize = fileStream.Length;
                      beforeLength = startFileSize;
                      afterLength = beforeLength;
