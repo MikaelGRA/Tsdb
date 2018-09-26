@@ -76,7 +76,7 @@ namespace Vibrant.Tsdb.Client
             {
                throw;
             }
-            catch( TaskCanceledException e ) when ( e.CancellationToken.IsCancellationRequested )
+            catch( TaskCanceledException e ) when( e.CancellationToken.IsCancellationRequested )
             {
                throw;
             }
@@ -241,32 +241,78 @@ namespace Vibrant.Tsdb.Client
 
       private async Task<ReadResult<TKey, TEntry>> ReadLatestInternal( TKey key, int count )
       {
+         var leftToRead = count;
+         var results = new List<ReadResult<TKey, TEntry>>();
+
          var storages = _storageSelector.GetStorage( key, null, null );
          foreach( var storage in storages )
          {
-            var rr = await storage.Storage.ReadLatestAsync( key, count );
-            if( rr.Entries.Count > 0 )
+            var rr = await storage.Storage.ReadLatestAsync( key, leftToRead );
+
+            var read = rr.Entries.Count;
+            leftToRead -= read;
+
+            if( read > 0 )
             {
-               return rr;
+               results.Add( rr );
+            }
+
+            if( leftToRead <= 0 )
+            {
+               break;
             }
          }
 
-         return new ReadResult<TKey, TEntry>( key, Sort.Descending );
+         if( results.Count == 0 )
+         {
+            return new ReadResult<TKey, TEntry>( key, Sort.Descending );
+         }
+         else if( results.Count == 1 )
+         {
+            return results[ 0 ];
+         }
+         else
+         {
+            return new ReadResult<TKey, TEntry>( key, Sort.Descending, results );
+         }
       }
 
       private async Task<ReadResult<TKey, TEntry>> ReadLatestSinceInternal( TKey key, DateTime to, int count, Sort sort )
       {
+         var leftToRead = count;
+         var results = new List<ReadResult<TKey, TEntry>>();
+
          var storages = _storageSelector.GetStorage( key, null, to );
          foreach( var storage in storages )
          {
             var rr = await storage.Storage.ReadLatestSinceAsync( key, to, count, sort );
-            if( rr.Entries.Count > 0 )
+
+            var read = rr.Entries.Count;
+            leftToRead -= read;
+
+            if( read > 0 )
             {
-               return rr;
+               results.Add( rr );
+            }
+
+            if( leftToRead <= 0 )
+            {
+               break;
             }
          }
 
-         return new ReadResult<TKey, TEntry>( key, Sort.Descending );
+         if( results.Count == 0 )
+         {
+            return new ReadResult<TKey, TEntry>( key, Sort.Descending );
+         }
+         else if( results.Count == 1 )
+         {
+            return results[ 0 ];
+         }
+         else
+         {
+            return new ReadResult<TKey, TEntry>( key, Sort.Descending, results );
+         }
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )

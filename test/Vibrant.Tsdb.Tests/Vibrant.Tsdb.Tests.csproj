@@ -20,7 +20,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Vibrant.Tsdb.Ats\Vibrant.Tsdb.Ats.csproj" />
-    <ProjectReference Include="..\..\src\Vibrant.Tsdb.CosmosTables\Vibrant.Tsdb.CosmosTables.csproj" />
     <ProjectReference Include="..\..\src\Vibrant.Tsdb.Sql\Vibrant.Tsdb.Sql.csproj" />
     <ProjectReference Include="..\..\src\Vibrant.Tsdb.Redis\Vibrant.Tsdb.Redis.csproj" />
     <ProjectReference Include="..\..\src\Vibrant.Tsdb\Vibrant.Tsdb.csproj" />

@@ -74,8 +74,9 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          var selector = new TestStorageSelector( new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>[]
          {
-            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dsql, switchDate, null ),
-            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dats, null, switchDate ),
+            //new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dsql, switchDate, null ),
+            //new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dats, null, switchDate ),
+            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dats ),
          } );
 
          var vats = new AtsVolumeStorage<BasicKey, BasicEntry>(
@@ -148,6 +149,8 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          Thread.Sleep( 30000 );
          Console.WriteLine( $"Info: Reading groupings..." );
+         var test = client.ReadLatestAsync( _dataSources[ 0 ].Id, 100 ).Result;
+         Console.WriteLine( "Latest since: " + test.Entries.Count );
 
          // make optional or nullable...
          //var result = client.ReadLatestAsync( _dataSources.Select( x => x.Id ), 10 ).Result;

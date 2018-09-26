@@ -9,6 +9,16 @@ namespace Vibrant.Tsdb
    public class ReadResult<TKey, TEntry> : ISerie<TKey, TEntry>
      where TEntry : IEntry
    {
+      public ReadResult( TKey id, Sort sort, List<ReadResult<TKey, TEntry>> resultsToCompose )
+      {
+         Key = id;
+         Sort = sort;
+         Entries = MergeSort.Sort(
+            collections: resultsToCompose.Select( x => x.Entries ),
+            comparer: EntryComparer.GetComparer<TKey, TEntry>( Sort ),
+            resolveConflict: x => x.First() );
+      }
+
       public ReadResult( TKey id, Sort sort, List<TEntry> entries )
       {
          Key = id;
@@ -31,10 +41,6 @@ namespace Vibrant.Tsdb
 
       internal ReadResult<TKey, TEntry> MergeWith( ReadResult<TKey, TEntry> other )
       {
-         Entries = MergeSort.Sort(
-            collections: new[] { Entries, other.Entries },
-            comparer: EntryComparer.GetComparer<TKey, TEntry>( Sort ),
-            resolveConflict: x => x.First() );
 
          return this;
       }
