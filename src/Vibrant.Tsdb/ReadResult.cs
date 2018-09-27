@@ -39,12 +39,6 @@ namespace Vibrant.Tsdb
 
       public List<TEntry> Entries { get; private set; }
 
-      internal ReadResult<TKey, TEntry> MergeWith( ReadResult<TKey, TEntry> other )
-      {
-
-         return this;
-      }
-
       public TKey GetKey()
       {
          return Key;

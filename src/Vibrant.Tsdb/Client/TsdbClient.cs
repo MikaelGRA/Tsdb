@@ -227,7 +227,7 @@ namespace Vibrant.Tsdb.Client
          tasks.AddRange( ids.Select( x => ReadLatestInternal( x, count ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         return tasks.Select( x => x.Result ).Combine();
+         return tasks.Select( x => x.Result ).Combine( count );
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> ReadLatestSinceAsync( IEnumerable<TKey> ids, DateTime to, int count, Sort sort = Sort.Descending )
@@ -236,7 +236,7 @@ namespace Vibrant.Tsdb.Client
          tasks.AddRange( ids.Select( x => ReadLatestSinceInternal( x, to, count, sort ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         return tasks.Select( x => x.Result ).Combine();
+         return tasks.Select( x => x.Result ).Combine( count );
       }
 
       private async Task<ReadResult<TKey, TEntry>> ReadLatestInternal( TKey key, int count )
@@ -285,7 +285,7 @@ namespace Vibrant.Tsdb.Client
          var storages = _storageSelector.GetStorage( key, null, to );
          foreach( var storage in storages )
          {
-            var rr = await storage.Storage.ReadLatestSinceAsync( key, to, count, sort );
+            var rr = await storage.Storage.ReadLatestSinceAsync( key, to, leftToRead, sort );
 
             var read = rr.Entries.Count;
             leftToRead -= read;
@@ -320,7 +320,7 @@ namespace Vibrant.Tsdb.Client
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
          tasks.AddRange( LookupStorages( ids ).Select( c => c.Storage.ReadAsync( c.Lookups, sort ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return tasks.Select( x => x.Result ).Combine();
+         return tasks.Select( x => x.Result ).Combine( tasks.Count );
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime to, Sort sort = Sort.Descending )
@@ -328,7 +328,7 @@ namespace Vibrant.Tsdb.Client
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
          tasks.AddRange( LookupStorages( ids, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.To.Value, sort ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return tasks.Select( x => x.Result ).Combine();
+         return tasks.Select( x => x.Result ).Combine( tasks.Count );
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, DateTime from, DateTime to, Sort sort = Sort.Descending )
@@ -336,7 +336,7 @@ namespace Vibrant.Tsdb.Client
          var tasks = new List<Task<MultiReadResult<TKey, TEntry>>>();
          tasks.AddRange( LookupStorages( ids, from, to ).Select( c => c.Storage.ReadAsync( c.Lookups, c.From.Value, c.To.Value, sort ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return tasks.Select( x => x.Result ).Combine();
+         return tasks.Select( x => x.Result ).Combine( tasks.Count );
       }
 
       public Task<Func<Task>> SubscribeAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback )

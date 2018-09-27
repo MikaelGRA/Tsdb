@@ -26,6 +26,11 @@ namespace Vibrant.Tsdb
          _results = new Dictionary<TKey, ReadResult<TKey, TEntry>>();
       }
 
+      internal void AddResult( ReadResult<TKey, TEntry> result )
+      {
+         _results.Add( result.Key, result );
+      }
+
       public ReadResult<TKey, TEntry> FindResult( TKey id )
       {
          return _results[ id ];
@@ -34,27 +39,6 @@ namespace Vibrant.Tsdb
       public bool TryFindResult( TKey id, out ReadResult<TKey, TEntry> readResult )
       {
          return _results.TryGetValue( id, out readResult );
-      }
-
-      internal void AddOrMerge( MultiReadResult<TKey, TEntry> result )
-      {
-         foreach( var item in result )
-         {
-            AddOrMerge( item );
-         }
-      }
-
-      internal void AddOrMerge( ReadResult<TKey, TEntry> result )
-      {
-         ReadResult<TKey, TEntry> existing;
-         if( _results.TryGetValue( result.Key, out existing ) )
-         {
-            existing.MergeWith( result );
-         }
-         else
-         {
-            _results.Add( result.Key, result );
-         }
       }
 
       public IEnumerator<ReadResult<TKey, TEntry>> GetEnumerator()

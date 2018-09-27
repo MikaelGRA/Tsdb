@@ -134,7 +134,7 @@ namespace Vibrant.Tsdb.Ats
             tasks.Add( ReadLatestForId( id, count ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return tasks.Select( x => x.Result ).Combine();
+         return tasks.Select( x => x.Result ).Combine( count );
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> ReadLatestSinceAsync( IEnumerable<TKey> ids, DateTime to, int count, Sort sort = Sort.Descending )
@@ -145,7 +145,7 @@ namespace Vibrant.Tsdb.Ats
             tasks.Add( ReadLatestForId( id, to, count, sort ) );
          }
          await Task.WhenAll( tasks ).ConfigureAwait( false );
-         return tasks.Select( x => x.Result ).Combine();
+         return tasks.Select( x => x.Result ).Combine( count );
       }
 
       public async Task<MultiReadResult<TKey, TEntry>> ReadAsync( IEnumerable<TKey> ids, Sort sort = Sort.Descending )

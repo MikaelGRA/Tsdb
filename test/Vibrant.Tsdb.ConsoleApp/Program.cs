@@ -49,7 +49,6 @@ namespace Vibrant.Tsdb.ConsoleApp
          var redis = config.GetSection( "RedisCache" );
 
          var startTime = DateTime.UtcNow;
-
          _dataSources = new List<DataSource>();
          for( int i = 0 ; i < 80 ; i++ )
          {
@@ -70,13 +69,13 @@ namespace Vibrant.Tsdb.ConsoleApp
             new ConcurrencyControl( 5, 5 ),
             this );
 
-         var switchDate = new DateTime( 2016, 10, 20, 18, 25, 0, DateTimeKind.Utc );
+         var switchDate = new DateTime( 2018, 9, 27, 15, 40, 0, DateTimeKind.Utc );
 
          var selector = new TestStorageSelector( new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>[]
          {
-            //new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dsql, switchDate, null ),
-            //new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dats, null, switchDate ),
-            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dats ),
+            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dsql, switchDate, null ),
+            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dats, null, switchDate ),
+            //new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dats ),
          } );
 
          var vats = new AtsVolumeStorage<BasicKey, BasicEntry>(
@@ -121,45 +120,50 @@ namespace Vibrant.Tsdb.ConsoleApp
 
 
          var typeStorage = new TestTypedKeyStorage( _dataSources.Select( x => x.Id ) );
-         var client = new TsdbClient<BasicKey, BasicEntry>( dats, tfs, this );
+         var client = new TsdbClient<BasicKey, BasicEntry>( selector, tfs, this );
          var aggregationFunctions = new AggregationTsdbClient<BasicKey, BasicEntry, MeasureType>( dats, typeStorage, this );
 
          var batcher = new TsdbWriteBatcher<BasicKey, BasicEntry>( client, PublicationType.None, Publish.Locally, false, TimeSpan.FromSeconds( 5 ), 20000, this );
 
          ThreadPool.QueueUserWorkItem( obj => batcher.Handle() );
 
-         var from = DateTime.UtcNow;
+         //Console.WriteLine( $"Info: Writing entries..." );
+         //for( int i = 0 ; i < 3600 ; i++ )
+         //{
+         //   var now = DateTime.UtcNow;
+         //   foreach( var ds in _dataSources )
+         //   {
+         //      var serie = ds.GetEntries( now );
 
-         Console.WriteLine( $"Info: Writing entries..." );
-         for( int i = 0 ; i < 5 ; i++ )
-         {
-            var now = DateTime.UtcNow;
-            foreach( var ds in _dataSources )
-            {
-               var serie = ds.GetEntries( now );
+         //      batcher.Write( serie );
+         //   }
 
-               batcher.Write( serie );
-            }
+         //   Thread.Sleep( 1000 );
+         //}
 
-            Thread.Sleep( 1000 );
-         }
+         var from = switchDate.AddSeconds( -5 );
+         var to = switchDate.AddSeconds( 5 );
 
-         var to = DateTime.UtcNow;
+         var id = DefaultKeyConverter<Guid>.Current.ConvertAsync( "fsmVxkSDCkKOcdV9t52R4A" ).Result;
+         var result = client.ReadAsync( new BasicKey { Id = id, Sampling = Sampling.Daily }, from, to ).Result;
+
+         Console.WriteLine( result );
 
 
-         Thread.Sleep( 30000 );
-         Console.WriteLine( $"Info: Reading groupings..." );
-         var test = client.ReadLatestAsync( _dataSources[ 0 ].Id, 100 ).Result;
-         Console.WriteLine( "Latest since: " + test.Entries.Count );
 
-         // make optional or nullable...
-         //var result = client.ReadLatestAsync( _dataSources.Select( x => x.Id ), 10 ).Result;
-         var fields = AggregationParameters.Fields( new AggregatedField( "Value", AggregationFunction.Average ) );
-         var result = aggregationFunctions.ReadGroupsAsync( "Temperature", fields, from, to, AggregationParameters.NoTagRequirements, new[] { "Placement" } ).Result;
-         Console.WriteLine( result.Sum( x => x.Entries.Count ) );
+         //Thread.Sleep( 30000 );
+         //Console.WriteLine( $"Info: Reading groupings..." );
+         //var test = client.ReadLatestAsync( _dataSources[ 0 ].Id, 100 ).Result;
+         //Console.WriteLine( "Latest since: " + test.Entries.Count );
 
-         result = aggregationFunctions.ReadGroupsAsync( "Temperature", fields, from, to, AggregationParameters.NoTagRequirements, AggregationParameters.NoGroupings ).Result;
-         Console.WriteLine( result.Sum( x => x.Entries.Count ) );
+         //// make optional or nullable...
+         ////var result = client.ReadLatestAsync( _dataSources.Select( x => x.Id ), 10 ).Result;
+         //var fields = AggregationParameters.Fields( new AggregatedField( "Value", AggregationFunction.Average ) );
+         //var result = aggregationFunctions.ReadGroupsAsync( "Temperature", fields, from, to, AggregationParameters.NoTagRequirements, new[] { "Placement" } ).Result;
+         //Console.WriteLine( result.Sum( x => x.Entries.Count ) );
+
+         //result = aggregationFunctions.ReadGroupsAsync( "Temperature", fields, from, to, AggregationParameters.NoTagRequirements, AggregationParameters.NoGroupings ).Result;
+         //Console.WriteLine( result.Sum( x => x.Entries.Count ) );
       }
 
       public Task<IEnumerable<TsdbVolumeMoval<BasicKey>>> GetAllMovalsAsync( DateTime now )
