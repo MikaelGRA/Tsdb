@@ -9,12 +9,12 @@ namespace Vibrant.Tsdb.Ats
    public class YearlyTable : ITable, IEquatable<YearlyTable>
    {
       private int _year;
-      private string _yearString;
+      private string _tableName;
 
-      public YearlyTable( int year )
+      public YearlyTable( int year, string tableName )
       {
          _year = year;
-         _yearString = year.ToString( CultureInfo.InvariantCulture );
+         _tableName = tableName + year.ToString( CultureInfo.InvariantCulture );
       }
 
       public DateTime From
@@ -33,17 +33,17 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      public string Suffix
+      public string Name
       {
          get
          {
-            return _yearString;
+            return _tableName;
          }
       }
 
       public YearlyTable GetPrevious()
       {
-         return new YearlyTable( _year - 1 );
+         return new YearlyTable( _year - 1, _tableName );
       }
 
       // override object.Equals

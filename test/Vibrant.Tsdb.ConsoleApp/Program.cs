@@ -56,11 +56,10 @@ namespace Vibrant.Tsdb.ConsoleApp
          }
 
          var dats = new AtsStorage<BasicKey, BasicEntry>(
-            "DatsTables13",
             ats.GetSection( "ConnectionString" ).Value,
             new ConcurrencyControl( AtsStorage<BasicKey, BasicEntry>.DefaultReadParallelism, AtsStorage<BasicKey, BasicEntry>.DefaultWriteParallelism ),
             new YearlyPartitioningProvider<BasicKey>(),
-            new YearlyTableProvider<BasicKey>(),
+            new YearlyTableProvider<BasicKey>( "DatsTables13" ),
             this );
 
          var dsql = new SqlStorage<BasicKey, BasicEntry>(

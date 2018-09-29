@@ -20,7 +20,6 @@ namespace Vibrant.Tsdb.Ats
 
       private readonly StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>[] _defaultSelection;
       private object _sync = new object();
-      private string _tableName;
       private Dictionary<string, CloudTable> _tables;
       private CloudStorageAccount _account;
       private CloudTableClient _client;
@@ -29,10 +28,9 @@ namespace Vibrant.Tsdb.Ats
       private IKeyConverter<TKey> _keyConverter;
       private IConcurrencyControl _cc;
 
-      public AtsStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider<TKey> tableProvider, IKeyConverter<TKey> keyConverter )
+      public AtsStorage( string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider<TKey> tableProvider, IKeyConverter<TKey> keyConverter )
       {
          _cc = concurrency;
-         _tableName = tableName;
          _account = CloudStorageAccount.Parse( connectionString );
          _client = _account.CreateCloudTableClient();
          _partitioningProvider = partitioningProvider;
@@ -44,18 +42,18 @@ namespace Vibrant.Tsdb.Ats
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
 
-      public AtsStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider<TKey> tableProvider )
-         : this( tableName, connectionString, concurrency, partitioningProvider, tableProvider, DefaultKeyConverter<TKey>.Current )
+      public AtsStorage( string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider<TKey> tableProvider )
+         : this( connectionString, concurrency, partitioningProvider, tableProvider, DefaultKeyConverter<TKey>.Current )
       {
       }
 
       public AtsStorage( string tableName, string connectionString, IConcurrencyControl concurrency )
-         : this( tableName, connectionString, concurrency, new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider<TKey>() )
+         : this( connectionString, concurrency, new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider<TKey>( tableName ) )
       {
       }
 
       public AtsStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider<TKey>() )
+         : this( connectionString, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider<TKey>( tableName ) )
       {
       }
 
@@ -423,9 +421,9 @@ namespace Vibrant.Tsdb.Ats
          }
       }
 
-      private async Task<List<TEntry>> ReadInternal( TableQuery<TsdbTableEntity> query, ITable suffix, Sort sort, int? take )
+      private async Task<List<TEntry>> ReadInternal( TableQuery<TsdbTableEntity> query, ITable tableRef, Sort sort, int? take )
       {
-         var table = GetTable( suffix );
+         var table = GetTable( tableRef );
 
          List<TEntry> results = new List<TEntry>();
 
@@ -663,9 +661,9 @@ namespace Vibrant.Tsdb.Ats
       {
          int count = 0;
 
-         foreach( var suffix in _tableProvider.IterateTables( id, from, to ) )
+         foreach( var tableRef in _tableProvider.IterateTables( id, from, to ) )
          {
-            var table = GetTable( suffix );
+            var table = GetTable( tableRef );
 
             TableContinuationToken token = null;
             do
@@ -820,11 +818,11 @@ namespace Vibrant.Tsdb.Ats
          await Task.WhenAll( tasks ).ConfigureAwait( false );
       }
 
-      private async Task WriteInternalLocked( ITable suffix, string partitionKey, List<TEntry> entries )
+      private async Task WriteInternalLocked( ITable tableRef, string partitionKey, List<TEntry> entries )
       {
          using( await _cc.WriteAsync().ConfigureAwait( false ) )
          {
-            var table = GetTable( suffix );
+            var table = GetTable( tableRef );
             if( entries.Count == 1 )
             {
                var operation = TableOperation.InsertOrReplace( Convert( entries, partitionKey ).First() );
@@ -961,7 +959,7 @@ namespace Vibrant.Tsdb.Ats
       {
          lock( _sync )
          {
-            string fullTableName = _tableName + tableRef.Suffix;
+            string fullTableName = tableRef.Name;
 
             CloudTable table;
             if( _tables.TryGetValue( fullTableName, out table ) )

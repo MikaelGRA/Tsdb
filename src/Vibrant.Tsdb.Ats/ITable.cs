@@ -7,7 +7,7 @@ namespace Vibrant.Tsdb.Ats
 {
    public interface ITable : IEquatable<ITable>
    {
-      string Suffix { get; }
+      string Name { get; }
 
       DateTime From { get; }
       

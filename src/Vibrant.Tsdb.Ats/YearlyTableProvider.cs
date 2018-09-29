@@ -8,6 +8,13 @@ namespace Vibrant.Tsdb.Ats
 {
    public class YearlyTableProvider<TKey> : ITableProvider<TKey>
    {
+      private string _tableName;
+
+      public YearlyTableProvider( string tableName )
+      {
+         _tableName = tableName;
+      }
+
       public int GetMaxTableMisses( TKey id )
       {
          return 5;
@@ -20,7 +27,7 @@ namespace Vibrant.Tsdb.Ats
 
       public ITable GetTable( TKey key, DateTime timestamp )
       {
-         return new YearlyTable( timestamp.Year );
+         return new YearlyTable( timestamp.Year, _tableName );
       }
 
       public IEnumerable<ITable> IterateTables( TKey key, DateTime from, DateTime to )
@@ -29,7 +36,7 @@ namespace Vibrant.Tsdb.Ats
          var toYear = to.Year;
          for( int current = toYear ; current >= fromYear ; current-- )
          {
-            yield return new YearlyTable( current );
+            yield return new YearlyTable( current, _tableName );
          }
       }
    }
