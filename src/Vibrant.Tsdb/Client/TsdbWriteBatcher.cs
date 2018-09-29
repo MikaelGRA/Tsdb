@@ -50,6 +50,8 @@ namespace Vibrant.Tsdb.Client
          _logger = logger;
       }
 
+      public int QueueCount => _queuedCount;
+
       public void Handle( CancellationToken cancel = default( CancellationToken ) )
       {
          WriteLoop( cancel );
