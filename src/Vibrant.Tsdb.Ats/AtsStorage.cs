@@ -203,16 +203,16 @@ namespace Vibrant.Tsdb.Ats
             .Where( CreatePartitionFilter( id ) );
 
          var currentTable = _tableProvider.GetTable( id, DateTime.UtcNow );
-         var entries = await ReadWithUnknownEnd( fullQuery, currentTable, sort, count ).ConfigureAwait( false );
+         var entries = await ReadWithUnknownEnd( id, fullQuery, currentTable, sort, count ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
 
-      private async Task<List<TEntry>> ReadWithUnknownEnd( TableQuery<TsdbTableEntity> query, ITable currentTable, Sort sort, int? count )
+      private async Task<List<TEntry>> ReadWithUnknownEnd( TKey id, TableQuery<TsdbTableEntity> query, ITable currentTable, Sort sort, int? count )
       {
          List<List<TEntry>> entries = new List<List<TEntry>>();
 
-         var maxTableMisses = _tableProvider.MaxTableMisses;
+         var maxTableMisses = _tableProvider.GetMaxTableMisses( id );
          int tableMisses = 0;
          bool queryMoreTables = true;
          while( queryMoreTables )
@@ -279,7 +279,7 @@ namespace Vibrant.Tsdb.Ats
             .Where( CreatePartitionFilter( id ) );
 
          var currentTable = _tableProvider.GetTable( id, DateTime.UtcNow );
-         var entries = await ReadWithUnknownEnd( fullQuery, currentTable, sort, null ).ConfigureAwait( false );
+         var entries = await ReadWithUnknownEnd( id, fullQuery, currentTable, sort, null ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
@@ -302,7 +302,7 @@ namespace Vibrant.Tsdb.Ats
             .Where( CreateBeforeFilter( id, to ) );
 
          var currentTable = _tableProvider.GetTable( id, to );
-         var entries = await ReadWithUnknownEnd( query, currentTable, sort, count ).ConfigureAwait( false );
+         var entries = await ReadWithUnknownEnd( id, query, currentTable, sort, count ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
       }
@@ -537,7 +537,7 @@ namespace Vibrant.Tsdb.Ats
 
          var currentTable = _tableProvider.GetTable( id, to );
 
-         var maxTableMisses = _tableProvider.MaxTableMisses;
+         var maxTableMisses = _tableProvider.GetMaxTableMisses( id );
          int tableMisses = 0;
          bool queryMoreTables = true;
          while( queryMoreTables )
@@ -709,7 +709,7 @@ namespace Vibrant.Tsdb.Ats
 
          var currentTable = _tableProvider.GetTable( id, to );
 
-         var maxTableMisses = _tableProvider.MaxTableMisses;
+         var maxTableMisses = _tableProvider.GetMaxTableMisses( id );
          int tableMisses = 0;
          bool queryMoreTables = true;
          while( queryMoreTables )

@@ -8,12 +8,9 @@ namespace Vibrant.Tsdb.Ats
 {
    public class YearlyTableProvider<TKey> : ITableProvider<TKey>
    {
-      public int MaxTableMisses
+      public int GetMaxTableMisses( TKey id )
       {
-         get
-         {
-            return 5;
-         }
+         return 5;
       }
 
       public ITable GetPreviousTable( ITable currentTable )

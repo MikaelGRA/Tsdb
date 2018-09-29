@@ -7,7 +7,7 @@ namespace Vibrant.Tsdb.Ats
 {
    public interface ITableProvider<TKey>
    {
-      int MaxTableMisses { get; }
+      int GetMaxTableMisses( TKey id );
 
       ITable GetTable( TKey key, DateTime timestamp );
 
