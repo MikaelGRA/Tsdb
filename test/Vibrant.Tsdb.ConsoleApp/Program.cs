@@ -73,8 +73,8 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          var selector = new TestStorageSelector( new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>[]
          {
-            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dsql, switchDate, null ),
-            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dats, null, switchDate ),
+            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dats, switchDate, null ),
+            new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dsql, null, switchDate ),
             //new StorageSelection<BasicKey, BasicEntry, IStorage<BasicKey, BasicEntry>>( dats ),
          } );
 
@@ -120,7 +120,7 @@ namespace Vibrant.Tsdb.ConsoleApp
 
 
          var typeStorage = new TestTypedKeyStorage( _dataSources.Select( x => x.Id ) );
-         var client = new TsdbClient<BasicKey, BasicEntry>( dats, tfs, this );
+         var client = new TsdbClient<BasicKey, BasicEntry>( selector, tfs, this );
          var aggregationFunctions = new AggregationTsdbClient<BasicKey, BasicEntry, MeasureType>( dats, typeStorage, this );
 
          var batcher = new TsdbWriteBatcher<BasicKey, BasicEntry>( client, PublicationType.None, Publish.Locally, false, TimeSpan.FromSeconds( 5 ), 20000, this );

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -24,6 +25,7 @@ namespace Vibrant.Tsdb.Client
       private int _maxBatchSize;
       private DateTime? _lastWarnTime;
       private Dictionary<TKey, BatchWrite<TKey, TEntry>> _queued;
+      private LinkedList<TKey> _keys;
       private int _queuedCount;
 
       public TsdbWriteBatcher(
@@ -36,6 +38,7 @@ namespace Vibrant.Tsdb.Client
          ITsdbLogger logger )
       {
          _queued = new Dictionary<TKey, BatchWrite<TKey, TEntry>>();
+         _keys = new LinkedList<TKey>();
 
          _client = client;
          _writeInterval = writeInterval;
@@ -61,6 +64,7 @@ namespace Vibrant.Tsdb.Client
             {
                existingBatchWrite = new BatchWrite<TKey, TEntry>( serie );
                _queued.Add( key, existingBatchWrite );
+               _keys.AddLast( key );
             }
             else
             {
@@ -81,9 +85,12 @@ namespace Vibrant.Tsdb.Client
             {
                List<BatchWrite<TKey, TEntry>> batches = new List<BatchWrite<TKey, TEntry>>();
                int totalCount = 0;
-               foreach( var kvp in _queued )
+               while( _keys.Count > 0 )
                {
-                  var batch = kvp.Value;
+                  var node = _keys.First;
+                  _keys.RemoveFirst();
+
+                  var batch = _queued[ node.Value ];
                   var count = batch.Count;
                   batches.Add( batch );
 
