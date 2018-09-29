@@ -5,14 +5,14 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public interface ITableProvider
+   public interface ITableProvider<TKey>
    {
       int MaxTableMisses { get; }
 
-      ITable GetTable( DateTime timestamp );
+      ITable GetTable( TKey key, DateTime timestamp );
 
       ITable GetPreviousTable( ITable currentTable );
 
-      IEnumerable<ITable> IterateTables( DateTime from, DateTime to );
+      IEnumerable<ITable> IterateTables( TKey key, DateTime from, DateTime to );
    }
 }

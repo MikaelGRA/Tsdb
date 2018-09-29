@@ -25,11 +25,11 @@ namespace Vibrant.Tsdb.Ats
       private CloudStorageAccount _account;
       private CloudTableClient _client;
       private IPartitionProvider<TKey> _partitioningProvider;
-      private ITableProvider _tableProvider;
+      private ITableProvider<TKey> _tableProvider;
       private IKeyConverter<TKey> _keyConverter;
       private IConcurrencyControl _cc;
 
-      public AtsStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider tableProvider, IKeyConverter<TKey> keyConverter )
+      public AtsStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider<TKey> tableProvider, IKeyConverter<TKey> keyConverter )
       {
          _cc = concurrency;
          _tableName = tableName;
@@ -44,18 +44,18 @@ namespace Vibrant.Tsdb.Ats
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
 
-      public AtsStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider tableProvider )
+      public AtsStorage( string tableName, string connectionString, IConcurrencyControl concurrency, IPartitionProvider<TKey> partitioningProvider, ITableProvider<TKey> tableProvider )
          : this( tableName, connectionString, concurrency, partitioningProvider, tableProvider, DefaultKeyConverter<TKey>.Current )
       {
       }
 
       public AtsStorage( string tableName, string connectionString, IConcurrencyControl concurrency )
-         : this( tableName, connectionString, concurrency, new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider() )
+         : this( tableName, connectionString, concurrency, new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider<TKey>() )
       {
       }
 
       public AtsStorage( string tableName, string connectionString )
-         : this( tableName, connectionString, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider() )
+         : this( tableName, connectionString, new ConcurrencyControl( DefaultReadParallelism, DefaultWriteParallelism ), new YearlyPartitioningProvider<TKey>(), new YearlyTableProvider<TKey>() )
       {
       }
 
@@ -202,7 +202,7 @@ namespace Vibrant.Tsdb.Ats
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreatePartitionFilter( id ) );
 
-         var currentTable = _tableProvider.GetTable( DateTime.UtcNow );
+         var currentTable = _tableProvider.GetTable( id, DateTime.UtcNow );
          var entries = await ReadWithUnknownEnd( fullQuery, currentTable, sort, count ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
@@ -278,7 +278,7 @@ namespace Vibrant.Tsdb.Ats
          var fullQuery = new TableQuery<TsdbTableEntity>()
             .Where( CreatePartitionFilter( id ) );
 
-         var currentTable = _tableProvider.GetTable( DateTime.UtcNow );
+         var currentTable = _tableProvider.GetTable( id, DateTime.UtcNow );
          var entries = await ReadWithUnknownEnd( fullQuery, currentTable, sort, null ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
@@ -301,7 +301,7 @@ namespace Vibrant.Tsdb.Ats
          var query = new TableQuery<TsdbTableEntity>()
             .Where( CreateBeforeFilter( id, to ) );
 
-         var currentTable = _tableProvider.GetTable( to );
+         var currentTable = _tableProvider.GetTable( id, to );
          var entries = await ReadWithUnknownEnd( query, currentTable, sort, count ).ConfigureAwait( false );
 
          return new ReadResult<TKey, TEntry>( id, sort, entries );
@@ -335,7 +335,7 @@ namespace Vibrant.Tsdb.Ats
             // use method 1 (Super fast)
             var tasks = new List<Task<List<TEntry>>>();
             var iterable = (IIterablePartitionProvider<TKey>)_partitioningProvider;
-            foreach( var table in _tableProvider.IterateTables( from, to ) )
+            foreach( var table in _tableProvider.IterateTables( id, from, to ) )
             {
                var computedFrom = table.ComputeFrom( from );
                var computedTo = table.ComputeTo( to );
@@ -367,7 +367,7 @@ namespace Vibrant.Tsdb.Ats
                .Where( CreateGeneralFilter( id, from, to ) );
 
             var tasks = new List<Task<List<TEntry>>>();
-            foreach( var table in _tableProvider.IterateTables( from, to ) )
+            foreach( var table in _tableProvider.IterateTables( id, from, to ) )
             {
                tasks.Add( ReadInternal( generalQuery, table, sort, null ) );
             }
@@ -467,7 +467,7 @@ namespace Vibrant.Tsdb.Ats
 
          bool lastHasSome = true;
 
-         foreach( var currentTable in _tableProvider.IterateTables( from, to ) )
+         foreach( var currentTable in _tableProvider.IterateTables( id, from, to ) )
          {
             var table = GetTable( currentTable );
 
@@ -535,7 +535,7 @@ namespace Vibrant.Tsdb.Ats
          bool lastHasSome = true;
          int read = 0;
 
-         var currentTable = _tableProvider.GetTable( to );
+         var currentTable = _tableProvider.GetTable( id, to );
 
          var maxTableMisses = _tableProvider.MaxTableMisses;
          int tableMisses = 0;
@@ -663,7 +663,7 @@ namespace Vibrant.Tsdb.Ats
       {
          int count = 0;
 
-         foreach( var suffix in _tableProvider.IterateTables( from, to ) )
+         foreach( var suffix in _tableProvider.IterateTables( id, from, to ) )
          {
             var table = GetTable( suffix );
 
@@ -707,7 +707,7 @@ namespace Vibrant.Tsdb.Ats
       {
          int count = 0;
 
-         var currentTable = _tableProvider.GetTable( to );
+         var currentTable = _tableProvider.GetTable( id, to );
 
          var maxTableMisses = _tableProvider.MaxTableMisses;
          int tableMisses = 0;
@@ -900,7 +900,7 @@ namespace Vibrant.Tsdb.Ats
 
                if( !hashkeys.Contains( hashkey ) )
                {
-                  var table = _tableProvider.GetTable( timestamp );
+                  var table = _tableProvider.GetTable( key, timestamp );
                   var pk = AtsKeyCalculator.CalculatePartitionKey( id, key, timestamp, _partitioningProvider );
                   var tpk = new AtsTablePartition( table, pk );
 

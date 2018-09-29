@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Vibrant.Tsdb.Ats
 {
-   public class YearlyTableProvider : ITableProvider
+   public class YearlyTableProvider<TKey> : ITableProvider<TKey>
    {
       public int MaxTableMisses
       {
@@ -21,12 +21,12 @@ namespace Vibrant.Tsdb.Ats
          return ( (YearlyTable)currentTable ).GetPrevious();
       }
 
-      public ITable GetTable( DateTime timestamp )
+      public ITable GetTable( TKey key, DateTime timestamp )
       {
          return new YearlyTable( timestamp.Year );
       }
 
-      public IEnumerable<ITable> IterateTables( DateTime from, DateTime to )
+      public IEnumerable<ITable> IterateTables( TKey key, DateTime from, DateTime to )
       {
          var fromYear = from.Year;
          var toYear = to.Year;
