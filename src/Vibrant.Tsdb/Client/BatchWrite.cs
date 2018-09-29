@@ -10,13 +10,12 @@ namespace Vibrant.Tsdb.Client
       where TEntry : IEntry
    {
       private TaskCompletionSource<bool> _tcs;
-      private Dictionary<TKey, ISerie<TKey, TEntry>> _series;
-      private int _count;
+      private ISerie<TKey, TEntry> _series;
 
-      public BatchWrite()
+      public BatchWrite( ISerie<TKey, TEntry> series )
       {
          _tcs = new TaskCompletionSource<bool>();
-         _series = new Dictionary<TKey, ISerie<TKey, TEntry>>();
+         _series = series;
       }
 
       public void Complete()
@@ -31,45 +30,24 @@ namespace Vibrant.Tsdb.Client
 
       public void Add( ISerie<TKey, TEntry> serie )
       {
-         var newEntries = serie.GetEntries();
-
-         ISerie<TKey, TEntry> existing;
-         if( _series.TryGetValue( serie.GetKey(), out existing ) )
+         var existingCollection = _series.GetEntries();
+         foreach( var newEntry in serie.GetEntries() )
          {
-            var existingEntries = existing.GetEntries();
-
-            var list = existingEntries as List<TEntry>;
-            if( list != null )
-            {
-               list.AddRange( newEntries );
-            }
-            else
-            {
-               foreach( var entry in newEntries )
-               {
-                  existingEntries.Add( entry );
-               }
-            }
+            existingCollection.Add( newEntry );
          }
-         else
-         {
-            _series.Add( serie.GetKey(), serie );
-         }
-
-         _count += newEntries.Count;
       }
 
       public int Count
       {
          get
          {
-            return _count;
+            return _series.GetEntries().Count;
          }
       }
 
-      public ICollection<ISerie<TKey, TEntry>> GetBatch()
+      public ISerie<TKey, TEntry> GetBatch()
       {
-         return _series.Values;
+         return _series;
       }
 
       public Task Task

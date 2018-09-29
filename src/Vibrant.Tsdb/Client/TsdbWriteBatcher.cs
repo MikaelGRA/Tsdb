@@ -14,8 +14,6 @@ namespace Vibrant.Tsdb.Client
 
       private object _sync = new object();
       private TsdbClient<TKey, TEntry> _client;
-      private BatchWrite<TKey, TEntry> _currentBatch;
-      private Queue<BatchWrite<TKey, TEntry>> _batches;
       private TimeSpan _writeInterval;
       private PublicationType _publishType;
       private Publish _publishMode;
@@ -25,23 +23,26 @@ namespace Vibrant.Tsdb.Client
       private ITsdbLogger _logger;
       private int _maxBatchSize;
       private DateTime? _lastWarnTime;
+      private Dictionary<TKey, BatchWrite<TKey, TEntry>> _queued;
+      private int _queuedCount;
 
-      public TsdbWriteBatcher( 
-         TsdbClient<TKey, TEntry> client, 
+      public TsdbWriteBatcher(
+         TsdbClient<TKey, TEntry> client,
          PublicationType publishType,
          Publish publishMode,
          bool useTempStorage,
-         TimeSpan writeInterval, 
+         TimeSpan writeInterval,
          int maxBatchSize,
          ITsdbLogger logger )
       {
+         _queued = new Dictionary<TKey, BatchWrite<TKey, TEntry>>();
+
          _client = client;
          _writeInterval = writeInterval;
          _publishType = publishType;
          _publishMode = publishMode;
          _useTempStorage = useTempStorage;
          _maxBatchSize = maxBatchSize;
-         _batches = new Queue<BatchWrite<TKey, TEntry>>();
          _cts = new CancellationTokenSource();
          _logger = logger;
       }
@@ -55,37 +56,53 @@ namespace Vibrant.Tsdb.Client
       {
          lock( _sync )
          {
-            if( _currentBatch == null )
+            var key = serie.GetKey();
+            if( !_queued.TryGetValue( key, out var existingBatchWrite ) )
             {
-               _currentBatch = new BatchWrite<TKey, TEntry>();
+               existingBatchWrite = new BatchWrite<TKey, TEntry>( serie );
+               _queued.Add( key, existingBatchWrite );
             }
-            if( _currentBatch.Count + serie.GetEntries().Count > _maxBatchSize )
+            else
             {
-               _batches.Enqueue( _currentBatch );
-               _currentBatch = new BatchWrite<TKey, TEntry>();
+               existingBatchWrite.Add( serie );
             }
 
-            _currentBatch.Add( serie );
+            _queuedCount += serie.GetEntries().Count;
 
-            return _currentBatch.Task;
+            return existingBatchWrite.Task;
          }
       }
 
-      private BatchWrite<TKey, TEntry> GetBatchToWrite()
+      private List<BatchWrite<TKey, TEntry>> GetBatchesToWrite()
       {
          lock( _sync )
          {
-            BatchWrite<TKey, TEntry> batch = null;
-            if( _batches.Count != 0 )
+            if( _queued.Count != 0 )
             {
-               batch = _batches.Dequeue();
+               List<BatchWrite<TKey, TEntry>> batches = new List<BatchWrite<TKey, TEntry>>();
+               int totalCount = 0;
+               foreach( var kvp in _queued )
+               {
+                  var batch = kvp.Value;
+                  var count = batch.Count;
+                  batches.Add( batch );
+
+                  totalCount += count;
+                  if( totalCount > _maxBatchSize )
+                  {
+                     break;
+                  }
+               }
+
+               foreach( var batch in batches )
+               {
+                  _queued.Remove( batch.GetBatch().GetKey() );
+               }
+               _queuedCount -= totalCount;
+
+               return batches;
             }
-            else if( _currentBatch != null )
-            {
-               batch = _currentBatch;
-               _currentBatch = null;
-            }
-            return batch;
+            return null;
          }
       }
 
@@ -93,33 +110,40 @@ namespace Vibrant.Tsdb.Client
       {
          while( !_disposed )
          {
-            var write = GetBatchToWrite();
-            if( write != null )
+            var writes = GetBatchesToWrite();
+            if( writes != null )
             {
                try
                {
-                  await _client.WriteAsync( write.GetBatch(), _publishType, _publishMode, _useTempStorage ).ConfigureAwait( false );
-                  write.Complete();
+                  await _client.WriteAsync( writes.Select( x => x.GetBatch() ), _publishType, _publishMode, _useTempStorage ).ConfigureAwait( false );
+
+                  foreach( var write in writes )
+                  {
+                     write.Complete();
+                  }
                }
                catch( Exception e )
                {
                   _logger.Error( e, "An error ocurred while inserting batch of entries." );
 
-                  write.Fail( e );
+                  foreach( var write in writes )
+                  {
+                     write.Fail( e );
+                  }
                }
             }
 
             try
             {
-               if( _batches.Count == 0 )
+               if( _queued.Count == 0 )
                {
                   await Task.Delay( _writeInterval, _cts.Token ).ConfigureAwait( false );
                }
-               else if( _batches.Count >= 10 )
+               else if( _queuedCount >= _maxBatchSize * 10 )
                {
                   if( !_lastWarnTime.HasValue || ( DateTime.UtcNow - _lastWarnTime ) > MinWarningInterval )
                   {
-                     _logger.Warn( $"There are {_batches.Count} batches of ~{_maxBatchSize} entries queued batches waiting to be written. This is an indication that the storage is too slow to handle the ingestion." );
+                     _logger.Warn( $"There are {_queuedCount} entries queued batches waiting to be written. This is an indication that the storage is too slow to handle the ingestion." );
                      _lastWarnTime = DateTime.UtcNow;
                   }
                }

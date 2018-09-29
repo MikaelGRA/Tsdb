@@ -50,9 +50,9 @@ namespace Vibrant.Tsdb.ConsoleApp
 
          var startTime = DateTime.UtcNow;
          _dataSources = new List<DataSource>();
-         for( int i = 0 ; i < 80 ; i++ )
+         for( int i = 0 ; i < 15 ; i++ )
          {
-            _dataSources.Add( new DataSource( new BasicKey { Id = Guid.NewGuid(), Sampling = Sampling.Daily }, startTime, TimeSpan.FromMilliseconds( 10 ) ) );
+            _dataSources.Add( new DataSource( new BasicKey { Id = Guid.NewGuid(), Sampling = Sampling.Daily }, startTime, TimeSpan.FromMilliseconds( 1 ) ) );
          }
 
          var dats = new AtsStorage<BasicKey, BasicEntry>(
@@ -120,26 +120,26 @@ namespace Vibrant.Tsdb.ConsoleApp
 
 
          var typeStorage = new TestTypedKeyStorage( _dataSources.Select( x => x.Id ) );
-         var client = new TsdbClient<BasicKey, BasicEntry>( selector, tfs, this );
+         var client = new TsdbClient<BasicKey, BasicEntry>( dats, tfs, this );
          var aggregationFunctions = new AggregationTsdbClient<BasicKey, BasicEntry, MeasureType>( dats, typeStorage, this );
 
          var batcher = new TsdbWriteBatcher<BasicKey, BasicEntry>( client, PublicationType.None, Publish.Locally, false, TimeSpan.FromSeconds( 5 ), 20000, this );
 
          ThreadPool.QueueUserWorkItem( obj => batcher.Handle() );
 
-         //Console.WriteLine( $"Info: Writing entries..." );
-         //for( int i = 0 ; i < 3600 ; i++ )
-         //{
-         //   var now = DateTime.UtcNow;
-         //   foreach( var ds in _dataSources )
-         //   {
-         //      var serie = ds.GetEntries( now );
+         Console.WriteLine( $"Info: Writing entries..." );
+         for( int i = 0 ; i < 3600 ; i++ )
+         {
+            var now = DateTime.UtcNow;
+            foreach( var ds in _dataSources )
+            {
+               var serie = ds.GetEntries( now );
 
-         //      batcher.Write( serie );
-         //   }
+               batcher.Write( serie );
+            }
 
-         //   Thread.Sleep( 1000 );
-         //}
+            Thread.Sleep( 1000 );
+         }
 
          var from = switchDate.AddSeconds( -5 );
          var to = switchDate.AddSeconds( 5 );
