@@ -144,7 +144,7 @@ namespace Vibrant.Tsdb.Client
 
             try
             {
-               if( _queued.Count == 0 )
+               if( _queuedCount < _maxBatchSize )
                {
                   await Task.Delay( _writeInterval, _cts.Token ).ConfigureAwait( false );
                }
