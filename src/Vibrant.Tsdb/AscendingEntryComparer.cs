@@ -10,7 +10,7 @@ namespace Vibrant.Tsdb
    {
       public int Compare( TEntry x, TEntry y )
       {
-         return y.GetTimestamp().CompareTo( x.GetTimestamp() );
+         return x.GetTimestamp().CompareTo( y.GetTimestamp() );
       }
    }
 }
