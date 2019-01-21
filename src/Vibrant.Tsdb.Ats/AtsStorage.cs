@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -20,7 +21,7 @@ namespace Vibrant.Tsdb.Ats
 
       private readonly StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>[] _defaultSelection;
       private object _sync = new object();
-      private Dictionary<string, CloudTable> _tables;
+      private ConcurrentDictionary<string, object> _tables;
       private CloudStorageAccount _account;
       private CloudTableClient _client;
       private IPartitionProvider<TKey> _partitioningProvider;
@@ -37,7 +38,7 @@ namespace Vibrant.Tsdb.Ats
          _tableProvider = tableProvider;
          _keyConverter = keyConverter;
          _defaultSelection = new[] { new StorageSelection<TKey, TEntry, IStorage<TKey, TEntry>>( this ) };
-         _tables = new Dictionary<string, CloudTable>();
+         _tables = new ConcurrentDictionary<string, object>();
 
          _client.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
       }
@@ -957,23 +958,35 @@ namespace Vibrant.Tsdb.Ats
 
       private CloudTable GetTable( ITable tableRef )
       {
+         string fullTableName = tableRef.Name;
+         object tableSync;
+
          lock( _sync )
          {
-            string fullTableName = tableRef.Name;
-
-            CloudTable table;
-            if( _tables.TryGetValue( fullTableName, out table ) )
+            if( _tables.TryGetValue( fullTableName, out tableSync ) && tableSync is CloudTable cloudTable )
             {
-               return table;
+               return cloudTable;
+            }
+            else if( tableSync == null )
+            {
+               tableSync = new object();
+               _tables[ fullTableName ] = tableSync;
+            }
+         }
+
+         lock( tableSync )
+         {
+            if( _tables.TryGetValue( fullTableName, out object table ) && table is CloudTable cloudTable )
+            {
+               return cloudTable;
             }
             else
             {
+               cloudTable = _client.GetTableReference( fullTableName );
+               cloudTable.CreateIfNotExistsAsync().Wait();
 
-               table = _client.GetTableReference( fullTableName );
-               table.CreateIfNotExistsAsync().Wait();
-
-               _tables.Add( fullTableName, table );
-               return table;
+               _tables[ fullTableName ] = cloudTable;
+               return cloudTable;
             }
          }
       }
