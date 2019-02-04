@@ -10,6 +10,12 @@ namespace Vibrant.Tsdb
    {
       TKey GetKey();
 
-      ICollection<TEntry> GetEntries();
+      List<TEntry> GetEntries();
+   }
+
+   public interface ISortedSerie<TKey, TEntry> : ISerie<TKey, TEntry>
+     where TEntry : IEntry
+   {
+      Sort GetOrdering();
    }
 }

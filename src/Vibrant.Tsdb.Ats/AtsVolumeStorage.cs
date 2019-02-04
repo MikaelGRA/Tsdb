@@ -299,7 +299,7 @@ namespace Vibrant.Tsdb.Ats
          var oldEntries = retrievals.SelectMany( x => x.GetEntries<TKey, TEntry>( Sort.Descending ) ).ToList();
          var mergedEntries = MergeSort.Sort(
             collections: new IEnumerable<TEntry>[] { newEntries, oldEntries },
-            comparer: EntryComparer.GetComparer<TKey, TEntry>( Sort.Descending ),
+            comparer: EntryComparer<TEntry>.GetComparer( Sort.Descending ),
             resolveConflict: x => x.First() ); // prioritize the item from the first collection (new one)
 
          // create new entities

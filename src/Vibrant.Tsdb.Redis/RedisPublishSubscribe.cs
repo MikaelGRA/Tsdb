@@ -44,7 +44,7 @@ namespace Vibrant.Tsdb.Redis
          return _waitWhileDisconnected.Task;
       }
 
-      protected override async Task OnPublished( IEnumerable<ISerie<TKey, TEntry>> series, PublicationType publish )
+      protected override async Task OnPublished( IEnumerable<ISortedSerie<TKey, TEntry>> series, PublicationType publish )
       {
          await WaitWhileDisconnectedAsync().ConfigureAwait( false );
 
@@ -54,7 +54,7 @@ namespace Vibrant.Tsdb.Redis
             var latest = FindLatestForEachId( series );
             foreach( var serie in latest )
             {
-               if( serie.Entries.Count > 0 )
+               if( serie.GetEntries().Count > 0 )
                {
                   var key = serie.GetKey();
                   var entry = serie.GetEntries().First();

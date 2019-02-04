@@ -6,7 +6,7 @@ using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb
 {
-   public class TypedReadResult<TKey, TEntry, TMeasureType> : ISerie<TKey, TEntry> 
+   public class TypedReadResult<TKey, TEntry, TMeasureType> : ISortedSerie<TKey, TEntry> 
       where TEntry : IEntry
       where TMeasureType : IMeasureType
    {
@@ -30,9 +30,14 @@ namespace Vibrant.Tsdb
          return Key;
       }
 
-      public ICollection<TEntry> GetEntries()
+      public List<TEntry> GetEntries()
       {
          return Entries;
+      }
+
+      public Sort GetOrdering()
+      {
+         return Sort;
       }
    }
 }

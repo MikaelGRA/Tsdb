@@ -122,7 +122,7 @@ namespace Vibrant.Tsdb.ConsoleApp
          var client = new TsdbClient<BasicKey, BasicEntry>( selector, tfs, this );
          var aggregationFunctions = new AggregationTsdbClient<BasicKey, BasicEntry, MeasureType>( dats, typeStorage, this );
 
-         var batcher = new TsdbWriteBatcher<BasicKey, BasicEntry>( client, PublicationType.None, Publish.Locally, false, TimeSpan.FromSeconds( 5 ), 20000, this );
+         var batcher = new TsdbWriteBatcher<BasicKey, BasicEntry>( client, PublicationType.None, Publish.Locally, Sort.Descending, false, TimeSpan.FromSeconds( 5 ), 20000, this );
 
          ThreadPool.QueueUserWorkItem( obj => batcher.Handle() );
 

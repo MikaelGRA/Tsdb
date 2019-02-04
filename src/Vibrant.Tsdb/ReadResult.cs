@@ -6,7 +6,7 @@ using Vibrant.Tsdb.Helpers;
 
 namespace Vibrant.Tsdb
 {
-   public class ReadResult<TKey, TEntry> : ISerie<TKey, TEntry>
+   public class ReadResult<TKey, TEntry> : ISortedSerie<TKey, TEntry>
      where TEntry : IEntry
    {
       public ReadResult( TKey id, Sort sort, List<ReadResult<TKey, TEntry>> resultsToCompose )
@@ -15,7 +15,7 @@ namespace Vibrant.Tsdb
          Sort = sort;
          Entries = MergeSort.Sort(
             collections: resultsToCompose.Select( x => x.Entries ),
-            comparer: EntryComparer.GetComparer<TKey, TEntry>( Sort ),
+            comparer: EntryComparer<TEntry>.GetComparer( Sort ),
             resolveConflict: x => x.First() );
       }
 
@@ -44,7 +44,7 @@ namespace Vibrant.Tsdb
          return Key;
       }
 
-      public ICollection<TEntry> GetEntries()
+      public List<TEntry> GetEntries()
       {
          return Entries;
       }
@@ -53,6 +53,11 @@ namespace Vibrant.Tsdb
          where TMeasureType : IMeasureType
       {
          return new TypedReadResult<TKey, TEntry, TMeasureType>( typedKey, Sort, Entries );
+      }
+
+      public Sort GetOrdering()
+      {
+         return Sort;
       }
    }
 }

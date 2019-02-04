@@ -14,16 +14,10 @@ namespace Vibrant.Tsdb
          return client.WriteAsync( new[] { serie }, useTemporaryStorageOnFailure );
       }
 
-      public static Task WriteAsync<TKey, TEntry>( this TsdbClient<TKey, TEntry> client, ISerie<TKey, TEntry> serie, PublicationType publicationType )
+      public static Task WriteAsync<TKey, TEntry>( this TsdbClient<TKey, TEntry> client, ISerie<TKey, TEntry> serie, PublicationType publicationType, Publish publish, bool useTemporaryStorageOnFailure, Sort? publicationSorting )
          where TEntry : IEntry
       {
-         return client.WriteAsync( new[] { serie }, publicationType );
-      }
-
-      public static Task WriteAsync<TKey, TEntry>( this TsdbClient<TKey, TEntry> client, ISerie<TKey, TEntry> serie, PublicationType publicationType, Publish publish, bool useTemporaryStorageOnFailure )
-         where TEntry : IEntry
-      {
-         return client.WriteAsync( new[] { serie }, publicationType, publish, useTemporaryStorageOnFailure );
+         return client.WriteAsync( new[] { serie }, publicationType, publish, publicationSorting, useTemporaryStorageOnFailure );
       }
 
       //public static async Task MoveToVolumeStorageAsync<TKey, TEntry>( this TsdbClient<TKey, TEntry> client, IEnumerable<TKey> ids, int batchSize )
@@ -48,7 +42,7 @@ namespace Vibrant.Tsdb
       //   return client.WriteDirectlyToVolumeStorageAsync( new[] { items } );
       //}
 
-      public static Task<Func<Task>> SubscribeLocallyAsync<TKey, TEntry>( this TsdbClient<TKey, TEntry> client, TKey id, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback )
+      public static Task<Func<Task>> SubscribeLocallyAsync<TKey, TEntry>( this TsdbClient<TKey, TEntry> client, TKey id, SubscriptionType subscribe, Action<ISortedSerie<TKey, TEntry>> callback )
          where TEntry : IEntry
       {
          return client.SubscribeLocallyAsync( new[] { id }, subscribe, callback );

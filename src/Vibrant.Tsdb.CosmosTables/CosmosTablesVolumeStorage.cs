@@ -295,7 +295,7 @@
 //         var oldEntries = retrievals.SelectMany( x => x.GetEntries<TKey, TEntry>( Sort.Descending ) ).ToList();
 //         var mergedEntries = MergeSort.Sort(
 //            collections: new IEnumerable<TEntry>[] { newEntries, oldEntries },
-//            comparer: EntryComparer.GetComparer<TKey, TEntry>( Sort.Descending ),
+//            comparer: EntryComparer<TEntry>.GetComparer( Sort.Descending ),
 //            resolveConflict: x => x.First() ); // prioritize the item from the first collection (new one)
 
 //         // create new entities
@@ -505,7 +505,7 @@
 //               .Where( CreateBeforeFilter( id, to ) );
 
 //            var generalQueryResult = await PerformQuery( generalQuery, true, sort );
-            
+
 //            if( sort == Sort.Ascending )
 //            {
 //               generalQueryResult.Reverse();
@@ -575,7 +575,7 @@
 //            {
 //               break; // fail safe, should not be needed
 //            }
-            
+
 //            token = rows.ContinuationToken;
 //         }
 //         while( token != null && taken < take );

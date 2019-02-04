@@ -8,8 +8,8 @@ namespace Vibrant.Tsdb
    public interface ISubscribe<TKey, TEntry>
       where TEntry : IEntry
    {
-      Task<Func<Task>> SubscribeAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback );
+      Task<Func<Task>> SubscribeAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<ISortedSerie<TKey, TEntry>> callback );
 
-      Task<Func<Task>> SubscribeToAllAsync( SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback );
+      Task<Func<Task>> SubscribeToAllAsync( SubscriptionType subscribe, Action<ISortedSerie<TKey, TEntry>> callback );
    }
 }

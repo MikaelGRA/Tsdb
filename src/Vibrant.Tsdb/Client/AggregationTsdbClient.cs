@@ -35,7 +35,7 @@ namespace Vibrant.Tsdb.Client
          var groupByTagsList = groupByTags.ToList(); // only iterate once
          var requiredTagsDictionary = requiredTags.ToDictionary( x => x.Key, x => x.Value );
          var fieldArray = fields.ToArray();
-         
+
          // get the type information for each key
          var typedKeys = await _typedKeyStorage.GetTaggedKeysAsync( measureTypeName, requiredTagsDictionary ).ConfigureAwait( false );
 
@@ -312,7 +312,7 @@ namespace Vibrant.Tsdb.Client
             {
                newCollection = MergeSort.Sort(
                   collections: collections.Value.Select( x => x.Entries ),
-                  comparer: EntryComparer.GetComparer<TKey, TEntry>( sort ),
+                  comparer: EntryComparer<TEntry>.GetComparer( sort ),
                   resolveConflict: x => Aggregate( x, calculators ) );
             }
 
@@ -343,7 +343,7 @@ namespace Vibrant.Tsdb.Client
             {
                newCollection = MergeSort.Sort(
                   collections: collections.Value.Select( x => x.Entries ),
-                  comparer: EntryComparer.GetComparer<TKey, TEntry>( sort ),
+                  comparer: EntryComparer<TEntry>.GetComparer( sort ),
                   resolveConflict: x => Aggregate( x, calculators ) );
             }
 

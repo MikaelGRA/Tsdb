@@ -27,7 +27,7 @@ namespace Vibrant.Tsdb.CosmosTables.Helpers
 
       public void Sort( Sort sort )
       {
-         _entries.Sort( EntryComparer.GetComparer<TKey, TEntry>( sort ) );
+         _entries.Sort( EntryComparer<TEntry>.GetComparer( sort ) );
       }
 
       public List<TEntry> Entries

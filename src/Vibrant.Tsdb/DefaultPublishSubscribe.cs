@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Vibrant.Tsdb.Extensions;
 
 namespace Vibrant.Tsdb
 {
@@ -14,21 +15,19 @@ namespace Vibrant.Tsdb
       where TEntry : IEntry
    {
       private Task _completed = Task.FromResult( 0 );
-      private IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> _latestCallbacksForSingle;
-      private List<Action<Serie<TKey, TEntry>>> _latestCallbacksForAll;
-      private IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> _allCallbacksForSingle;
-      private List<Action<Serie<TKey, TEntry>>> _allCallbacksForAll;
-      private IDictionary<TKey, DateTimeRef> _latest;
+      private IDictionary<TKey, List<Action<ISortedSerie<TKey, TEntry>>>> _latestCallbacksForSingle;
+      private List<Action<ISortedSerie<TKey, TEntry>>> _latestCallbacksForAll;
+      private IDictionary<TKey, List<Action<ISortedSerie<TKey, TEntry>>>> _allCallbacksForSingle;
+      private List<Action<ISortedSerie<TKey, TEntry>>> _allCallbacksForAll;
       private readonly TaskFactory _taskFactory;
       private bool _publishOnBackgroundThread;
 
       public DefaultPublishSubscribe( bool publishOnBackgroundThread )
       {
-         _latestCallbacksForSingle = new ConcurrentDictionary<TKey, List<Action<Serie<TKey, TEntry>>>>();
-         _latestCallbacksForAll = new List<Action<Serie<TKey, TEntry>>>();
-         _allCallbacksForSingle = new ConcurrentDictionary<TKey, List<Action<Serie<TKey, TEntry>>>>();
-         _allCallbacksForAll = new List<Action<Serie<TKey, TEntry>>>();
-         _latest = new ConcurrentDictionary<TKey, DateTimeRef>();
+         _latestCallbacksForSingle = new ConcurrentDictionary<TKey, List<Action<ISortedSerie<TKey, TEntry>>>>();
+         _latestCallbacksForAll = new List<Action<ISortedSerie<TKey, TEntry>>>();
+         _allCallbacksForSingle = new ConcurrentDictionary<TKey, List<Action<ISortedSerie<TKey, TEntry>>>>();
+         _allCallbacksForAll = new List<Action<ISortedSerie<TKey, TEntry>>>();
          _taskFactory = new TaskFactory( TaskScheduler.Default );
          _publishOnBackgroundThread = publishOnBackgroundThread;
       }
@@ -38,7 +37,7 @@ namespace Vibrant.Tsdb
          return _completed;
       }
 
-      public async Task PublishAsync( IEnumerable<ISerie<TKey, TEntry>> entries, PublicationType publish )
+      public async Task PublishAsync( IEnumerable<ISortedSerie<TKey, TEntry>> entries, PublicationType publish )
       {
          if( publish == PublicationType.None )
          {
@@ -48,9 +47,9 @@ namespace Vibrant.Tsdb
          await OnPublished( entries, publish ).ConfigureAwait( false );
       }
 
-      public async Task<Func<Task>> SubscribeAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback )
+      public async Task<Func<Task>> SubscribeAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<ISortedSerie<TKey, TEntry>> callback )
       {
-         IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> single;
+         IDictionary<TKey, List<Action<ISortedSerie<TKey, TEntry>>>> single;
          switch( subscribe )
          {
             case SubscriptionType.LatestPerCollection:
@@ -81,9 +80,9 @@ namespace Vibrant.Tsdb
          return () => Unsubscribe( ids, subscribe, callback );
       }
 
-      private async Task Unsubscribe( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback )
+      private async Task Unsubscribe( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<ISortedSerie<TKey, TEntry>> callback )
       {
-         IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> single;
+         IDictionary<TKey, List<Action<ISortedSerie<TKey, TEntry>>>> single;
          switch( subscribe )
          {
             case SubscriptionType.LatestPerCollection:
@@ -112,9 +111,9 @@ namespace Vibrant.Tsdb
          }
       }
 
-      public async Task<Func<Task>> SubscribeToAllAsync( SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback )
+      public async Task<Func<Task>> SubscribeToAllAsync( SubscriptionType subscribe, Action<ISortedSerie<TKey, TEntry>> callback )
       {
-         List<Action<Serie<TKey, TEntry>>> all;
+         List<Action<ISortedSerie<TKey, TEntry>>> all;
          switch( subscribe )
          {
             case SubscriptionType.LatestPerCollection:
@@ -158,9 +157,9 @@ namespace Vibrant.Tsdb
          return () => UnsubscribeFromAll( callback, subscribe );
       }
 
-      private async Task UnsubscribeFromAll( Action<Serie<TKey, TEntry>> callback, SubscriptionType subscribe )
+      private async Task UnsubscribeFromAll( Action<ISortedSerie<TKey, TEntry>> callback, SubscriptionType subscribe )
       {
-         List<Action<Serie<TKey, TEntry>>> all;
+         List<Action<ISortedSerie<TKey, TEntry>>> all;
          switch( subscribe )
          {
             case SubscriptionType.LatestPerCollection:
@@ -204,18 +203,18 @@ namespace Vibrant.Tsdb
 
       private List<TKey> AddSubscriptionsToLatest(
          IEnumerable<TKey> ids,
-         Action<Serie<TKey, TEntry>> callback,
-         IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> single )
+         Action<ISortedSerie<TKey, TEntry>> callback,
+         IDictionary<TKey, List<Action<ISortedSerie<TKey, TEntry>>>> single )
       {
          List<TKey> newSubscriptions = new List<TKey>();
          lock( single )
          {
             foreach( var id in ids )
             {
-               List<Action<Serie<TKey, TEntry>>> subscribers;
+               List<Action<ISortedSerie<TKey, TEntry>>> subscribers;
                if( !single.TryGetValue( id, out subscribers ) )
                {
-                  subscribers = new List<Action<Serie<TKey, TEntry>>>();
+                  subscribers = new List<Action<ISortedSerie<TKey, TEntry>>>();
                   single.Add( id, subscribers );
                   newSubscriptions.Add( id );
                }
@@ -228,15 +227,15 @@ namespace Vibrant.Tsdb
 
       private List<TKey> RemoveSubscriptionsFromLatest(
          IEnumerable<TKey> ids,
-         Action<Serie<TKey, TEntry>> callback,
-         IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> single )
+         Action<ISortedSerie<TKey, TEntry>> callback,
+         IDictionary<TKey, List<Action<ISortedSerie<TKey, TEntry>>>> single )
       {
          List<TKey> subscriptionsRemoved = new List<TKey>();
          lock( single )
          {
             foreach( var id in ids )
             {
-               List<Action<Serie<TKey, TEntry>>> subscribers;
+               List<Action<ISortedSerie<TKey, TEntry>>> subscribers;
                if( single.TryGetValue( id, out subscribers ) )
                {
                   subscribers.Remove( callback );
@@ -272,9 +271,9 @@ namespace Vibrant.Tsdb
          return _completed;
       }
 
-      protected virtual Task OnPublished( IEnumerable<ISerie<TKey, TEntry>> series, PublicationType publish )
+      protected virtual Task OnPublished( IEnumerable<ISortedSerie<TKey, TEntry>> series, PublicationType publish )
       {
-         IEnumerable<Serie<TKey, TEntry>> latest = null;
+         IEnumerable<ISortedSerie<TKey, TEntry>> latest = null;
          if( publish.HasFlag( PublicationType.LatestPerCollection ) )
          {
             latest = FindLatestForEachId( series );
@@ -309,39 +308,35 @@ namespace Vibrant.Tsdb
          return _completed;
       }
 
-      private void PublishForLatest( IEnumerable<ISerie<TKey, TEntry>> series )
+      private void PublishForLatest( IEnumerable<ISortedSerie<TKey, TEntry>> series )
       {
          PublishFor( series, _latestCallbacksForSingle, _latestCallbacksForAll, false );
       }
 
-      private void PublishForAll( IEnumerable<ISerie<TKey, TEntry>> series )
+      private void PublishForAll( IEnumerable<ISortedSerie<TKey, TEntry>> series )
       {
          PublishFor( series, _allCallbacksForSingle, _allCallbacksForAll, true );
       }
 
-      private void PublishFor( IEnumerable<ISerie<TKey, TEntry>> series, IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> single, List<Action<Serie<TKey, TEntry>>> all, bool createNew )
+      private void PublishFor( IEnumerable<ISortedSerie<TKey, TEntry>> series, IDictionary<TKey, List<Action<ISortedSerie<TKey, TEntry>>>> single, List<Action<ISortedSerie<TKey, TEntry>>> all, bool createNew )
       {
+         // TODO: Do not create NEW.... (less references!!!!!)
+
+         
          foreach( var serie in series )
          {
             if( serie.GetEntries().Count > 0 )
             {
-               Serie<TKey, TEntry> data = null;
-
-               List<Action<Serie<TKey, TEntry>>> subscribers;
+               List<Action<ISortedSerie<TKey, TEntry>>> subscribers;
                lock( single )
                {
                   if( single.TryGetValue( serie.GetKey(), out subscribers ) )
                   {
-                     if( data == null )
-                     {
-                        data = createNew ? new Serie<TKey, TEntry>( serie.GetKey(), serie.GetEntries() ) : (Serie<TKey, TEntry>)serie;
-                     }
-
                      for( int i = subscribers.Count - 1 ; 0 <= i ; i-- )
                      {
                         try
                         {
-                           subscribers[ i ]( data );
+                           subscribers[ i ]( serie );
                         }
                         catch( Exception )
                         {
@@ -356,14 +351,9 @@ namespace Vibrant.Tsdb
                {
                   for( int i = all.Count - 1 ; 0 <= i ; i-- )
                   {
-                     if( data == null )
-                     {
-                        data = createNew ? new Serie<TKey, TEntry>( serie.GetKey(), serie.GetEntries() ) : (Serie<TKey, TEntry>)serie;
-                     }
-
                      try
                      {
-                        all[ i ]( data );
+                        all[ i ]( serie );
                      }
                      catch( Exception )
                      {
@@ -375,32 +365,32 @@ namespace Vibrant.Tsdb
          }
       }
 
-      protected void PublishToSingleForLatestEntriesWithSameId( Serie<TKey, TEntry> serie )
+      protected void PublishToSingleForLatestEntriesWithSameId( ISortedSerie<TKey, TEntry> serie )
       {
          PublishToSingleForEntriesWithSameId( serie, _latestCallbacksForSingle );
       }
 
-      protected void PublishToSingleForAllEntriesWithSameId( Serie<TKey, TEntry> serie )
+      protected void PublishToSingleForAllEntriesWithSameId( ISortedSerie<TKey, TEntry> serie )
       {
          PublishToSingleForEntriesWithSameId( serie, _allCallbacksForSingle );
       }
 
-      protected void PublishToAllForLatestEntriesWithSameId( Serie<TKey, TEntry> serie )
+      protected void PublishToAllForLatestEntriesWithSameId( ISortedSerie<TKey, TEntry> serie )
       {
          PublishToAllForEntriesWithSameId( serie, _latestCallbacksForAll );
       }
 
-      protected void PublishToAllForAllEntriesWithSameId( Serie<TKey, TEntry> serie )
+      protected void PublishToAllForAllEntriesWithSameId( ISortedSerie<TKey, TEntry> serie )
       {
          PublishToAllForEntriesWithSameId( serie, _allCallbacksForAll );
       }
 
-      private void PublishToSingleForEntriesWithSameId( Serie<TKey, TEntry> serie, IDictionary<TKey, List<Action<Serie<TKey, TEntry>>>> single )
+      private void PublishToSingleForEntriesWithSameId( ISortedSerie<TKey, TEntry> serie, IDictionary<TKey, List<Action<ISortedSerie<TKey, TEntry>>>> single )
       {
          if( serie.GetEntries().Count > 0 )
          {
             var id = serie.GetKey();
-            List<Action<Serie<TKey, TEntry>>> subscribers;
+            List<Action<ISortedSerie<TKey, TEntry>>> subscribers;
             lock( single )
             {
                if( single.TryGetValue( id, out subscribers ) )
@@ -421,7 +411,7 @@ namespace Vibrant.Tsdb
          }
       }
 
-      private void PublishToAllForEntriesWithSameId( Serie<TKey, TEntry> serie, List<Action<Serie<TKey, TEntry>>> all )
+      private void PublishToAllForEntriesWithSameId( ISortedSerie<TKey, TEntry> serie, List<Action<ISortedSerie<TKey, TEntry>>> all )
       {
          if( serie.GetEntries().Count > 0 )
          {
@@ -442,63 +432,38 @@ namespace Vibrant.Tsdb
          }
       }
 
-      protected IEnumerable<Serie<TKey, TEntry>> FindLatestForEachId( IEnumerable<ISerie<TKey, TEntry>> series )
+      protected IEnumerable<ISortedSerie<TKey, TEntry>> FindLatestForEachId( IEnumerable<ISortedSerie<TKey, TEntry>> series )
       {
-         var foundSeries = new Dictionary<TKey, Serie<TKey, TEntry>>();
+         var foundSeries = new Dictionary<TKey, SortedSerie<TKey, TEntry>>();
          foreach( var serie in series )
          {
             var key = serie.GetKey();
 
-            Serie<TKey, TEntry> existingSerie;
+            SortedSerie<TKey, TEntry> existingSerie;
             if( !foundSeries.TryGetValue( key, out existingSerie ) )
             {
-               existingSerie = new Serie<TKey, TEntry>( key );
+               existingSerie = new SortedSerie<TKey, TEntry>( key, serie.GetOrdering() );
+               foundSeries.Add( key, existingSerie );
             }
 
-            DateTimeRef latest;
-            if( !_latest.TryGetValue( key, out latest ) )
-            {
-               latest = new DateTimeRef();
-               _latest[ key ] = latest;
-            }
+            var latestEntry = serie.GetLatestEntry();
 
-            foreach( var entry in serie.GetEntries() )
+
+            var timestamp = latestEntry.GetTimestamp();
+            if( existingSerie.Entries.Count == 0 )
             {
-               var timestamp = entry.GetTimestamp();
-               if( existingSerie.Entries.Count == 0 )
+               existingSerie.Entries.Add( latestEntry );
+            }
+            else
+            {
+               if( timestamp > existingSerie.Entries[ 0 ].GetTimestamp() )
                {
-                  if( timestamp > latest.Value )
-                  {
-                     latest.Value = timestamp;
-                     existingSerie.Entries.Add( entry );
-                  }
+                  existingSerie.Entries[ 0 ] = latestEntry;
                }
-               else
-               {
-                  if( timestamp > existingSerie.Entries[ 0 ].GetTimestamp() )
-                  {
-                     existingSerie.Entries[ 0 ] = entry;
-                  }
-               }
-            }
-
-            if( existingSerie.Entries.Count > 0 )
-            {
-               foundSeries[ key ] = existingSerie;
             }
          }
 
          return foundSeries.Values;
-      }
-
-      private class DateTimeRef
-      {
-         public DateTimeRef()
-         {
-            Value = DateTime.MinValue;
-         }
-
-         internal DateTime Value;
       }
    }
 }

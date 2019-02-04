@@ -58,7 +58,7 @@ namespace Vibrant.Tsdb.Redis
          return endpoint?.ToString() ?? "";
       }
 
-      public Task SubscribeAsync<TKey, TEntry>( string id, IKeyConverter<TKey> keyConverter, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> onMessage )
+      public Task SubscribeAsync<TKey, TEntry>( string id, IKeyConverter<TKey> keyConverter, SubscriptionType subscribe, Action<ISortedSerie<TKey, TEntry>> onMessage )
          where TEntry : IRedisEntry, new()
       {
          if( _redisSubscriber == null )

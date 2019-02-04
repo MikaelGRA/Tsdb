@@ -12,7 +12,6 @@ namespace Vibrant.Tsdb.Client
    public class TsdbClient<TKey, TEntry> : IStorage<TKey, TEntry>, ISubscribe<TKey, TEntry>
       where TEntry : IEntry
    {
-      private static readonly ISerie<TKey, TEntry>[] _series = new ISerie<TKey, TEntry>[ 0 ];
       private readonly IStorageSelector<TKey, TEntry> _storageSelector;
       private readonly IPublishSubscribe<TKey, TEntry> _remotePublishSubscribe;
       private readonly ITemporaryStorage<TKey, TEntry> _temporaryStorage;
@@ -123,57 +122,70 @@ namespace Vibrant.Tsdb.Client
 
       public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items )
       {
-         return WriteAsync( items, PublicationType.None, Publish.Nowhere, true );
+         return WriteAsync( items, PublicationType.None, Publish.Nowhere, Sort.Descending, true );
       }
 
       public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items, bool useTemporaryStorageOnFailure )
       {
-         return WriteAsync( items, PublicationType.None, Publish.Nowhere, useTemporaryStorageOnFailure );
+         return WriteAsync( items, PublicationType.None, Publish.Nowhere, Sort.Descending, useTemporaryStorageOnFailure );
       }
 
-      public Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items, PublicationType publicationType )
-      {
-         return WriteAsync( items, publicationType, publicationType != PublicationType.None ? Publish.LocallyAndRemotely : Publish.Nowhere, true );
-      }
-
-      public async Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> items, PublicationType publicationType, Publish publish, bool useTemporaryStorageOnFailure )
+      public async Task WriteAsync( IEnumerable<ISerie<TKey, TEntry>> series, PublicationType publicationType, Publish publish, Sort? publicationSorting, bool useTemporaryStorageOnFailure )
       {
          // ensure we only iterate the original collection once, if it is not a list or array
-         if( !( items is ICollection<ISerie<TKey, TEntry>> || items is Array ) )
+         if( !( series is ICollection<ISerie<TKey, TEntry>> || series is Array ) )
          {
-            items = items.ToList();
+            series = series.ToList();
          }
 
-         var tasks = new List<Task<IEnumerable<ISerie<TKey, TEntry>>>>();
-         tasks.AddRange( LookupStorages( items ).Select( c => WriteToStorageAsync( c.Storage, c.Lookups, useTemporaryStorageOnFailure ) ) );
+         var tasks = new List<Task<List<SortedSerie<TKey, TEntry>>>>();
+         tasks.AddRange( LookupStorages( series ).Select( c => WriteToStorageAsync( c.Storage, c.Lookups, useTemporaryStorageOnFailure, publicationSorting ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         // Only publish things that were written
-         var writtenItems = tasks.SelectMany( x => x.Result );
-
-         if( publish.HasFlag( Publish.Remotely ) )
+         if( publicationSorting.HasValue )
          {
-            if( _remotePublishSubscribe == null )
+            // Only publish things that were written
+            var writtenSeries = tasks.SelectMany( x => x.Result ).Where( x => x != null );
+
+            if( publish.HasFlag( Publish.Remotely ) )
             {
-               throw new MissingTsdbServiceException( "No remote publish subscribe store has been provided for the TsdbClient." );
-            }
+               if( _remotePublishSubscribe == null )
+               {
+                  throw new MissingTsdbServiceException( "No remote publish subscribe store has been provided for the TsdbClient." );
+               }
 
-            await _remotePublishSubscribe.PublishAsync( writtenItems, publicationType ).ConfigureAwait( false );
-         }
-         if( publish.HasFlag( Publish.Locally ) )
-         {
-            await _localPublishSubscribe.PublishAsync( writtenItems, publicationType ).ConfigureAwait( false );
+               await _remotePublishSubscribe.PublishAsync( writtenSeries, publicationType ).ConfigureAwait( false );
+            }
+            if( publish.HasFlag( Publish.Locally ) )
+            {
+               await _localPublishSubscribe.PublishAsync( writtenSeries, publicationType ).ConfigureAwait( false );
+            }
          }
       }
 
-      private async Task<IEnumerable<ISerie<TKey, TEntry>>> WriteToStorageAsync( IStorage<TKey, TEntry> storage, IEnumerable<ISerie<TKey, TEntry>> series, bool useTemporaryStorageOnFailure )
+      private async Task<List<SortedSerie<TKey, TEntry>>> WriteToStorageAsync( IStorage<TKey, TEntry> storage, IEnumerable<ISerie<TKey, TEntry>> series, bool useTemporaryStorageOnFailure, Sort? publicationSorting )
       {
          var sw = Stopwatch.StartNew();
          try
          {
             await storage.WriteAsync( series ).ConfigureAwait( false );
             _logger.Trace( $"Inserted {series.Sum( x => x.GetEntries().Count )} to storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
-            return series;
+
+            if( publicationSorting.HasValue )
+            {
+               var publicationSeries = series.Select( x =>
+               {
+                  var newList = x.GetEntries();
+                  newList.Sort( Comparer<TEntry>.Default );
+
+                  return new SortedSerie<TKey, TEntry>( x.GetKey(), publicationSorting.Value, newList );
+
+               } ).ToList();
+
+               return publicationSeries;
+
+            }
+            return null;
          }
          catch( Exception e1 )
          {
@@ -196,7 +208,7 @@ namespace Vibrant.Tsdb.Client
 
             _logger.Error( e1, $"An error ocurred while writing to storage. Elapsed = {sw.ElapsedMilliseconds} ms." );
 
-            return _series;
+            return null;
          }
       }
 
@@ -339,7 +351,7 @@ namespace Vibrant.Tsdb.Client
          return tasks.Select( x => x.Result ).Combine( tasks.Count );
       }
 
-      public Task<Func<Task>> SubscribeAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback )
+      public Task<Func<Task>> SubscribeAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<ISortedSerie<TKey, TEntry>> callback )
       {
          if( _remotePublishSubscribe == null )
          {
@@ -349,7 +361,7 @@ namespace Vibrant.Tsdb.Client
          return _remotePublishSubscribe.SubscribeAsync( ids, subscribe, callback );
       }
 
-      public Task<Func<Task>> SubscribeToAllAsync( SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback )
+      public Task<Func<Task>> SubscribeToAllAsync( SubscriptionType subscribe, Action<ISortedSerie<TKey, TEntry>> callback )
       {
          if( _remotePublishSubscribe == null )
          {
@@ -359,12 +371,12 @@ namespace Vibrant.Tsdb.Client
          return _remotePublishSubscribe.SubscribeToAllAsync( subscribe, callback );
       }
 
-      public Task<Func<Task>> SubscribeLocallyAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback )
+      public Task<Func<Task>> SubscribeLocallyAsync( IEnumerable<TKey> ids, SubscriptionType subscribe, Action<ISortedSerie<TKey, TEntry>> callback )
       {
          return _localPublishSubscribe.SubscribeAsync( ids, subscribe, callback );
       }
 
-      public Task<Func<Task>> SubscribeToAllLocallyAsync( SubscriptionType subscribe, Action<Serie<TKey, TEntry>> callback )
+      public Task<Func<Task>> SubscribeToAllLocallyAsync( SubscriptionType subscribe, Action<ISortedSerie<TKey, TEntry>> callback )
       {
          return _localPublishSubscribe.SubscribeToAllAsync( subscribe, callback );
       }

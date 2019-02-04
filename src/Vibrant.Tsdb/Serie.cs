@@ -42,9 +42,40 @@ namespace Vibrant.Tsdb
          return Key;
       }
 
-      public ICollection<TEntry> GetEntries()
+      public List<TEntry> GetEntries()
       {
          return Entries;
+      }
+   }
+
+   public class SortedSerie<TKey, TEntry> : Serie<TKey, TEntry>, ISortedSerie<TKey, TEntry>
+     where TEntry : IEntry
+   {
+      private Sort _sort;
+
+      public SortedSerie( TKey key, Sort sort ) : base( key )
+      {
+         _sort = sort;
+      }
+
+      public SortedSerie( TKey key, Sort sort, IEnumerable<TEntry> entries ) : base( key, entries )
+      {
+         _sort = sort;
+      }
+
+      public SortedSerie( TKey key, Sort sort, List<TEntry> entries ) : base( key, entries )
+      {
+         _sort = sort;
+      }
+
+      public SortedSerie( TKey key, Sort sort, TEntry entry ) : base( key, entry )
+      {
+         _sort = sort;
+      }
+
+      public Sort GetOrdering()
+      {
+         return _sort;
       }
    }
 }

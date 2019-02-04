@@ -126,7 +126,7 @@ namespace Vibrant.Tsdb.Ats.Serialization
          return data;
       }
 
-      public static async Task<Serie<TKey, TEntry>> Deserialize<TKey, TEntry>( byte[] bytes, IKeyConverter<TKey> keyConverter )
+      public static async Task<SortedSerie<TKey, TEntry>> Deserialize<TKey, TEntry>( byte[] bytes, IKeyConverter<TKey> keyConverter )
          where TEntry : IRedisEntry, new()
       {
          var stream = new MemoryStream( bytes );
@@ -134,7 +134,9 @@ namespace Vibrant.Tsdb.Ats.Serialization
 
          var id = reader.ReadString();
          var key = await keyConverter.ConvertAsync( id ).ConfigureAwait( false );
-         var serie = new Serie<TKey, TEntry>( key );
+
+#warning This is not a correct implementation! Sort should be serialized
+         var serie = new SortedSerie<TKey, TEntry>( key, Sort.Descending );
 
          while( stream.Length != stream.Position )
          {

@@ -27,11 +27,13 @@ namespace Vibrant.Tsdb.Client
       private Dictionary<TKey, BatchWrite<TKey, TEntry>> _queued;
       private LinkedList<TKey> _keys;
       private int _queuedCount;
+      private Sort _publicationSort;
 
       public TsdbWriteBatcher(
          TsdbClient<TKey, TEntry> client,
          PublicationType publishType,
          Publish publishMode,
+         Sort publicationSort,
          bool useTempStorage,
          TimeSpan writeInterval,
          int maxBatchSize,
@@ -45,6 +47,7 @@ namespace Vibrant.Tsdb.Client
          _publishType = publishType;
          _publishMode = publishMode;
          _useTempStorage = useTempStorage;
+         _publicationSort = publicationSort;
          _maxBatchSize = maxBatchSize;
          _cts = new CancellationTokenSource();
          _logger = logger;
@@ -124,7 +127,7 @@ namespace Vibrant.Tsdb.Client
             {
                try
                {
-                  await _client.WriteAsync( writes.Select( x => x.GetBatch() ), _publishType, _publishMode, _useTempStorage ).ConfigureAwait( false );
+                  await _client.WriteAsync( writes.Select( x => x.GetBatch() ), _publishType, _publishMode, _publicationSort, _useTempStorage ).ConfigureAwait( false );
 
                   foreach( var write in writes )
                   {

@@ -61,16 +61,16 @@ namespace Vibrant.Tsdb.Tests
 
          var series = new[]
          {
-            new Serie<string, BasicEntry>( "row1", new[]
+            new SortedSerie<string, BasicEntry>( "row1", Sort.Ascending, new[]
             {
                new BasicEntry { Timestamp = now, Value = 23.53 },
                new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 1 ), Value = 50.23 },
             } ),
-            new Serie<string, BasicEntry>( "row2", new[]
+            new SortedSerie<string, BasicEntry>( "row2", Sort.Ascending, new[]
             {
                new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 2 ), Value = 23 },
             } ),
-            new Serie<string, BasicEntry>( "row6", new[]
+            new SortedSerie<string, BasicEntry>( "row6", Sort.Ascending, new[]
             {
                new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 3 ), Value = 2364 },
             } ),
@@ -91,7 +91,7 @@ namespace Vibrant.Tsdb.Tests
          Assert.Equal( 4, received1 );
          Assert.Equal( 2, received2 );
          Assert.Equal( 4, received3 );
-         Assert.Equal( 1, received4 );
+         Assert.Equal( 2, received4 );
 
          await unsubscribe2();
          await ps.PublishAsync( series, PublicationType.Both );
@@ -100,7 +100,7 @@ namespace Vibrant.Tsdb.Tests
          Assert.Equal( 6, received1 );
          Assert.Equal( 2, received2 );
          Assert.Equal( 4, received3 );
-         Assert.Equal( 1, received4 );
+         Assert.Equal( 3, received4 );
 
          await unsubscribe1();
          await ps.PublishAsync( series, PublicationType.Both );
@@ -109,15 +109,15 @@ namespace Vibrant.Tsdb.Tests
          Assert.Equal( 6, received1 );
          Assert.Equal( 2, received2 );
          Assert.Equal( 4, received3 );
-         Assert.Equal( 1, received4 );
+         Assert.Equal( 4, received4 );
 
-         await ps.PublishAsync( new Serie<string, BasicEntry>( "row6", new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 5 ), Value = 1337 } ), PublicationType.LatestPerCollection );
+         await ps.PublishAsync( new SortedSerie<string, BasicEntry>( "row6", Sort.Ascending, new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 5 ), Value = 1337 } ), PublicationType.LatestPerCollection );
          await Task.Delay( 3000 );
 
          Assert.Equal( 6, received1 );
          Assert.Equal( 2, received2 );
          Assert.Equal( 4, received3 );
-         Assert.Equal( 2, received4 );
+         Assert.Equal( 5, received4 );
 
          await unsubscribe4();
       }
