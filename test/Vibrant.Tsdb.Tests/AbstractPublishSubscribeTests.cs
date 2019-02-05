@@ -12,8 +12,10 @@ namespace Vibrant.Tsdb.Tests
    {
       public abstract TPublishSubscribe CreatePublishSubscribe();
 
-      [Fact]
-      public async Task Should_Subscribe_And_Publish()
+      [Theory]
+      [InlineData( Sort.Descending )]
+      [InlineData( Sort.Ascending )]
+      public async Task Should_Subscribe_And_Publish( Sort sort )
       {
          var ps = CreatePublishSubscribe();
 
@@ -23,9 +25,29 @@ namespace Vibrant.Tsdb.Tests
          var unsubscribe1 = await ps.SubscribeAsync( new[] { "row1" }, SubscriptionType.AllFromCollections, serie =>
          {
             Assert.Equal( "row1", serie.GetKey() );
+            DateTime? last = null;
+
             foreach( var entry in serie.GetEntries() )
             {
                received1++;
+               if( last.HasValue )
+               {
+                  if( sort == Sort.Descending )
+                  {
+                     // must be smaller and smaller
+                     Assert.True( entry.GetTimestamp() < last );
+                     last = entry.GetTimestamp();
+                  }
+                  else
+                  {
+                     Assert.True( entry.GetTimestamp() > last );
+                     last = entry.GetTimestamp();
+                  }
+               }
+               else
+               {
+                  last = entry.GetTimestamp();
+               }
             }
          } );
 
@@ -61,16 +83,16 @@ namespace Vibrant.Tsdb.Tests
 
          var series = new[]
          {
-            new SortedSerie<string, BasicEntry>( "row1", Sort.Ascending, new[]
+            new SortedSerie<string, BasicEntry>( "row1", sort, new[]
             {
                new BasicEntry { Timestamp = now, Value = 23.53 },
                new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 1 ), Value = 50.23 },
             } ),
-            new SortedSerie<string, BasicEntry>( "row2", Sort.Ascending, new[]
+            new SortedSerie<string, BasicEntry>( "row2", sort, new[]
             {
                new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 2 ), Value = 23 },
             } ),
-            new SortedSerie<string, BasicEntry>( "row6", Sort.Ascending, new[]
+            new SortedSerie<string, BasicEntry>( "row6", sort, new[]
             {
                new BasicEntry { Timestamp = now + TimeSpan.FromSeconds( 3 ), Value = 2364 },
             } ),
