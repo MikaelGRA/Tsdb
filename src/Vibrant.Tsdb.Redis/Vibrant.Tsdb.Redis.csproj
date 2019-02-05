@@ -4,7 +4,7 @@
       <Description>An easy-to-use timeseries database client that allows storing of masses of simple of data structures identified by a string id and a timestamp.</Description>
       <Copyright>Copyright (c) 2015-2017 MikaelGRA</Copyright>
       <AssemblyTitle>REDIS pubsub for TSDB client</AssemblyTitle>
-      <Version>7.2.0</Version>
+      <Version>8.0.0</Version>
       <Authors>MikaelGRA</Authors>
       <TargetFrameworks>net45;netstandard1.3</TargetFrameworks>
       <AssemblyName>Vibrant.Tsdb.Redis</AssemblyName>
