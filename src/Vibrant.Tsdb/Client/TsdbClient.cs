@@ -145,7 +145,7 @@ namespace Vibrant.Tsdb.Client
          if( publicationSorting.HasValue )
          {
             // Only publish things that were written
-            var writtenSeries = tasks.SelectMany( x => x.Result ).Where( x => x != null );
+            var writtenSeries = tasks.Where(x => x.Result != null).SelectMany(x => x.Result);
 
             if( publish.HasFlag( Publish.Remotely ) )
             {
