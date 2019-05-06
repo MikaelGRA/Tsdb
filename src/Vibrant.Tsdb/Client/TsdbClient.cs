@@ -142,10 +142,12 @@ namespace Vibrant.Tsdb.Client
          tasks.AddRange( LookupStorages( series ).Select( c => WriteToStorageAsync( c.Storage, c.Lookups, useTemporaryStorageOnFailure, publicationSorting ) ) );
          await Task.WhenAll( tasks ).ConfigureAwait( false );
 
-         if( publicationSorting.HasValue )
+         if( publicationSorting.HasValue && (publish.HasFlag(Publish.Remotely) || publish.HasFlag(Publish.Locally)) )
          {
             // Only publish things that were written
             var writtenSeries = tasks.Where(x => x.Result != null).SelectMany(x => x.Result);
+
+            BeforePublish(writtenSeries);
 
             if( publish.HasFlag( Publish.Remotely ) )
             {
@@ -161,6 +163,11 @@ namespace Vibrant.Tsdb.Client
                await _localPublishSubscribe.PublishAsync( writtenSeries, publicationType ).ConfigureAwait( false );
             }
          }
+      }
+
+      protected virtual void BeforePublish( IEnumerable<SortedSerie<TKey, TEntry>> series )
+      {
+
       }
 
       private async Task<List<SortedSerie<TKey, TEntry>>> WriteToStorageAsync( IStorage<TKey, TEntry> storage, IEnumerable<ISerie<TKey, TEntry>> series, bool useTemporaryStorageOnFailure, Sort? publicationSorting )
